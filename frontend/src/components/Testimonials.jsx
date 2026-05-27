@@ -1,35 +1,5 @@
+import { testimonialsData as reviews } from '../data/mockData'
 import './Testimonials.css'
-
-const reviews = [
-  {
-    id: 1,
-    title: 'Trải nghiệm đáng nhớ',
-    text: '"Cảnh hồ rất thư giãn, buffet sáng tuyệt vời và nhân viên thì rất chu đáo, sẵn sàng hỗ trợ để đảm bảo chúng tôi có đầy đủ mọi thứ mà chúng tôi cần."',
-    author: 'Michael T',
-    location: 'Singapore'
-  },
-  {
-    id: 2,
-    title: 'Khách sạn tuyệt vời giữa lòng thủ đô',
-    text: '"Đây là khách sạn yêu thích của tôi mỗi lần đến Hà Nội. Phòng nghỉ lúc nào cũng sạch sẽ, dịch vụ tốt và nhân viên chu đáo. Bữa trưa và tối ở đây cũng rất ngon."',
-    author: 'Satoshi K',
-    location: 'Nhật Bản'
-  },
-  {
-    id: 3,
-    title: 'Cảnh đẹp và dịch vụ tốt',
-    text: '"Khách sạn Hà Nội có cảnh hồ đẹp, đội ngũ nhân viên rất thân thiện và luôn hỗ trợ nhiệt tình. Chắc chắn tôi sẽ còn quay lại đây lần nữa!"',
-    author: 'Linh N',
-    location: 'Việt Nam'
-  },
-  {
-    id: 4,
-    title: 'Ẩm thực chuẩn vị Trung Hoa',
-    text: '"Nhà hàng ẩm thực Trung Hoa của khách sạn thật sự rất tuyệt vời. Tôi đặc biệt ấn tượng với những món Dimsum ở đây, một trong những món Dimsum ngon nhất tôi từng thử!"',
-    author: 'Ryan H',
-    location: 'Singapore'
-  }
-]
 
 const LotusWatermark = () => (
   <svg className="testimonial-card__watermark" viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">

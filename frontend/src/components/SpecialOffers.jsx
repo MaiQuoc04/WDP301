@@ -1,3 +1,4 @@
+import { specialOffersData as offers } from '../data/mockData'
 import './SpecialOffers.css'
 
 const SpecialOffers = () => {
@@ -11,15 +12,11 @@ const SpecialOffers = () => {
         </p>
 
         <div className="special-offers__grid">
-          <a href="#" className="offer-card">
-            <img src="https://images.unsplash.com/photo-1543330091-27228394c7dc?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Children's Day Promotion" />
-          </a>
-          <a href="#" className="offer-card">
-            <img src="https://images.unsplash.com/photo-1490818387583-1b5ba4098939?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Summer Unlocked Promotion" />
-          </a>
-          <a href="#" className="offer-card">
-            <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Sturgeon Essence Promotion" />
-          </a>
+          {offers.map((offer, index) => (
+            <a key={offer.id || index} href={offer.link} className="offer-card">
+              <img src={offer.image} alt={offer.title} />
+            </a>
+          ))}
         </div>
       </div>
     </section>

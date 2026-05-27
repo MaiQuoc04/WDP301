@@ -1,25 +1,5 @@
+import { diningData as diningItems } from '../data/mockData'
 import './Dining.css'
-
-const diningItems = [
-  {
-    id: 1,
-    title: 'Nhà hàng Kim Long',
-    image: 'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-    link: '/dining/kim-long'
-  },
-  {
-    id: 2,
-    title: 'Lobby Bar',
-    image: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-    link: '/dining/lobby-bar'
-  },
-  {
-    id: 3,
-    title: 'Nhà hàng Hoàng Triều',
-    image: 'https://images.unsplash.com/photo-1555126634-323283e090fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-    link: '/dining/hoang-trieu'
-  }
-]
 
 const Dining = () => {
   return (
