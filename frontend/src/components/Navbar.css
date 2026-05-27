@@ -1,0 +1,300 @@
+/* ============================================================
+   Navbar Component — Hanoi Hotel Design System
+   ============================================================ */
+
+.navbar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--nav-height);
+  background-color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.navbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--space-10);
+  height: 100%;
+}
+
+/* --- Logo --- */
+.navbar__logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.navbar__logo-icon {
+  height: 48px;
+  width: auto;
+}
+
+.navbar__logo-text {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--color-gold);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* --- Navigation Menu --- */
+.navbar__menu {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar__item {
+  position: relative;
+}
+
+.navbar__link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-nav);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 38px;
+  color: var(--color-charcoal);
+  padding: 8px 16px;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.25s ease;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  min-height: 44px;
+}
+
+.navbar__link:hover {
+  color: var(--color-gold);
+}
+
+.navbar__link--active {
+  color: var(--color-gold);
+  border-bottom-color: var(--color-gold);
+}
+
+.navbar__arrow {
+  font-size: 10px;
+  margin-left: 2px;
+  transition: transform 0.25s ease;
+}
+
+.navbar__item:hover .navbar__arrow {
+  transform: rotate(180deg);
+}
+
+/* --- Dropdown --- */
+.navbar__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  min-width: 220px;
+  padding: 12px 0;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.1);
+  list-style: none;
+  animation: slideDown 0.2s ease;
+  z-index: 100;
+}
+
+.navbar__dropdown-link {
+  display: block;
+  padding: 10px 24px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-charcoal);
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  line-height: 24px;
+}
+
+.navbar__dropdown-link:hover {
+  background-color: var(--color-off-white);
+  color: var(--color-gold);
+}
+
+/* --- CTA Button --- */
+.navbar__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-gold);
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 24px;
+  border-radius: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background-color 0.3s ease;
+  min-height: 44px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.navbar__cta:hover {
+  background-color: var(--color-gold-hover);
+}
+
+/* --- Hamburger Menu (Mobile) --- */
+.navbar__hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  gap: 5px;
+}
+
+.navbar__hamburger span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background-color: var(--color-charcoal);
+  transition: all 0.3s ease;
+}
+
+.navbar__hamburger--open span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+.navbar__hamburger--open span:nth-child(2) {
+  opacity: 0;
+}
+.navbar__hamburger--open span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* --- Mobile Menu Overlay --- */
+.navbar__mobile-menu {
+  display: none;
+  position: fixed;
+  top: var(--nav-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-white);
+  z-index: 999;
+  overflow-y: auto;
+  padding: var(--space-8);
+  animation: fadeIn 0.25s ease;
+}
+
+.navbar__mobile-menu--open {
+  display: block;
+}
+
+.navbar__mobile-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.navbar__mobile-item {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.navbar__mobile-link {
+  display: block;
+  font-family: var(--font-nav);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-charcoal);
+  padding: 16px 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.navbar__mobile-link:hover,
+.navbar__mobile-link--active {
+  color: var(--color-gold);
+}
+
+.navbar__mobile-sub {
+  list-style: none;
+  padding: 0 0 8px 20px;
+}
+
+.navbar__mobile-sub-link {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-medium-gray);
+  padding: 8px 0;
+  text-decoration: none;
+}
+
+.navbar__mobile-sub-link:hover {
+  color: var(--color-gold);
+}
+
+.navbar__mobile-cta {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background-color: var(--color-gold);
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 32px;
+  margin-top: var(--space-8);
+  border-radius: 0;
+  text-decoration: none;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1023px) {
+  .navbar__menu {
+    display: none;
+  }
+  .navbar__cta {
+    display: none;
+  }
+  .navbar__hamburger {
+    display: flex;
+  }
+  .navbar__inner {
+    padding: 0 var(--space-4);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .navbar__link {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+  .navbar__cta {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+}

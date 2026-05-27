@@ -1,0 +1,114 @@
+/* Dining.css */
+.dining {
+  text-align: center;
+}
+
+.dining__desc {
+  max-width: 800px;
+  margin: 0 auto var(--space-15) auto;
+  color: var(--color-charcoal);
+}
+
+.dining__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+/* 3D Flip Card Effect */
+.dining-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  perspective: 1000px;
+  display: block;
+  text-decoration: none;
+}
+
+.dining-card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 2.5s ease-in-out;
+  transform-style: preserve-3d;
+}
+
+.dining-card:hover .dining-card__inner {
+  transform: rotateY(180deg);
+}
+
+.dining-card__front, .dining-card__back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  top: 0;
+  left: 0;
+}
+
+.dining-card__front img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dining-card__overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: var(--space-8) var(--space-4) var(--space-6) var(--space-4);
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  color: var(--color-white);
+  text-align: center;
+}
+
+.dining-card__title {
+  color: var(--color-white);
+  font-size: 24px;
+  margin: 0;
+}
+
+.dining-card__back {
+  background-color: var(--color-charcoal);
+  transform: rotateY(180deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.dining-card__back img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+  filter: blur(2px);
+  transform: scaleX(-1); /* Fix mirroring */
+}
+
+.dining-card__btn {
+  position: relative;
+  z-index: 2;
+  background-color: var(--color-white);
+  color: var(--color-gold);
+  padding: 12px 32px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-raised);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@media (max-width: 1023px) {
+  .dining__grid {
+    grid-template-columns: 1fr;
+  }
+}

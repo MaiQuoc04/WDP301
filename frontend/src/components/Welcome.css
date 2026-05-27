@@ -1,0 +1,36 @@
+/* Welcome.css */
+.welcome__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-15);
+  align-items: center;
+}
+
+.welcome__title {
+  margin-bottom: var(--space-6);
+}
+
+.welcome__text {
+  color: var(--color-charcoal);
+  text-align: justify;
+  line-height: 1.8;
+}
+
+.welcome__image-wrap {
+  width: 100%;
+  aspect-ratio: 4/5;
+  background-color: var(--color-off-white);
+}
+
+.welcome__image-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 1023px) {
+  .welcome__grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+}

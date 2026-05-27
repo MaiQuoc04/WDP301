@@ -1,2 +1,333 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: sans-serif; }
+/* ============================================================
+   HANOI HOTEL — Design System Foundation
+   ============================================================ */
+
+/* ---------- 1. Design Tokens (CSS Custom Properties) ---------- */
+:root {
+  /* Primary */
+  --color-gold: #A18348;
+  --color-gold-hover: #8B6F3F;
+  --color-gold-active: #7D6338;
+  --color-soft-green: #CEF093;
+
+  /* Accent */
+  --color-luxury-blue: #248ACC;
+  --color-deep-purple: #7024C4;
+  --color-electric-purple: #6317F5;
+  --color-magenta: #C21975;
+  --color-magenta-hover: #A91660;
+  --color-magenta-active: #8F1350;
+  --color-light-cyan: #AADDDD;
+  --color-warm-gold: #FFD074;
+
+  /* Neutral */
+  --color-black: #000000;
+  --color-charcoal: #222222;
+  --color-medium-gray: #3E3E3F;
+  --color-light-gray: #777777;
+  --color-pale-gray: #999999;
+  --color-border: #DDDDDD;
+  --color-white: #FFFFFF;
+
+  /* Surface */
+  --color-off-white: #F8F9FF;
+
+  /* Semantic */
+  --color-warning: #E09B3D;
+  --color-error: #C74C4D;
+  --color-error-bright: #CF2E2E;
+
+  /* Typography */
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-nav: 'Gothic A1', Arial, sans-serif;
+
+  /* Spacing (base 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-15: 60px;
+  --space-20: 80px;
+  --space-23: 92px;
+  --space-25: 100px;
+  --space-34: 136px;
+
+  /* Elevation / Shadow */
+  --shadow-none: none;
+  --shadow-subtle: 0px 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-raised: 0px 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-elevated: 0px 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0px 16px 32px rgba(0, 0, 0, 0.15);
+
+  /* Layout */
+  --container-max: 1280px;
+  --nav-height: 80px;
+}
+
+/* ---------- 2. Global Reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 29px;
+  color: var(--color-charcoal);
+  background-color: var(--color-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ---------- 3. Typography ---------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-black);
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+h4 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 31px;
+}
+
+h5 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+h6 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 26px;
+}
+
+p {
+  margin-bottom: var(--space-4);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.25s ease;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+  outline: none;
+  border: none;
+  background: transparent;
+}
+
+/* ---------- 4. Container / Layout ---------- */
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding-left: var(--space-10);
+  padding-right: var(--space-10);
+}
+
+.section {
+  padding-top: var(--space-20);
+  padding-bottom: var(--space-20);
+}
+
+.section--alt {
+  background-color: var(--color-off-white);
+}
+
+/* ---------- 5. Button System ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 19px;
+  letter-spacing: 0;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.btn--primary {
+  background-color: var(--color-gold);
+  color: var(--color-white);
+  padding: 12px 32px;
+  border: none;
+}
+.btn--primary:hover {
+  background-color: var(--color-gold-hover);
+  opacity: 0.9;
+}
+.btn--primary:active {
+  background-color: var(--color-gold-active);
+}
+
+.btn--secondary {
+  background-color: transparent;
+  color: var(--color-white);
+  padding: 10px 35px;
+  border: 1px solid var(--color-white);
+  font-weight: 400;
+  line-height: 21px;
+  height: 42px;
+}
+.btn--secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.btn--secondary:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn--tertiary {
+  background-color: transparent;
+  color: var(--color-gold);
+  padding: 8px 16px;
+  border: 1px solid var(--color-gold);
+  font-weight: 400;
+}
+.btn--tertiary:hover {
+  background-color: rgba(161, 131, 72, 0.1);
+}
+
+.btn--alert {
+  background-color: var(--color-magenta);
+  color: var(--color-white);
+  padding: 12px 32px;
+  border: none;
+}
+.btn--alert:hover {
+  background-color: var(--color-magenta-hover);
+}
+.btn--alert:active {
+  background-color: var(--color-magenta-active);
+}
+
+.btn:disabled {
+  background-color: #CCCCCC;
+  color: #999999;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* ---------- 6. Responsive Breakpoints ---------- */
+@media (max-width: 599px) {
+  .container {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .section {
+    padding-top: var(--space-10);
+    padding-bottom: var(--space-10);
+  }
+  h1 { font-size: 32px; line-height: 38px; }
+  h2 { font-size: 26px; line-height: 32px; }
+  h3 { font-size: 24px; line-height: 30px; }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .container {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+  .section {
+    padding-top: var(--space-15);
+    padding-bottom: var(--space-15);
+  }
+}
+
+/* ---------- 7. Utility Classes ---------- */
+.text-gold { color: var(--color-gold); }
+.text-white { color: var(--color-white); }
+.text-charcoal { color: var(--color-charcoal); }
+.text-gray { color: var(--color-medium-gray); }
+.text-center { text-align: center; }
+.font-display { font-family: var(--font-display); }
+.font-body { font-family: var(--font-body); }
+
+/* ---------- 8. Animations ---------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

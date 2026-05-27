@@ -1,0 +1,109 @@
+/* ============================================================
+   Booking Form Component
+   ============================================================ */
+
+.booking-form-overlay {
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: var(--space-10) var(--space-8);
+  border-radius: 0;
+  width: 100%;
+}
+
+.booking-form {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.booking-form__group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.booking-form__label {
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+  opacity: 0.9;
+}
+
+.booking-form__input,
+.booking-form__select {
+  background-color: transparent;
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 400;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0;
+  padding: 10px 12px;
+  height: 49px;
+  width: 100%;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.booking-form__input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.booking-form__input:focus,
+.booking-form__select:focus {
+  border-color: var(--color-white);
+  box-shadow: 0px 0px 0px 2px rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+/* Custom dropdown arrow for select */
+.booking-form__select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px top 50%;
+  background-size: 10px auto;
+  min-width: 140px;
+}
+.booking-form__select option {
+  background-color: var(--color-charcoal);
+  color: var(--color-white);
+}
+
+.booking-form__action {
+  flex-shrink: 0;
+}
+
+.booking-form__btn {
+  height: 49px;
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 599px) {
+  .booking-form {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+  .booking-form-overlay {
+    padding: var(--space-6) var(--space-4);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .booking-form {
+    flex-wrap: wrap;
+  }
+  .booking-form__group {
+    flex: 1 1 calc(50% - var(--space-3));
+  }
+  .booking-form__action {
+    flex: 1 1 100%;
+    margin-top: var(--space-2);
+  }
+}

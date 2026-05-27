@@ -1,0 +1,166 @@
+/* FeaturedRoom.css */
+.featured-room {
+  display: flex;
+  width: 100%;
+  background-color: #162444; /* Dark blue */
+  color: var(--color-white);
+  overflow: hidden;
+  position: relative;
+}
+
+.featured-room__content {
+  flex: 0 0 42%;
+  padding-top: var(--space-20);
+  padding-bottom: var(--space-20);
+  padding-right: var(--space-10);
+  /* Dynamically align left padding with the max-width container (1280px) */
+  padding-left: max(var(--space-6), calc((100vw - 1280px) / 2 + var(--space-10)));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+.featured-room__title {
+  color: var(--color-white);
+  font-size: 48px;
+  line-height: 1.1;
+  margin-bottom: var(--space-8);
+}
+
+.featured-room__features {
+  list-style: none;
+  margin-bottom: var(--space-10);
+  padding: 0;
+}
+
+.featured-room__feature {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--color-white);
+}
+
+.featured-room__feature svg {
+  width: 24px;
+  height: 24px;
+}
+
+.featured-room__link {
+  display: inline-block;
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 16px;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255,255,255,0.3);
+  padding-bottom: var(--space-2);
+  width: fit-content;
+  transition: border-color 0.3s;
+}
+
+.featured-room__link:hover {
+  border-color: var(--color-white);
+}
+
+/* Slider Track Area */
+.featured-room__slider-area {
+  flex: 0 0 58%;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.featured-room__track {
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.featured-room__slide {
+  flex: 0 0 85%; /* Leaves 15% for the next image to peek out */
+  height: 600px;
+  padding-right: 20px; /* Gap between slides */
+  transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
+}
+
+.featured-room__slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Text Animation */
+.featured-room__text-wrap {
+  animation: textFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes textFadeIn {
+  0% { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+/* Nav Button positioned on the edge of the blue section */
+.featured-room__nav {
+  position: absolute;
+  top: 50%;
+  right: -24px; /* Sticks out to the right overlapping the image */
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  background-color: var(--color-white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  color: var(--color-charcoal);
+  z-index: 10;
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.featured-room__nav:hover {
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+.featured-room__nav svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 1023px) {
+  .featured-room {
+    flex-direction: column;
+  }
+  .featured-room__content {
+    flex: 1 1 auto;
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+  .featured-room__slider-area {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .featured-room__slide {
+    flex: 0 0 90%;
+    height: 400px;
+  }
+  .featured-room__nav {
+    right: 20px;
+    z-index: 10;
+  }
+}
