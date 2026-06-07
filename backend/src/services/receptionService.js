@@ -4,6 +4,7 @@ const Room = require('../models/roomModel')
 const Payment = require('../models/paymentModel')
 const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
 const RoleAssignment = require('../models/roleAssignmentModel')
+const bookingService = require('./bookingService')
 
 // Các branchId mà lễ tân được gán (BR-30: chỉ quản lý chi nhánh của mình)
 async function myBranchIds(accountId) {
@@ -55,4 +56,40 @@ exports.getBookingDetail = async (accountId, bookingId) => {
   const payments = await Payment.find({ booking: bookingId }).sort('createdAt').lean()
   const history = await BookingStatusHistory.find({ booking: bookingId }).sort('createdAt').lean()
   return { booking, payments, history }
+}
+
+// Đảm bảo booking thuộc chi nhánh của lễ tân trước khi thao tác (BR-30)
+async function assertInBranch(accountId, bookingId) {
+  const branches = await myBranchIds(accountId)
+  const ok = await Booking.exists({ _id: bookingId, branch: { $in: branches } })
+  if (!ok) { const e = new Error('Không tìm thấy booking trong chi nhánh của bạn'); e.status = 404; throw e }
+}
+
+// ---------- GĐ2: thao tác vòng đời (scope branch + ủy quyền cho bookingService) ----------
+// UC-29: tạo booking tại quầy (walk-in)
+exports.walkIn = async (accountId, body) => {
+  const branches = await myBranchIds(accountId)
+  return bookingService.create({
+    branchId: branches[0],
+    roomTypeId: body.roomTypeId,
+    guestName: body.guestName, guestPhone: body.guestPhone,
+    checkIn: body.checkIn, checkOut: body.checkOut, guests: body.guests,
+    source: 'walk_in', createdBy: accountId,
+  })
+}
+exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, by: accountId })
+}
+exports.checkIn = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.checkIn(bookingId, { roomId: body.roomId, by: accountId })
+}
+exports.checkOut = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.checkOut(bookingId, { method: body.method, by: accountId })
+}
+exports.complete = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.complete(bookingId, { by: accountId })
 }

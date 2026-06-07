@@ -11,7 +11,13 @@ router.get('/rooms', c.listRooms)                 // UC-26 danh sách phòng + t
 router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
 router.get('/bookings/:id', validateObjectId('id'), c.getBookingDetail) // UC-28 chi tiết booking
 
-// TODO(Quốc) GĐ2+: walk-in, confirm-deposit, check-in, check-out, complete,
-//   bill (extra service / missing amenity), cancel, no-show, transfer, schedule/timeline, transactions
+// Giai đoạn 2 — vòng đời booking
+router.post('/bookings', c.walkIn)                                                      // UC-29 walk-in
+router.post('/bookings/:id/confirm-deposit', validateObjectId('id'), c.confirmDeposit)  // thu cọc -> confirmed
+router.post('/bookings/:id/check-in', validateObjectId('id'), c.checkIn)                // UC-30
+router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)              // UC-31
+router.post('/bookings/:id/complete', validateObjectId('id'), c.complete)               // -> completed
+
+// TODO(Quốc) GĐ3/4: bill (extra service / missing amenity), cancel, no-show, transfer, schedule/timeline, transactions
 
 module.exports = router

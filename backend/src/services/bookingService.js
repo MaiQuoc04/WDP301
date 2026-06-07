@@ -7,6 +7,7 @@ const Branch = require('../models/branchModel')
 const RoomType = require('../models/roomTypeModel')
 const RoomPrice = require('../models/roomPriceModel')
 const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
+const Payment = require('../models/paymentModel')
 
 const DAY = 24 * 60 * 60 * 1000
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
@@ -123,6 +124,7 @@ exports.create = async (p) => {
   if (!branch || !branch.isActive) throw new Error('Chi nhánh không tồn tại hoặc đã ngừng hoạt động')
   const roomType = await RoomType.findById(p.roomTypeId)
   if (!roomType || roomType.status !== 'active') throw new Error('Loại phòng không khả dụng')
+  if (String(roomType.branch) !== String(branch._id)) throw new Error('Loại phòng không thuộc chi nhánh')
 
   // Availability (BR-23)
   if ((await countAvailableRooms(roomType._id, branch._id, checkIn, checkOut)) <= 0)
@@ -165,7 +167,77 @@ exports.create = async (p) => {
   return booking
 }
 
-// TODO(Quốc): confirmDeposit (webhook/quầy -> confirmed + paymentStatus=partial),
-//   checkIn (gán room, -> checked_in, gọi housekeepingService.createOnCheckIn),
-//   checkOut (thu remaining -> checked_out + paymentStatus=paid), complete,
-//   addExtraService, addMissingAmenity, recalcBill, cancel, markNoShow, transferRoom (in-house).
+// ---------- Vòng đời booking (GĐ2) ----------
+async function loadBooking(bookingId) {
+  const b = await Booking.findById(bookingId)
+  if (!b) { const e = new Error('Booking không tồn tại'); e.status = 404; throw e }
+  return b
+}
+
+// UC-18 (Khánh gọi sau webhook PayOS) / thu cọc tại quầy: pending -> confirmed
+exports.confirmDeposit = async (bookingId, { method = 'online_qr', transactionCode, by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'pending') throw new Error('Chỉ booking đang chờ cọc mới xác nhận được')
+  await Payment.create({
+    booking: booking._id, type: 'deposit', method, amount: booking.depositAmount,
+    status: 'paid', paidAt: new Date(), transactionCode, confirmedBy: by,
+  })
+  booking.paidAmount = booking.depositAmount
+  booking.remainingAmount = booking.totalAmount - booking.paidAmount
+  booking.paymentStatus = 'partial'
+  await exports.transition(booking, 'confirmed', by, 'Đã thu cọc')
+  await HoldRoom.deleteMany({ booking: booking._id }) // hết cần giữ tạm
+  return booking
+}
+
+// UC-30: check-in -> gán phòng + occupied + sinh task dọn (Tú)
+exports.checkIn = async (bookingId, { roomId, by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'confirmed') throw new Error('Chỉ booking đã xác nhận mới check-in được')
+  let room
+  if (roomId) {
+    room = await Room.findOne({ _id: roomId, branch: booking.branch, roomType: booking.roomType })
+    if (!room) throw new Error('Phòng không hợp lệ (sai chi nhánh/loại phòng)')
+    if (['occupied', 'maintenance', 'locked'].includes(room.status)) throw new Error(`Phòng đang ${room.status}, không nhận được`)
+  } else {
+    room = await Room.findOne({ branch: booking.branch, roomType: booking.roomType, status: { $in: ['available', 'cleaning'] } }).sort('roomNumber')
+    if (!room) throw new Error('Không còn phòng trống cùng loại để gán')
+  }
+  booking.room = room._id
+  room.status = 'occupied'
+  await room.save()
+  await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)
+  // 🔗 Hợp đồng Tú: sinh HousekeepingTask. Gọi defensive — không chặn check-in nếu Tú chưa cài.
+  try { await require('./housekeepingService').createOnCheckIn(booking._id, room._id) }
+  catch (e) { console.warn('[checkIn] createOnCheckIn chưa sẵn sàng:', e.message) }
+  return booking
+}
+
+// UC-31: check-out -> thu remaining + room cleaning
+exports.checkOut = async (bookingId, { method = 'cash', by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'checked_in') throw new Error('Chỉ booking đang ở mới check-out được')
+  if (booking.remainingAmount > 0) {
+    await Payment.create({
+      booking: booking._id, type: 'remaining', method, amount: booking.remainingAmount,
+      status: 'paid', paidAt: new Date(), confirmedBy: by,
+    })
+    booking.paidAmount = booking.totalAmount
+    booking.remainingAmount = 0
+  }
+  booking.paymentStatus = 'paid'
+  await exports.transition(booking, 'checked_out', by, 'Khách trả phòng')
+  if (booking.room) await Room.findByIdAndUpdate(booking.room, { status: 'cleaning' })
+  return booking
+}
+
+// Complete -> đóng booking (BR-28: không sửa được nữa)
+exports.complete = async (bookingId, { by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'checked_out') throw new Error('Chỉ booking đã trả phòng mới hoàn tất được')
+  if (booking.paymentStatus !== 'paid') throw new Error('Chưa thanh toán đủ, không thể hoàn tất')
+  await exports.transition(booking, 'completed', by, 'Hoàn tất')
+  return booking
+}
+
+// TODO(Quốc) GĐ3/4: addExtraService, addMissingAmenity, recalcBill, cancel, markNoShow, transferRoom (in-house), updateBooking.
