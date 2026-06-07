@@ -51,7 +51,7 @@ exports.getBookingDetail = async (accountId, bookingId) => {
     .populate('room', 'roomNumber floor')
     .populate({ path: 'customer', select: 'fullName phone idCard' })
     .lean()
-  if (!booking) throw new Error('Không tìm thấy booking trong chi nhánh của bạn')
+  if (!booking) { const e = new Error('Không tìm thấy booking trong chi nhánh của bạn'); e.status = 404; throw e }
   const payments = await Payment.find({ booking: bookingId }).sort('createdAt').lean()
   const history = await BookingStatusHistory.find({ booking: bookingId }).sort('createdAt').lean()
   return { booking, payments, history }
