@@ -17,6 +17,7 @@ router.post('/bookings/:id/confirm-deposit', validateObjectId('id'), c.confirmDe
 router.post('/bookings/:id/check-in', validateObjectId('id'), c.checkIn)                // UC-30
 router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)              // UC-31
 router.post('/bookings/:id/complete', validateObjectId('id'), c.complete)               // -> completed
+router.post('/bookings/:id/bed-surcharge', validateObjectId('id'), c.setBedSurcharge)   // bật/tắt phụ phí giường phụ
 
 // TODO(Quốc) GĐ3/4: bill (extra service / missing amenity), cancel, no-show, transfer, schedule/timeline, transactions
 

@@ -94,3 +94,7 @@ exports.complete = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.complete(bookingId, { by: accountId })
 }
+exports.setBedSurcharge = async (accountId, bookingId, apply) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.setBedSurcharge(bookingId, apply, accountId)
+}

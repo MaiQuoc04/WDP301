@@ -36,6 +36,8 @@ const bookingSchema = new mongoose.Schema({
   depositAmount:         { type: Number, default: 0 },
   extraServicesTotal:    { type: Number, default: 0 },
   missingAmenitiesTotal: { type: Number, default: 0 },
+  bedSurcharge:          { type: Number, default: 0 },      // phụ phí giường phụ (ước tính, theo §9.7)
+  bedSurchargeApplied:   { type: Boolean, default: false }, // đã cộng vào bill chưa (tự áp khi check-in)
   totalAmount:           { type: Number, default: 0 },
   paidAmount:            { type: Number, default: 0 },
   remainingAmount:       { type: Number, default: 0 },

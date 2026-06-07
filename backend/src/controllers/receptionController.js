@@ -15,3 +15,4 @@ exports.confirmDeposit = handle((req) => svc.confirmDeposit(req.user.id, req.par
 exports.checkIn = handle((req) => svc.checkIn(req.user.id, req.params.id, req.body))  // UC-30
 exports.checkOut = handle((req) => svc.checkOut(req.user.id, req.params.id, req.body)) // UC-31
 exports.complete = handle((req) => svc.complete(req.user.id, req.params.id))
+exports.setBedSurcharge = handle((req) => svc.setBedSurcharge(req.user.id, req.params.id, req.body.apply))

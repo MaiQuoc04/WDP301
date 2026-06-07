@@ -77,6 +77,15 @@ exports.quote = async (roomType, checkIn, checkOut, adults = 1, children = 0) =>
   return { nights, roomCharge, extraChildren: occ.extraChildren, surcharge, total: roomCharge + surcharge, fitsAdults: occ.fitsAdults }
 }
 
+// Tính lại bill: total = phòng + dịch vụ + amenity thiếu + (phụ phí giường phụ nếu đã áp); remaining = total - đã trả - credit
+function recalcBill(booking) {
+  const surcharge = booking.bedSurchargeApplied ? (booking.bedSurcharge || 0) : 0
+  booking.totalAmount = booking.roomCharge + (booking.extraServicesTotal || 0) + (booking.missingAmenitiesTotal || 0) + surcharge
+  booking.remainingAmount = booking.totalAmount - (booking.paidAmount || 0) - (booking.creditApplied || 0)
+  return booking
+}
+exports.recalcBill = recalcBill
+
 async function genBookingCode(branchCode) {
   const year = new Date().getFullYear()
   for (let i = 0; i < 5; i++) {
@@ -159,10 +168,12 @@ exports.create = async (p) => {
     throw new Error('Hết phòng cho khoảng thời gian đã chọn')
 
   // Tính tiền
+  const nights = nightsBetween(checkIn, checkOut)
   const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
   const depositAmount = Math.round(branch.depositRate * roomCharge)
-  const totalAmount = roomCharge // extra services/amenities cộng sau
-  const remainingAmount = totalAmount - depositAmount
+  const bedSurcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights // ước tính, chưa áp
+  const totalAmount = roomCharge // phụ phí/dịch vụ cộng sau qua recalcBill
+  const remainingAmount = totalAmount // chưa trả gì (paid 0)
 
   const booking = await Booking.create({
     code: await genBookingCode(branch.code),
@@ -177,6 +188,7 @@ exports.create = async (p) => {
     status: 'pending',
     paymentStatus: 'unpaid',
     roomCharge, depositAmount, totalAmount, remainingAmount, paidAmount: 0,
+    bedSurcharge, bedSurchargeApplied: false,
     createdBy: p.createdBy,
   })
 
@@ -235,6 +247,12 @@ exports.checkIn = async (bookingId, { roomId, by } = {}) => {
   room.status = 'occupied'
   await room.save()
   await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)
+  // Tự áp phụ phí giường phụ khi check-in (lễ tân có thể tắt sau qua setBedSurcharge)
+  if (booking.bedSurcharge > 0 && !booking.bedSurchargeApplied) {
+    booking.bedSurchargeApplied = true
+    recalcBill(booking)
+    await booking.save()
+  }
   // 🔗 Hợp đồng Tú: sinh HousekeepingTask. Gọi defensive — không chặn check-in nếu Tú chưa cài.
   try { await require('./housekeepingService').createOnCheckIn(booking._id, room._id) }
   catch (e) { console.warn('[checkIn] createOnCheckIn chưa sẵn sàng:', e.message) }
@@ -268,4 +286,15 @@ exports.complete = async (bookingId, { by } = {}) => {
   return booking
 }
 
-// TODO(Quốc) GĐ3/4: addExtraService, addMissingAmenity, recalcBill, cancel, markNoShow, transferRoom (in-house), updateBooking.
+// Bật/tắt phụ phí giường phụ (lễ tân) -> tính lại bill
+exports.setBedSurcharge = async (bookingId, apply, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!['pending', 'confirmed', 'checked_in'].includes(booking.status))
+    throw new Error('Chỉ chỉnh phụ phí khi booking chưa check-out')
+  booking.bedSurchargeApplied = !!apply
+  recalcBill(booking)
+  await booking.save()
+  return booking
+}
+
+// TODO(Quốc) GĐ3/4: addExtraService, addMissingAmenity, cancel, markNoShow, transferRoom (in-house), updateBooking.
