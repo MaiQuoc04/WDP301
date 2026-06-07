@@ -32,24 +32,21 @@ exports.countAvailableRooms = countAvailableRooms
 exports.isRoomTypeAvailable = async (roomTypeId, branchId, checkIn, checkOut) =>
   (await countAvailableRooms(roomTypeId, branchId, checkIn, checkOut)) > 0
 
-// Tính tiền phòng theo giá động (RoomPrice); fallback basePrice (UC tối ưu: docs §9.1)
+// Tính tiền phòng theo KHOẢNG giá (RoomPrice); ngày ngoài mọi khoảng -> RoomType.basePrice. docs §9.1
 async function computeRoomCharge(roomType, checkIn, checkOut) {
   const nights = nightsBetween(checkIn, checkOut)
   let total = 0
   for (let i = 0; i < nights; i++) {
     const day = startOfDay(new Date(startOfDay(checkIn).getTime() + i * DAY))
-    const next = new Date(day.getTime() + DAY)
-    let price = roomType.basePrice
-    let discount = 0
-    const byDate = await RoomPrice.findOne({ roomType: roomType._id, date: { $gte: day, $lt: next } })
-    if (byDate) {
-      price = byDate.price; discount = byDate.discount || 0
-    } else {
-      const isWeekend = [0, 6].includes(day.getDay())
-      const byType = await RoomPrice.findOne({ roomType: roomType._id, dayType: isWeekend ? 'weekend' : 'weekday' })
-      if (byType) { price = byType.price; discount = byType.discount || 0 }
-    }
-    total += price * (1 - discount / 100)
+    // RoomPrice phủ ngày này (nhiều khoảng chồng nhau -> ưu tiên khoảng bắt đầu muộn nhất)
+    const rp = await RoomPrice.findOne({
+      roomType: roomType._id,
+      startDate: { $lte: day },
+      endDate: { $gte: day },
+    }).sort('-startDate')
+    const base = rp && rp.price != null ? rp.price : roomType.basePrice
+    const discount = rp ? (rp.discount || 0) : 0
+    total += base * (1 - discount / 100)
   }
   return Math.round(total)
 }

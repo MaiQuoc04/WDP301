@@ -123,7 +123,7 @@ Theo BR-16: `active` (tốt) | `broken` (hỏng) | `missing` (thiếu). Nếu `b
 
 ## 9. Quy tắc nghiệp vụ liên quan workflow (tối ưu so với Dev_Doc_V2)
 
-1. **Giá động (RoomPrices)** — total = Σ theo từng đêm của giá (thường/cuối tuần/lễ) trừ discount. *Không* dùng `basePrice` phẳng × số đêm.
+1. **Giá theo khoảng (RoomPrice)** — mỗi RoomPrice có `startDate`/`endDate` (sự kiện/KM/lễ) + `price` (tuỳ chọn) + `discount` %. `computeRoomCharge` tính **từng đêm**: nếu đêm nằm trong 1 khoảng RoomPrice → `(price ?? basePrice) × (1 − discount/100)`; ngoài mọi khoảng → `RoomType.basePrice`. Sự kiện giảm giá = **thêm 1 dòng RoomPrice** cho khoảng đó, không sửa RoomType.
 2. **Tỉ lệ cọc theo branch** — `depositAmount = branch.depositRate × totalAmount` (BR + Branch.depositRate). *Không* cứng 30%.
 3. **Room Transfer = in-house** (UC-37, BR-27) — đổi phòng **khi khách đang `checked_in`**: gán lại `roomId` trên *cùng* booking, phòng cũ → `cleaning`/`available`. KHÔNG tạo booking mới, KHÔNG cần status `transferred`.
 4. **Credit balance (BR-34)** — Branch Manager áp credit từ booking trước vào `remaining` lúc check-out.
