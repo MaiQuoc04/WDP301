@@ -24,7 +24,9 @@ const bookingSchema = new mongoose.Schema({
   guestPhone:{ type: String, trim: true },
   checkIn:   { type: Date, required: true },
   checkOut:  { type: Date, required: true },
-  guests:    { type: Number, default: 1 },
+  guests:    { type: Number, default: 1 },   // tổng = adults + children
+  adults:    { type: Number, default: 1, min: 1 },
+  children:  { type: Number, default: 0, min: 0 },
   source:    { type: String, enum: ['online', 'walk_in'], default: 'online' },
   status:        { type: String, enum: BOOKING_STATUS, default: 'pending' },
   paymentStatus: { type: String, enum: PAYMENT_PROGRESS, default: 'unpaid' }, // BR-33

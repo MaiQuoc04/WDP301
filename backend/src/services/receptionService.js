@@ -73,7 +73,8 @@ exports.walkIn = async (accountId, body) => {
     branchId: branches[0],
     roomTypeId: body.roomTypeId,
     guestName: body.guestName, guestPhone: body.guestPhone,
-    checkIn: body.checkIn, checkOut: body.checkOut, guests: body.guests,
+    checkIn: body.checkIn, checkOut: body.checkOut,
+    adults: body.adults, children: body.children,
     source: 'walk_in', createdBy: accountId,
   })
 }

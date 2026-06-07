@@ -55,6 +55,28 @@ async function computeRoomCharge(roomType, checkIn, checkOut) {
 }
 exports.computeRoomCharge = computeRoomCharge
 
+// Mô hình sức chứa theo "đơn vị": người lớn=1, trẻ em=0.5, mỗi giường=2 đơn vị.
+// Người lớn phải vừa giường; trẻ vượt sức chứa -> phụ phí từng trẻ (giường phụ).
+const ADULT_UNIT = 1, CHILD_UNIT = 0.5, BED_UNIT = 2
+function computeOccupancy(roomType, adults = 1, children = 0) {
+  const unitCapacity = (roomType.totalBeds || 1) * BED_UNIT
+  const adultUnits = adults * ADULT_UNIT
+  const fitsAdults = adultUnits <= unitCapacity
+  const childrenThatFit = fitsAdults ? Math.floor((unitCapacity - adultUnits) / CHILD_UNIT) : 0
+  const extraChildren = Math.max(0, children - childrenThatFit)
+  return { unitCapacity, fitsAdults, childrenThatFit, extraChildren }
+}
+exports.computeOccupancy = computeOccupancy
+
+// Báo giá 1 room type cho yêu cầu (Khánh dùng ở màn tìm phòng): tiền phòng + phụ phí giường phụ (/đêm).
+exports.quote = async (roomType, checkIn, checkOut, adults = 1, children = 0) => {
+  const nights = nightsBetween(checkIn, checkOut)
+  const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
+  const occ = computeOccupancy(roomType, adults, children)
+  const surcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights
+  return { nights, roomCharge, extraChildren: occ.extraChildren, surcharge, total: roomCharge + surcharge, fitsAdults: occ.fitsAdults }
+}
+
 async function genBookingCode(branchCode) {
   const year = new Date().getFullYear()
   for (let i = 0; i < 5; i++) {
@@ -126,6 +148,12 @@ exports.create = async (p) => {
   if (!roomType || roomType.status !== 'active') throw new Error('Loại phòng không khả dụng')
   if (String(roomType.branch) !== String(branch._id)) throw new Error('Loại phòng không thuộc chi nhánh')
 
+  // Sức chứa (mô hình đơn vị): người lớn phải vừa giường; trẻ vượt -> phụ phí (lễ tân tick sau)
+  const adults = p.adults || 1
+  const children = p.children || 0
+  const occ = computeOccupancy(roomType, adults, children)
+  if (!occ.fitsAdults) throw new Error('Số người lớn vượt sức chứa phòng, vui lòng chọn loại phòng lớn hơn')
+
   // Availability (BR-23)
   if ((await countAvailableRooms(roomType._id, branch._id, checkIn, checkOut)) <= 0)
     throw new Error('Hết phòng cho khoảng thời gian đã chọn')
@@ -144,7 +172,7 @@ exports.create = async (p) => {
     guestName: p.guestName,
     guestPhone: p.guestPhone,
     checkIn, checkOut,
-    guests: p.guests || 1,
+    guests: adults + children, adults, children,
     source,
     status: 'pending',
     paymentStatus: 'unpaid',

@@ -105,6 +105,14 @@ async function seed() {
     { bedType: 'king', capacity: 4, area: 50, basePrice: 2500000, status: 'active',
       description: 'Phòng Suite rộng cho gia đình' }, 'RoomType Suite')
 
+  // Backfill mô hình sức chứa theo đơn vị (totalBeds × 2; phụ phí trẻ vượt /đêm)
+  for (const [rt, beds, fee] of [[standard, 1, 150000], [deluxe, 1, 200000], [suite, 2, 250000]]) {
+    if (rt.totalBeds !== beds || rt.extraChildFee !== fee) {
+      rt.totalBeds = beds; rt.extraChildFee = fee; await rt.save()
+      console.log(`✅ Cập nhật ${rt.name}: totalBeds=${beds}, extraChildFee=${fee}`)
+    }
+  }
+
   const rooms = [
     { roomType: standard, roomNumber: '101', floor: 1 },
     { roomType: standard, roomNumber: '102', floor: 1 },
