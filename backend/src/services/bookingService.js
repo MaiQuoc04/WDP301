@@ -8,6 +8,8 @@ const RoomType = require('../models/roomTypeModel')
 const RoomPrice = require('../models/roomPriceModel')
 const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
 const Payment = require('../models/paymentModel')
+const Service = require('../models/serviceModel')
+const Amenity = require('../models/amenityModel')
 
 const DAY = 24 * 60 * 60 * 1000
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
@@ -82,6 +84,13 @@ function recalcBill(booking) {
   return booking
 }
 exports.recalcBill = recalcBill
+
+// Tính lại tổng dịch vụ + tổng thiết bị thiếu từ các dòng
+function recomputeExtras(booking) {
+  booking.extraServicesTotal = (booking.services || []).reduce((s, x) => s + x.price * x.quantity, 0)
+  booking.missingAmenitiesTotal = (booking.missingAmenities || []).reduce((s, x) => s + x.price * x.quantity, 0)
+  return booking
+}
 
 async function genBookingCode(branchCode) {
   const year = new Date().getFullYear()
@@ -294,4 +303,62 @@ exports.setBedSurcharge = async (bookingId, apply, by) => {
   return booking
 }
 
-// TODO(Quốc) GĐ3/4: addExtraService, addMissingAmenity, cancel, markNoShow, transferRoom (in-house), updateBooking.
+// ---------- GĐ3: Bill (UC-32/33/34) ----------
+const BILL_EDITABLE = ['confirmed', 'checked_in']
+
+// UC-32: thêm dịch vụ phát sinh vào bill
+exports.addExtraService = async (bookingId, serviceId, quantity = 1, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ thêm dịch vụ khi booking đã xác nhận / đang ở')
+  const service = await Service.findOne({ _id: serviceId, branch: booking.branch })
+  if (!service || service.status !== 'active') throw new Error('Dịch vụ không khả dụng')
+  const qty = Math.max(1, parseInt(quantity, 10) || 1)
+  booking.services.push({ service: service._id, name: service.name, price: service.price, quantity: qty, addedAt: new Date() })
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+exports.removeExtraService = async (bookingId, lineId, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ sửa bill khi chưa check-out')
+  if (!booking.services.id(lineId)) throw new Error('Không tìm thấy dòng dịch vụ')
+  booking.services.pull(lineId)
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+
+// UC-33: ghi thiết bị thiếu vào bill (lễ tân; Tú cũng ghi vào mảng này từ UC-50)
+exports.addMissingAmenity = async (bookingId, amenityId, quantity = 1, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ ghi thiết bị thiếu khi chưa check-out')
+  const amenity = await Amenity.findOne({ _id: amenityId, branch: booking.branch })
+  if (!amenity) throw new Error('Thiết bị không hợp lệ')
+  const qty = Math.max(1, parseInt(quantity, 10) || 1)
+  booking.missingAmenities.push({ amenity: amenity._id, name: amenity.name, price: amenity.missingPrice, quantity: qty })
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+exports.removeMissingAmenity = async (bookingId, lineId, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ sửa bill khi chưa check-out')
+  if (!booking.missingAmenities.id(lineId)) throw new Error('Không tìm thấy dòng thiết bị')
+  booking.missingAmenities.pull(lineId)
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+
+// UC-34: hoá đơn tổng hợp
+exports.getBill = async (bookingId) => {
+  const b = await loadBooking(bookingId)
+  return {
+    code: b.code, status: b.status, paymentStatus: b.paymentStatus,
+    roomCharge: b.roomCharge,
+    services: b.services, extraServicesTotal: b.extraServicesTotal,
+    missingAmenities: b.missingAmenities, missingAmenitiesTotal: b.missingAmenitiesTotal,
+    bedSurchargeEstimate: b.bedSurcharge, bedSurchargeApplied: b.bedSurchargeApplied,
+    bedSurcharge: b.bedSurchargeApplied ? b.bedSurcharge : 0,
+    depositAmount: b.depositAmount, creditApplied: b.creditApplied,
+    totalAmount: b.totalAmount, paidAmount: b.paidAmount, remainingAmount: b.remainingAmount,
+  }
+}
+
+// TODO(Quốc) GĐ4: cancel, markNoShow, transferRoom (in-house), updateBooking.

@@ -19,6 +19,13 @@ router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)      
 router.post('/bookings/:id/complete', validateObjectId('id'), c.complete)               // -> completed
 router.post('/bookings/:id/bed-surcharge', validateObjectId('id'), c.setBedSurcharge)   // bật/tắt phụ phí giường phụ
 
-// TODO(Quốc) GĐ3/4: bill (extra service / missing amenity), cancel, no-show, transfer, schedule/timeline, transactions
+// Giai đoạn 3 — Bill
+router.get('/bookings/:id/bill', validateObjectId('id'), c.getBill)                                          // UC-34
+router.post('/bookings/:id/services', validateObjectId('id'), c.addService)                                  // UC-32
+router.delete('/bookings/:id/services/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeService)
+router.post('/bookings/:id/missing-amenities', validateObjectId('id'), c.addMissingAmenity)                  // UC-33
+router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeMissingAmenity)
+
+// TODO(Quốc) GĐ4/5: cancel, no-show, transfer, schedule/timeline, transactions
 
 module.exports = router

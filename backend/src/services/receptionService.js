@@ -98,3 +98,25 @@ exports.setBedSurcharge = async (accountId, bookingId, apply) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.setBedSurcharge(bookingId, apply, accountId)
 }
+
+// ---------- GĐ3: Bill ----------
+exports.addService = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.addExtraService(bookingId, body.serviceId, body.quantity, accountId)
+}
+exports.removeService = async (accountId, bookingId, lineId) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.removeExtraService(bookingId, lineId, accountId)
+}
+exports.addMissingAmenity = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.addMissingAmenity(bookingId, body.amenityId, body.quantity, accountId)
+}
+exports.removeMissingAmenity = async (accountId, bookingId, lineId) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.removeMissingAmenity(bookingId, lineId, accountId)
+}
+exports.getBill = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.getBill(bookingId)
+}
