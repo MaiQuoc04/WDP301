@@ -1,0 +1,109 @@
+### HBMS Auth — test bằng VS Code REST Client (cài extension "REST Client" của Huachao Mao)
+### Mở file này, bấm "Send Request" phía trên từng request. Chạy TỪ TRÊN XUỐNG.
+### Yêu cầu: server đang chạy (cd backend && npm run dev) và đã seed (npm run seed).
+
+@base = http://localhost:9999/api
+@email = kh1@gmail.com
+@password = Pass@123
+
+### 1) UC-01 Đăng ký  (devOtp sẽ tự bắt cho bước 2)
+# @name register
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "fullName": "Khach Hang 1",
+  "phone": "0901234567"
+}
+
+### (tự lấy OTP từ response bước 1)
+@otp = {{register.response.body.$.data.devOtp}}
+
+### 2a) UC-02 Verify OTP SAI  -> phải lỗi "OTP không đúng"
+POST {{base}}/auth/verify-otp
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "000000" }
+
+### 2b) UC-02 Verify OTP ĐÚNG -> kích hoạt + trả token
+POST {{base}}/auth/verify-otp
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "{{otp}}" }
+
+### 3) UC-03 Đăng nhập (token tự bắt cho các bước cần auth)
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+###
+@token = {{login.response.body.$.data.token}}
+
+### 4) UC-08 Lấy thông tin tài khoản (cần token)
+GET {{base}}/auth/me
+Authorization: Bearer {{token}}
+
+### 5) UC-10 Đổi mật khẩu (cần token)
+POST {{base}}/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "oldPassword": "{{password}}", "newPassword": "New@123" }
+
+### 6) UC-07 Đăng xuất
+POST {{base}}/auth/logout
+Authorization: Bearer {{token}}
+
+### 7) UC-05 Quên mật khẩu (devOtp tự bắt cho bước 8)
+# @name forgot
+POST {{base}}/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+###
+@resetOtp = {{forgot.response.body.$.data.devOtp}}
+
+### 8) UC-05 Đặt lại mật khẩu
+POST {{base}}/auth/reset-password
+Content-Type: application/json
+
+{ "email": "{{email}}", "otp": "{{resetOtp}}", "password": "Reset@123" }
+
+### 9) UC-06 Gửi lại OTP (đăng ký 1 acc MỚI rồi gọi 2 lần liên tiếp -> lần 2 báo cooldown 60s)
+POST {{base}}/auth/resend-otp
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+### 10) Đăng nhập Super Admin (seed) -> role phải = super_admin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@hbms.com", "password": "Admin@123" }
+
+### 11) UC-04 Google (stub) -> 400 "chưa được cài đặt"
+POST {{base}}/auth/google
+Content-Type: application/json
+
+{ "idToken": "dummy" }
+
+### --- CÁC CASE LỖI NÊN THỬ ---
+### a) Login sai mật khẩu -> 400
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "saibet" }
+
+### b) /me không token -> 401
+GET {{base}}/auth/me
+
+### c) Đăng ký trùng email -> 400 "Email đã được đăng ký"
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}", "fullName": "Trung" }

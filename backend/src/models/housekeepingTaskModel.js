@@ -1,28 +1,28 @@
-// Owner: Tú — room cleaning & inspection tasks (UC-44→55)
-// ⚠️ HỢP ĐỒNG: housekeepingService.createOnCheckIn(bookingId, roomId) do Tú cung cấp,
-//    Quốc gọi khi check-in. Amenity thiếu ghi ngược vào Booking.missingAmenities (Quốc định nghĩa).
+// Owner: Tú — room cleaning & inspection tasks (UC-44→55). Status theo docs/STATUS_WORKFLOW_SPEC.md §7.
+// ⚠️ HỢP ĐỒNG: housekeepingService.createOnCheckIn(bookingId, roomId) do Tú cung cấp, Quốc gọi khi check-in.
+//    Amenity thiếu ghi ngược vào Booking (Quốc định nghĩa). Giao việc qua assignedTo (null = chưa nhận - BR-38).
 const mongoose = require('mongoose')
 
-const TASK_STATUS = ['unassigned', 'claimed', 'in_progress', 'completed']
+const TASK_STATUS = ['pending', 'in_progress', 'urgent', 'completed', 'missed']
 
 const housekeepingTaskSchema = new mongoose.Schema({
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   room:       { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
   booking:    { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // null = chưa ai claim
-  type:       { type: String, enum: ['checkout_cleaning', 'inspection'], default: 'checkout_cleaning' },
-  status:     { type: String, enum: TASK_STATUS, default: 'unassigned' },
+  status:     { type: String, enum: TASK_STATUS, default: 'pending' },
 
-  // Báo cáo kiểm kê amenity (UC-49→51)
+  // Báo cáo kiểm kê amenity (UC-49→51, BR-41/42)
   amenityReport: [{
     amenity:   { type: mongoose.Schema.Types.ObjectId, ref: 'Amenity' },
     name:      String,
     expected:  Number,
     actual:    Number,
     missing:   Number,
-    condition: { type: String, enum: ['good', 'damaged', 'missing'], default: 'good' },
+    condition: { type: String, enum: ['active', 'broken', 'missing'], default: 'active' },
   }],
-  issueReport: { type: String, trim: true }, // báo sự cố phòng (UC-52)
+  amenityChecked: { type: Boolean, default: false }, // HK đã submit kiểm tra thiết bị chưa
+  issueNote:      { type: String, trim: true },      // báo sự cố phòng (UC-52)
 
   startedAt:   { type: Date },
   completedAt: { type: Date },

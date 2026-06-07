@@ -1,6 +1,5 @@
 // Sprint 0 / Owner: Khánh — login credentials for ALL users (UC-01→10)
-// NOTE: authService/authController hiện vẫn dùng userModel.js (legacy).
-//       Quốc migrate auth sang Account ở Sprint 0 và nhét `role` vào JWT.
+// Auth đã chạy trên model này (authService dùng Account + JWT kèm role).
 const mongoose = require('mongoose')
 
 const ROLES = ['customer', 'receptionist', 'housekeeper', 'branch_manager', 'super_admin']

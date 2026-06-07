@@ -4,7 +4,7 @@ const mongoose = require('mongoose')
 const roomTypeSchema = new mongoose.Schema({
   branch:      { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   name:        { type: String, required: true, trim: true },
-  bedType:     { type: String, trim: true },
+  bedType:     { type: String, enum: ['single', 'double', 'twin', 'king'] },
   capacity:    { type: Number, default: 2 },
   area:        { type: Number }, // m2
   basePrice:   { type: Number, required: true },

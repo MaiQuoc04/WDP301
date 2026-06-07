@@ -1,7 +1,7 @@
 // Owner: Hoàng — physical room detail & status (UC-60→62)
 const mongoose = require('mongoose')
 
-const ROOM_STATUS = ['available', 'occupied', 'cleaning', 'maintenance']
+const ROOM_STATUS = ['available', 'occupied', 'cleaning', 'maintenance', 'locked']
 
 const roomSchema = new mongoose.Schema({
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },

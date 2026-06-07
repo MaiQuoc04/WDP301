@@ -12,6 +12,7 @@ const BOOKING_STATUS = [
   'cancelled',    // huỷ trước check-in
   'no_show',      // khách không đến, giữ cọc
 ]
+const PAYMENT_PROGRESS = ['unpaid', 'partial', 'paid'] // BR-33
 
 const bookingSchema = new mongoose.Schema({
   code:      { type: String, unique: true },
@@ -25,7 +26,8 @@ const bookingSchema = new mongoose.Schema({
   checkOut:  { type: Date, required: true },
   guests:    { type: Number, default: 1 },
   source:    { type: String, enum: ['online', 'walk_in'], default: 'online' },
-  status:    { type: String, enum: BOOKING_STATUS, default: 'pending' },
+  status:        { type: String, enum: BOOKING_STATUS, default: 'pending' },
+  paymentStatus: { type: String, enum: PAYMENT_PROGRESS, default: 'unpaid' }, // BR-33
 
   // Tiền (đơn vị VND) — bill tổng hợp realtime
   roomCharge:            { type: Number, default: 0 },
@@ -53,9 +55,12 @@ const bookingSchema = new mongoose.Schema({
     quantity: { type: Number, default: 1 },
   }],
 
+  creditApplied: { type: Number, default: 0 },     // credit từ booking trước áp lúc checkout (BR-34)
+  cancelReason:  { type: String, trim: true },     // vd 'payment_timeout' khi HoldRoom hết hạn
   notes:     { type: String, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân (walk-in)
 }, { timestamps: true })
 
 bookingSchema.statics.BOOKING_STATUS = BOOKING_STATUS
+bookingSchema.statics.PAYMENT_PROGRESS = PAYMENT_PROGRESS
 module.exports = mongoose.model('Booking', bookingSchema)
