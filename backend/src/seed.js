@@ -101,11 +101,20 @@ async function seed() {
   const deluxe = await ensure(RoomType, { branch: branch._id, name: 'Deluxe' },
     { bedType: 'king', capacity: 2, area: 30, basePrice: 1500000, status: 'active',
       description: 'Phòng cao cấp giường King' }, 'RoomType Deluxe')
+  const suite = await ensure(RoomType, { branch: branch._id, name: 'Suite' },
+    { bedType: 'king', capacity: 4, area: 50, basePrice: 2500000, status: 'active',
+      description: 'Phòng Suite rộng cho gia đình' }, 'RoomType Suite')
 
   const rooms = [
     { roomType: standard, roomNumber: '101', floor: 1 },
     { roomType: standard, roomNumber: '102', floor: 1 },
+    { roomType: standard, roomNumber: '103', floor: 1 },
+    { roomType: standard, roomNumber: '104', floor: 1 },
     { roomType: deluxe,   roomNumber: '201', floor: 2 },
+    { roomType: deluxe,   roomNumber: '202', floor: 2 },
+    { roomType: deluxe,   roomNumber: '203', floor: 2 },
+    { roomType: suite,    roomNumber: '301', floor: 3 },
+    { roomType: suite,    roomNumber: '302', floor: 3 },
   ]
   const roomDocs = []
   for (const r of rooms) {
