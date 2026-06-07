@@ -69,6 +69,27 @@ async function logStatus(bookingId, from, to, by, note) {
 }
 exports.logStatus = logStatus
 
+// Bảng chuyển trạng thái hợp lệ (docs/STATUS_WORKFLOW_SPEC.md §3)
+const ALLOWED_TRANSITIONS = {
+  pending:     ['confirmed', 'cancelled'],
+  confirmed:   ['checked_in', 'cancelled', 'no_show'],
+  checked_in:  ['checked_out'],
+  checked_out: ['completed'],
+  completed:   [], cancelled: [], no_show: [],
+}
+exports.ALLOWED_TRANSITIONS = ALLOWED_TRANSITIONS
+
+// Đổi status có kiểm tra hợp lệ + ghi log (BR-29). `booking` là document đã load.
+exports.transition = async (booking, toStatus, by, note) => {
+  const from = booking.status
+  if (!ALLOWED_TRANSITIONS[from] || !ALLOWED_TRANSITIONS[from].includes(toStatus))
+    throw new Error(`Không thể chuyển trạng thái ${from} → ${toStatus}`)
+  booking.status = toStatus
+  await booking.save()
+  await logStatus(booking._id, from, toStatus, by, note)
+  return booking
+}
+
 /**
  * Tạo booking + tính cọc theo depositRate của branch. Trạng thái 'pending'.
  * Dùng bởi: customer online (Khánh, source='online') và walk-in (Quốc, source='walk_in').

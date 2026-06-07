@@ -1,9 +1,16 @@
 // Owner: Quốc — Receptionist APIs (UC-26→43)
 const router = require('express').Router()
-// const { protect, authorize } = require('../middlewares/authMiddleware')
-// router.use(protect, authorize('receptionist'))
+const { protect, authorize } = require('../middlewares/authMiddleware')
+const c = require('../controllers/receptionController')
 
-// TODO(Quốc): rooms status, bookings list/detail, walk-in, check-in/out, bill + extra service,
-//   cancel/no-show/transfer/update, room schedule/timeline, transactions, history
+router.use(protect, authorize('receptionist'))
+
+// Giai đoạn 1 — đọc dữ liệu
+router.get('/rooms', c.listRooms)                 // UC-26 danh sách phòng + trạng thái
+router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
+router.get('/bookings/:id', c.getBookingDetail)   // UC-28 chi tiết booking
+
+// TODO(Quốc) GĐ2+: walk-in, confirm-deposit, check-in, check-out, complete,
+//   bill (extra service / missing amenity), cancel, no-show, transfer, schedule/timeline, transactions
 
 module.exports = router
