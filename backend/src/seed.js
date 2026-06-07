@@ -8,6 +8,7 @@ const Account = require('./models/accountModel')
 const Employee = require('./models/employeeModel')
 const Customer = require('./models/customerModel')
 const Branch = require('./models/branchModel')
+const Role = require('./models/roleModel')
 const RoleAssignment = require('./models/roleAssignmentModel')
 const RoomType = require('./models/roomTypeModel')
 const Room = require('./models/roomModel')
@@ -44,6 +45,18 @@ async function ensureStaff(email, password, role, fullName, branch) {
 
 async function seed() {
   await connectDB()
+
+  // 0) Roles (bảng tham chiếu — jurisdiction theo report_final). permissions = scope module.
+  const ROLES = [
+    { name: 'super_admin',    description: 'Quản trị toàn hệ thống: quản lý chi nhánh, cấp tài khoản & phân quyền', permissions: ['*'] },
+    { name: 'branch_manager', description: 'Quản lý chi nhánh: cấu hình phòng/dịch vụ/giá, theo dõi dashboard',     permissions: ['manager'] },
+    { name: 'receptionist',   description: 'Lễ tân: quản lý booking, check-in/out, thu phí, gán phòng',             permissions: ['reception'] },
+    { name: 'housekeeper',    description: 'Buồng phòng: nhận task dọn, kiểm kê thiết bị, báo thiếu/hỏng',           permissions: ['housekeeping'] },
+    { name: 'customer',       description: 'Khách đã đăng ký: đặt phòng, thanh toán cọc, xem lịch sử',               permissions: ['customer'] },
+  ]
+  for (const r of ROLES) {
+    await ensure(Role, { name: r.name }, { description: r.description, permissions: r.permissions }, `Role ${r.name}`)
+  }
 
   // 1) Branch
   const branch = await ensure(Branch, { code: 'HN01' }, {
