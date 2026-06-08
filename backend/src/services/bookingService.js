@@ -396,4 +396,44 @@ exports.expirePendingBookings = async () => {
   return expired.length
 }
 
-// TODO(Quốc) GĐ4/5: transferRoom (in-house), updateBooking; room schedule/timeline, transactions.
+// UC-37: đổi phòng in-house (khách đang ở) — cùng chi nhánh & cùng loại phòng, giữ nguyên booking
+exports.transferRoom = async (bookingId, { newRoomId, by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'checked_in') throw new Error('Chỉ đổi phòng khi khách đang ở (checked_in)')
+  if (!newRoomId) throw new Error('Thiếu phòng mới')
+  const newRoom = await Room.findOne({ _id: newRoomId, branch: booking.branch, roomType: booking.roomType })
+  if (!newRoom) throw new Error('Phòng mới không hợp lệ (phải cùng chi nhánh & loại phòng)')
+  if (String(newRoom._id) === String(booking.room)) throw new Error('Trùng phòng hiện tại')
+  if (['occupied', 'maintenance', 'locked'].includes(newRoom.status)) throw new Error(`Phòng mới đang ${newRoom.status}`)
+  const oldRoomId = booking.room
+  newRoom.status = 'occupied'; await newRoom.save()
+  if (oldRoomId) await Room.findByIdAndUpdate(oldRoomId, { status: 'cleaning' })
+  booking.room = newRoom._id
+  await booking.save()
+  await logStatus(booking._id, booking.status, booking.status, by, `Đổi phòng -> ${newRoom.roomNumber}`)
+  return booking
+}
+
+// UC-38: cập nhật thông tin booking (số khách / tên / sđt / ghi chú). Đổi số khách -> tính lại bedSurcharge.
+exports.updateBooking = async (bookingId, { adults, children, guestName, guestPhone, notes, by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (!['pending', 'confirmed', 'checked_in'].includes(booking.status)) throw new Error('Chỉ cập nhật booking chưa check-out')
+  if (guestName !== undefined) booking.guestName = guestName
+  if (guestPhone !== undefined) booking.guestPhone = guestPhone
+  if (notes !== undefined) booking.notes = notes
+  if (adults !== undefined || children !== undefined) {
+    const newAdults = adults !== undefined ? adults : booking.adults
+    const newChildren = children !== undefined ? children : booking.children
+    const roomType = await RoomType.findById(booking.roomType)
+    const occ = computeOccupancy(roomType, newAdults, newChildren)
+    if (!occ.fitsAdults) throw new Error('Số người lớn vượt sức chứa phòng')
+    booking.adults = newAdults; booking.children = newChildren; booking.guests = newAdults + newChildren
+    const nights = nightsBetween(booking.checkIn, booking.checkOut)
+    booking.bedSurcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights
+    recalcBill(booking) // nếu bedSurchargeApplied thì total cập nhật theo
+  }
+  await booking.save()
+  return booking
+}
+
+// TODO(Quốc) GĐ5: room schedule/timeline (UC-39/40), transactions (UC-41/42).

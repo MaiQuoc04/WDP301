@@ -130,3 +130,11 @@ exports.markNoShow = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.markNoShow(bookingId, { by: accountId })
 }
+exports.transfer = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.transferRoom(bookingId, { newRoomId: body.newRoomId, by: accountId })
+}
+exports.update = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.updateBooking(bookingId, { ...body, by: accountId })
+}

@@ -27,3 +27,5 @@ exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user
 // GĐ4 — huỷ / no-show
 exports.cancel = handle((req) => svc.cancel(req.user.id, req.params.id, req.body))      // UC-35
 exports.markNoShow = handle((req) => svc.markNoShow(req.user.id, req.params.id))        // UC-36
+exports.transfer = handle((req) => svc.transfer(req.user.id, req.params.id, req.body))  // UC-37
+exports.update = handle((req) => svc.update(req.user.id, req.params.id, req.body))       // UC-38
