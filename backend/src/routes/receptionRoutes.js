@@ -32,6 +32,9 @@ router.post('/bookings/:id/no-show', validateObjectId('id'), c.markNoShow)  // U
 router.post('/bookings/:id/transfer', validateObjectId('id'), c.transfer)   // UC-37 đổi phòng in-house
 router.patch('/bookings/:id', validateObjectId('id'), c.update)             // UC-38 cập nhật booking
 
-// TODO(Quốc) GĐ5: schedule/timeline, transactions
+// Giai đoạn 5 — lịch phòng + giao dịch
+router.get('/schedule', c.getSchedule)                                          // UC-39/40 lịch/timeline phòng
+router.get('/transactions', c.listTransactions)                                 // UC-41 danh sách giao dịch
+router.get('/transactions/:id', validateObjectId('id'), c.getTransaction)       // UC-42 chi tiết
 
 module.exports = router

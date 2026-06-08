@@ -138,3 +138,46 @@ exports.update = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.updateBooking(bookingId, { ...body, by: accountId })
 }
+
+// ---------- GĐ5: lịch phòng + giao dịch ----------
+// UC-39/40: lịch/timeline phòng — từng phòng kèm các booking đã gán (checked_in trở đi) trong khoảng
+exports.getSchedule = async (accountId, { from, to } = {}) => {
+  const branches = await myBranchIds(accountId)
+  const start = from ? new Date(from) : new Date()
+  const end = to ? new Date(to) : new Date(start.getTime() + 7 * 86400000)
+  const rooms = await Room.find({ branch: { $in: branches } }).populate('roomType', 'name').sort('roomNumber').lean()
+  const bookings = await Booking.find({
+    branch: { $in: branches },
+    room: { $ne: null },
+    status: { $in: ['checked_in', 'checked_out', 'completed'] },
+    checkIn: { $lt: end }, checkOut: { $gt: start },
+  }).select('code guestName checkIn checkOut status room').lean()
+  const byRoom = {}
+  bookings.forEach((b) => { const k = String(b.room); (byRoom[k] = byRoom[k] || []).push(b) })
+  return { from: start, to: end, rooms: rooms.map((r) => ({ ...r, bookings: byRoom[String(r._id)] || [] })) }
+}
+
+// UC-41: danh sách giao dịch trong chi nhánh (lọc status/type/khoảng ngày)
+exports.listTransactions = async (accountId, { status, type, from, to } = {}) => {
+  const branches = await myBranchIds(accountId)
+  const bookingIds = await Booking.find({ branch: { $in: branches } }).distinct('_id')
+  const q = { booking: { $in: bookingIds } }
+  if (status) q.status = status
+  if (type) q.type = type
+  if (from || to) {
+    q.createdAt = {}
+    if (from) q.createdAt.$gte = new Date(from)
+    if (to) q.createdAt.$lte = new Date(to)
+  }
+  return Payment.find(q).populate('booking', 'code guestName').sort('-createdAt').lean()
+}
+
+// UC-42: chi tiết giao dịch
+exports.getTransaction = async (accountId, paymentId) => {
+  const branches = await myBranchIds(accountId)
+  const payment = await Payment.findById(paymentId).populate('booking', 'code guestName branch totalAmount paidAmount').lean()
+  if (!payment || !payment.booking || !branches.some((b) => String(b) === String(payment.booking.branch))) {
+    const e = new Error('Không tìm thấy giao dịch trong chi nhánh của bạn'); e.status = 404; throw e
+  }
+  return payment
+}
