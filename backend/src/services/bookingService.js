@@ -180,6 +180,9 @@ exports.create = async (p) => {
   const bedSurcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights // ước tính, chưa áp
   const totalAmount = roomCharge // phụ phí/dịch vụ cộng sau qua recalcBill
   const remainingAmount = totalAmount // chưa trả gì (paid 0)
+  // Hạn cọc cho đặt online; walk-in không hết hạn (lễ tân tự quản)
+  const expiresAt = source === 'online'
+    ? new Date(Date.now() + (branch.pendingTimeoutMinutes || 15) * 60 * 1000) : undefined
 
   const booking = await Booking.create({
     code: await genBookingCode(branch.code),
@@ -195,17 +198,17 @@ exports.create = async (p) => {
     paymentStatus: 'unpaid',
     roomCharge, depositAmount, totalAmount, remainingAmount, paidAmount: 0,
     bedSurcharge, bedSurchargeApplied: false,
+    expiresAt,
     createdBy: p.createdBy,
   })
 
-  // Giữ phòng tạm cho đặt online (hết hạn theo branch). TTL index tự xoá; cron sẽ cancel booking pending khi hết hạn.
+  // Giữ phòng tạm cho đặt online (HoldRoom có TTL tự xoá; booking.expiresAt mới là mốc job tự huỷ)
   if (source === 'online') {
     await HoldRoom.create({
       roomType: roomType._id,
       customer: p.customerId,
       booking: booking._id,
-      checkIn, checkOut,
-      expiresAt: new Date(Date.now() + (branch.pendingTimeoutMinutes || 15) * 60 * 1000),
+      checkIn, checkOut, expiresAt,
     })
   }
 
@@ -361,4 +364,36 @@ exports.getBill = async (bookingId) => {
   }
 }
 
-// TODO(Quốc) GĐ4: cancel, markNoShow, transferRoom (in-house), updateBooking.
+// ---------- GĐ4: huỷ / no-show ----------
+// UC-35: huỷ booking trước check-in. Cọc đã thu KHÔNG hoàn (BR).
+exports.cancel = async (bookingId, { reason, by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (!['pending', 'confirmed'].includes(booking.status)) throw new Error('Chỉ huỷ được booking chưa check-in')
+  booking.cancelReason = reason || 'Huỷ bởi lễ tân'
+  await exports.transition(booking, 'cancelled', by, booking.cancelReason)
+  await HoldRoom.deleteMany({ booking: booking._id })
+  return booking
+}
+
+// UC-36: đánh no-show (giữ cọc) — chỉ khi confirmed & đã tới ngày check-in
+exports.markNoShow = async (bookingId, { by } = {}) => {
+  const booking = await loadBooking(bookingId)
+  if (booking.status !== 'confirmed') throw new Error('Chỉ đánh no-show booking đã xác nhận')
+  if (startOfDay(new Date()) < booking.checkIn) throw new Error('Chưa tới ngày check-in, không thể đánh no-show')
+  await exports.transition(booking, 'no_show', by, 'Khách không đến (giữ cọc)')
+  await HoldRoom.deleteMany({ booking: booking._id })
+  return booking
+}
+
+// Job: tự huỷ booking pending quá hạn cọc (chỉ online có expiresAt). Trả về số lượng đã huỷ.
+exports.expirePendingBookings = async () => {
+  const expired = await Booking.find({ status: 'pending', expiresAt: { $lt: new Date() } })
+  for (const b of expired) {
+    b.cancelReason = 'payment_timeout'
+    await exports.transition(b, 'cancelled', null, 'Tự huỷ: quá hạn thanh toán cọc')
+    await HoldRoom.deleteMany({ booking: b._id })
+  }
+  return expired.length
+}
+
+// TODO(Quốc) GĐ4/5: transferRoom (in-house), updateBooking; room schedule/timeline, transactions.

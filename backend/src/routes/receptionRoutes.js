@@ -26,6 +26,10 @@ router.delete('/bookings/:id/services/:lineId', validateObjectId('id'), validate
 router.post('/bookings/:id/missing-amenities', validateObjectId('id'), c.addMissingAmenity)                  // UC-33
 router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeMissingAmenity)
 
-// TODO(Quốc) GĐ4/5: cancel, no-show, transfer, schedule/timeline, transactions
+// Giai đoạn 4 — huỷ / no-show
+router.post('/bookings/:id/cancel', validateObjectId('id'), c.cancel)       // UC-35 huỷ trước check-in
+router.post('/bookings/:id/no-show', validateObjectId('id'), c.markNoShow)  // UC-36 giữ cọc
+
+// TODO(Quốc) GĐ4/5: transfer in-house, update; schedule/timeline, transactions
 
 module.exports = router

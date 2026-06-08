@@ -60,7 +60,8 @@ const bookingSchema = new mongoose.Schema({
   }],
 
   creditApplied: { type: Number, default: 0 },     // credit từ booking trước áp lúc checkout (BR-34)
-  cancelReason:  { type: String, trim: true },     // vd 'payment_timeout' khi HoldRoom hết hạn
+  cancelReason:  { type: String, trim: true },     // vd 'payment_timeout' khi quá hạn cọc
+  expiresAt:     { type: Date },                    // hạn thanh toán cọc (online); quá hạn -> job tự huỷ
   notes:     { type: String, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân (walk-in)
 }, { timestamps: true })

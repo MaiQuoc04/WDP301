@@ -120,3 +120,13 @@ exports.getBill = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.getBill(bookingId)
 }
+
+// ---------- GĐ4: huỷ / no-show ----------
+exports.cancel = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.cancel(bookingId, { reason: body.reason, by: accountId })
+}
+exports.markNoShow = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.markNoShow(bookingId, { by: accountId })
+}

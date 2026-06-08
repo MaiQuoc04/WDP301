@@ -23,3 +23,7 @@ exports.addService = handle((req) => svc.addService(req.user.id, req.params.id, 
 exports.removeService = handle((req) => svc.removeService(req.user.id, req.params.id, req.params.lineId))
 exports.addMissingAmenity = handle((req) => svc.addMissingAmenity(req.user.id, req.params.id, req.body), 201) // UC-33
 exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user.id, req.params.id, req.params.lineId))
+
+// GĐ4 — huỷ / no-show
+exports.cancel = handle((req) => svc.cancel(req.user.id, req.params.id, req.body))      // UC-35
+exports.markNoShow = handle((req) => svc.markNoShow(req.user.id, req.params.id))        // UC-36
