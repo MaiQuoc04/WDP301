@@ -10,6 +10,29 @@ const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
 const Payment = require('../models/paymentModel')
 const Service = require('../models/serviceModel')
 const Amenity = require('../models/amenityModel')
+const mongoose = require('mongoose')
+
+// Chạy `work(session)` trong 1 transaction, retry khi đụng write-conflict (chống đặt trùng - review #2)
+async function runInTransaction(work, retries = 4) {
+  for (let attempt = 1; ; attempt++) {
+    const session = await mongoose.startSession()
+    try {
+      session.startTransaction()
+      const result = await work(session)
+      await session.commitTransaction()
+      return result
+    } catch (e) {
+      try { await session.abortTransaction() } catch (_) { /* noop */ }
+      const transient = typeof e.hasErrorLabel === 'function' &&
+        (e.hasErrorLabel('TransientTransactionError') || e.hasErrorLabel('UnknownTransactionCommitResult'))
+      const writeConflict = e.code === 112 || e.codeName === 'WriteConflict'
+      if ((transient || writeConflict) && attempt < retries) continue
+      throw e
+    } finally {
+      session.endSession()
+    }
+  }
+}
 
 const DAY = 24 * 60 * 60 * 1000
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
@@ -169,11 +192,7 @@ exports.create = async (p) => {
   const occ = computeOccupancy(roomType, adults, children)
   if (!occ.fitsAdults) throw new Error('Số người lớn vượt sức chứa phòng, vui lòng chọn loại phòng lớn hơn')
 
-  // Availability (BR-23)
-  if ((await countAvailableRooms(roomType._id, branch._id, checkIn, checkOut)) <= 0)
-    throw new Error('Hết phòng cho khoảng thời gian đã chọn')
-
-  // Tính tiền
+  // Tính tiền (đọc, ngoài transaction)
   const nights = nightsBetween(checkIn, checkOut)
   const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
   const depositAmount = Math.round(branch.depositRate * roomCharge)
@@ -183,37 +202,35 @@ exports.create = async (p) => {
   // Hạn cọc cho đặt online; walk-in không hết hạn (lễ tân tự quản)
   const expiresAt = source === 'online'
     ? new Date(Date.now() + (branch.pendingTimeoutMinutes || 15) * 60 * 1000) : undefined
+  const code = await genBookingCode(branch.code)
 
-  const booking = await Booking.create({
-    code: await genBookingCode(branch.code),
-    branch: branch._id,
-    roomType: roomType._id,
-    customer: source === 'online' ? p.customerId : undefined,
-    guestName: p.guestName,
-    guestPhone: p.guestPhone,
-    checkIn, checkOut,
-    guests: adults + children, adults, children,
-    source,
-    status: 'pending',
-    paymentStatus: 'unpaid',
-    roomCharge, depositAmount, totalAmount, remainingAmount, paidAmount: 0,
-    bedSurcharge, bedSurchargeApplied: false,
-    expiresAt,
-    createdBy: p.createdBy,
+  // Transaction: re-check availability (BR-23) + tạo, NGUYÊN TỬ để chống đặt trùng (review #2).
+  // $inc RoomType.bookingSeq buộc 2 giao dịch đồng thời cùng loại phòng xung đột -> 1 cái retry rồi thấy hết phòng.
+  return runInTransaction(async (session) => {
+    const totalRooms = await Room.countDocuments({ roomType: roomType._id, branch: branch._id }).session(session)
+    const overlap = await Booking.countDocuments({
+      roomType: roomType._id, status: { $in: OCCUPYING },
+      checkIn: { $lt: checkOut }, checkOut: { $gt: checkIn },
+    }).session(session)
+    if (totalRooms - overlap <= 0) throw new Error('Hết phòng cho khoảng thời gian đã chọn')
+
+    const [booking] = await Booking.create([{
+      code, branch: branch._id, roomType: roomType._id,
+      customer: source === 'online' ? p.customerId : undefined,
+      guestName: p.guestName, guestPhone: p.guestPhone,
+      checkIn, checkOut, guests: adults + children, adults, children,
+      source, status: 'pending', paymentStatus: 'unpaid',
+      roomCharge, depositAmount, totalAmount, remainingAmount, paidAmount: 0,
+      bedSurcharge, bedSurchargeApplied: false, expiresAt, createdBy: p.createdBy,
+    }], { session })
+
+    if (source === 'online') {
+      await HoldRoom.create([{ roomType: roomType._id, customer: p.customerId, booking: booking._id, checkIn, checkOut, expiresAt }], { session })
+    }
+    await BookingStatusHistory.create([{ booking: booking._id, fromStatus: null, toStatus: 'pending', changedBy: p.createdBy, note: `Tạo booking (${source})` }], { session })
+    await RoomType.updateOne({ _id: roomType._id }, { $inc: { bookingSeq: 1 } }, { session }) // serialize chống đặt trùng
+    return booking
   })
-
-  // Giữ phòng tạm cho đặt online (HoldRoom có TTL tự xoá; booking.expiresAt mới là mốc job tự huỷ)
-  if (source === 'online') {
-    await HoldRoom.create({
-      roomType: roomType._id,
-      customer: p.customerId,
-      booking: booking._id,
-      checkIn, checkOut, expiresAt,
-    })
-  }
-
-  await logStatus(booking._id, null, 'pending', p.createdBy, `Tạo booking (${source})`)
-  return booking
 }
 
 // ---------- Vòng đời booking (GĐ2) ----------
@@ -243,19 +260,32 @@ exports.confirmDeposit = async (bookingId, { method = 'online_qr', transactionCo
 exports.checkIn = async (bookingId, { roomId, by } = {}) => {
   const booking = await loadBooking(bookingId)
   if (booking.status !== 'confirmed') throw new Error('Chỉ booking đã xác nhận mới check-in được')
+  // Nhận phòng NGUYÊN TỬ (compare-and-set status) chống 2 check-in cùng giành 1 phòng (review #2)
   let room
+  const CLAIM = { $in: ['available', 'cleaning'] }
   if (roomId) {
-    room = await Room.findOne({ _id: roomId, branch: booking.branch, roomType: booking.roomType })
-    if (!room) throw new Error('Phòng không hợp lệ (sai chi nhánh/loại phòng)')
-    if (['occupied', 'maintenance', 'locked'].includes(room.status)) throw new Error(`Phòng đang ${room.status}, không nhận được`)
+    room = await Room.findOneAndUpdate(
+      { _id: roomId, branch: booking.branch, roomType: booking.roomType, status: CLAIM },
+      { $set: { status: 'occupied' } }, { new: true })
+    if (!room) {
+      const exists = await Room.findOne({ _id: roomId, branch: booking.branch, roomType: booking.roomType })
+      throw new Error(exists ? `Phòng đang ${exists.status}, không nhận được` : 'Phòng không hợp lệ (sai chi nhánh/loại phòng)')
+    }
   } else {
-    room = await Room.findOne({ branch: booking.branch, roomType: booking.roomType, status: { $in: ['available', 'cleaning'] } }).sort('roomNumber')
+    const candidates = await Room.find({ branch: booking.branch, roomType: booking.roomType, status: CLAIM }).sort('roomNumber').select('_id')
+    for (const cand of candidates) {
+      const claimed = await Room.findOneAndUpdate({ _id: cand._id, status: CLAIM }, { $set: { status: 'occupied' } }, { new: true })
+      if (claimed) { room = claimed; break }
+    }
     if (!room) throw new Error('Không còn phòng trống cùng loại để gán')
   }
   booking.room = room._id
-  room.status = 'occupied'
-  await room.save()
-  await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)
+  try {
+    await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)
+  } catch (e) {
+    await Room.findByIdAndUpdate(room._id, { status: 'available' }) // revert nếu transition lỗi
+    throw e
+  }
   // Tự áp phụ phí giường phụ khi check-in (lễ tân có thể tắt sau qua setBedSurcharge)
   if (booking.bedSurcharge > 0 && !booking.bedSurchargeApplied) {
     booking.bedSurchargeApplied = true
