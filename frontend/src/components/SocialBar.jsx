@@ -3,7 +3,7 @@ import './SocialBar.css'
 const SocialBar = () => {
   return (
     <div className="social-bar">
-      <a href="#" className="social-badge social-badge--facebook" aria-label="Facebook">
+      {/* <a href="#" className="social-badge social-badge--facebook" aria-label="Facebook">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"></path>
         </svg>
@@ -32,7 +32,7 @@ const SocialBar = () => {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="18 15 12 9 6 15"></polyline>
         </svg>
-      </a>
+      </a> */}
     </div>
   )
 }
