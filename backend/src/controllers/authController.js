@@ -1,10 +1,21 @@
 const authService = require('../services/authService')
-exports.register = async (req, res) => {
-  try { res.status(201).json({ success: true, data: await authService.register(req.body) }) }
-  catch (err) { res.status(400).json({ success: false, message: err.message }) }
+
+// Bọc try/catch chung cho gọn
+const handle = (fn, okCode = 200) => async (req, res) => {
+  try {
+    res.status(okCode).json({ success: true, data: await fn(req) })
+  } catch (err) {
+    res.status(err.status || 400).json({ success: false, message: err.message })
+  }
 }
-exports.login = async (req, res) => {
-  try { res.status(200).json({ success: true, data: await authService.login(req.body) }) }
-  catch (err) { res.status(401).json({ success: false, message: err.message }) }
-}
-exports.logout = async (req, res) => res.status(200).json({ success: true, message: 'Logged out' })
+
+exports.register = handle((req) => authService.register(req.body), 201)
+exports.verifyOtp = handle((req) => authService.verifyOtp(req.body))
+exports.resendOtp = handle((req) => authService.resendOtp(req.body))
+exports.login = handle((req) => authService.login(req.body))
+exports.logout = (req, res) => res.json({ success: true, message: 'Đã đăng xuất' })
+exports.forgotPassword = handle((req) => authService.forgotPassword(req.body))
+exports.resetPassword = handle((req) => authService.resetPassword(req.body))
+exports.changePassword = handle((req) => authService.changePassword({ accountId: req.user.id, ...req.body }))
+exports.me = handle((req) => authService.getMe(req.user.id))
+exports.google = handle((req) => authService.googleLogin(req.body))
