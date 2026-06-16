@@ -15,6 +15,7 @@ const Room = require('./models/roomModel')
 const Amenity = require('./models/amenityModel')
 const RoomAmenity = require('./models/roomAmenityModel')
 const Service = require('./models/serviceModel')
+const RoomPrice = require('./models/roomPriceModel')
 
 // Tạo nếu chưa có (theo `query`), trả về document.
 async function ensure(Model, query, data, label) {
@@ -94,19 +95,53 @@ async function seed() {
     console.log('✅ Tạo Customer: customer@hbms.com / Customer@123')
   } else { console.log('⏭  Customer mẫu đã có') }
 
-  // 5) RoomType + Room
+  // 5) Clean and Seed RoomType, Room, Amenity, RoomAmenity, Service, RoomPrice
+  console.log('🧹 Clearing old room types, rooms, prices, amenities, and services...')
+  await RoomPrice.deleteMany({})
+  await RoomAmenity.deleteMany({})
+  await Room.deleteMany({})
+  await RoomType.deleteMany({})
+  await Amenity.deleteMany({})
+  await Service.deleteMany({})
+
   const standard = await ensure(RoomType, { branch: branch._id, name: 'Standard' },
     { bedType: 'double', capacity: 2, area: 20, basePrice: 800000, status: 'active',
       description: 'Phòng tiêu chuẩn 2 người' }, 'RoomType Standard')
-  const deluxe = await ensure(RoomType, { branch: branch._id, name: 'Deluxe' },
-    { bedType: 'king', capacity: 2, area: 30, basePrice: 1500000, status: 'active',
-      description: 'Phòng cao cấp giường King' }, 'RoomType Deluxe')
+  
+  const deluxeTwin = await ensure(RoomType, { branch: branch._id, name: 'Deluxe Twin' },
+    { bedType: 'twin', capacity: 2, area: 30, basePrice: 1200000, status: 'active',
+      description: 'Phòng cao cấp 2 giường đơn' }, 'RoomType Deluxe Twin')
 
-  const rooms = [
-    { roomType: standard, roomNumber: '101', floor: 1 },
-    { roomType: standard, roomNumber: '102', floor: 1 },
-    { roomType: deluxe,   roomNumber: '201', floor: 2 },
-  ]
+  const deluxeDouble = await ensure(RoomType, { branch: branch._id, name: 'Deluxe Double' },
+    { bedType: 'double', capacity: 2, area: 30, basePrice: 1500000, status: 'active',
+      description: 'Phòng cao cấp 1 giường đôi lớn' }, 'RoomType Deluxe Double')
+
+  const familySuite = await ensure(RoomType, { branch: branch._id, name: 'Family Suite' },
+    { bedType: 'king', capacity: 4, area: 50, basePrice: 2500000, status: 'active',
+      description: 'Phòng Suite cho gia đình' }, 'RoomType Family Suite')
+
+  const execSuite = await ensure(RoomType, { branch: branch._id, name: 'Executive Suite' },
+    { bedType: 'king', capacity: 2, area: 65, basePrice: 4000000, status: 'active',
+      description: 'Phòng Suite hoàng gia hạng sang' }, 'RoomType Executive Suite')
+
+  const rooms = []
+  // Tầng 1: 101 -> 110: Deluxe Twin
+  for (let i = 1; i <= 10; i++) {
+    rooms.push({ roomType: deluxeTwin, roomNumber: `1${String(i).padStart(2, '0')}`, floor: 1 })
+  }
+  // Tầng 2: 201 -> 210: Deluxe Double
+  for (let i = 1; i <= 10; i++) {
+    rooms.push({ roomType: deluxeDouble, roomNumber: `2${String(i).padStart(2, '0')}`, floor: 2 })
+  }
+  // Tầng 3: 301 -> 305: Family Suite
+  for (let i = 1; i <= 5; i++) {
+    rooms.push({ roomType: familySuite, roomNumber: `3${String(i).padStart(2, '0')}`, floor: 3 })
+  }
+  // Tầng 4: 401 -> 403: Executive Suite
+  for (let i = 1; i <= 3; i++) {
+    rooms.push({ roomType: execSuite, roomNumber: `4${String(i).padStart(2, '0')}`, floor: 4 })
+  }
+
   const roomDocs = []
   for (const r of rooms) {
     roomDocs.push(await ensure(Room, { branch: branch._id, roomNumber: r.roomNumber },

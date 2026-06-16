@@ -13,4 +13,6 @@ const roomTypeSchema = new mongoose.Schema({
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
 }, { timestamps: true })
 
+roomTypeSchema.index({ branch: 1, name: 1 }, { unique: true })
+
 module.exports = mongoose.model('RoomType', roomTypeSchema)

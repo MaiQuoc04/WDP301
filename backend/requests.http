@@ -107,3 +107,152 @@ POST {{base}}/auth/register
 Content-Type: application/json
 
 { "email": "{{email}}", "password": "{{password}}", "fullName": "Trung" }
+
+
+### =========================================================================
+### BRANCH MANAGER APIs (UC-57→62 + RoomPrice)
+### =========================================================================
+
+### 1) Đăng nhập Branch Manager (manager@hbms.com / Manager@123)
+# @name managerLogin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@hbms.com",
+  "password": "Manager@123"
+}
+
+###
+@mToken = {{managerLogin.response.body.$.data.token}}
+
+### 2) Lấy danh sách Room Types của chi nhánh
+GET {{base}}/manager/room-types
+Authorization: Bearer {{mToken}}
+
+### 3) Lấy danh sách options Room Types (Dropdown - chỉ active)
+GET {{base}}/manager/room-types/options
+Authorization: Bearer {{mToken}}
+
+### 4) Tạo mới Room Type
+# @name createRT
+POST {{base}}/manager/room-types
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Suite Deluxe",
+  "bedType": "king",
+  "capacity": 2,
+  "area": 45,
+  "basePrice": 2200000,
+  "description": "Phòng Suite cao cấp có ban công rộng rãi"
+}
+
+###
+@newRtId = {{createRT.response.body.$.data._id}}
+
+### 5) Cập nhật Room Type
+PUT {{base}}/manager/room-types/{{newRtId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "basePrice": 2300000,
+  "description": "Phòng Suite cao cấp hướng biển kèm ban công rộng rãi"
+}
+
+### 6) Đổi trạng thái Room Type sang inactive (Soft Delete)
+PATCH {{base}}/manager/room-types/{{newRtId}}/status
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+### 7) Lấy danh sách Rooms của chi nhánh
+GET {{base}}/manager/rooms
+Authorization: Bearer {{mToken}}
+
+### 8) Lấy danh sách Rooms có bộ lọc (ví dụ: tầng 2, Deluxe Double)
+GET {{base}}/manager/rooms?floor=2
+Authorization: Bearer {{mToken}}
+
+### 9) Tạo mới Room
+# @name createRoom
+POST {{base}}/manager/rooms
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "roomNumber": "501",
+  "floor": 5,
+  "notes": "Phòng VIP tầng thượng"
+}
+
+###
+@newRoomId = {{createRoom.response.body.$.data._id}}
+
+### 10) Cập nhật Room
+PUT {{base}}/manager/rooms/{{newRoomId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "notes": "Phòng VIP tầng thượng hướng Đông Nam"
+}
+
+### 11) Thay đổi trạng thái Room nhanh (ví dụ sang bảo trì)
+PATCH {{base}}/manager/rooms/{{newRoomId}}/status
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "status": "maintenance"
+}
+
+### 12) Deactivate Room (Soft Delete)
+PATCH {{base}}/manager/rooms/{{newRoomId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+### 13) Lấy danh sách cấu hình giá động (RoomPrice)
+GET {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+
+### 14) Tạo cấu hình giá động theo ngày cụ thể (ví dụ Giáng Sinh 2026)
+# @name createPriceDate
+POST {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "date": "2026-12-25",
+  "price": 3500000,
+  "discount": 10
+}
+
+###
+@priceId1 = {{createPriceDate.response.body.$.data._id}}
+
+### 15) Tạo cấu hình giá động theo loại ngày (ví dụ weekend)
+# @name createPriceDayType
+POST {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "dayType": "weekend",
+  "price": 2800000
+}
+
+###
+@priceId2 = {{createPriceDayType.response.body.$.data._id}}
+
+### 16) Xóa cấu hình giá động
+DELETE {{base}}/manager/room-prices/{{priceId1}}
+Authorization: Bearer {{mToken}}
+
