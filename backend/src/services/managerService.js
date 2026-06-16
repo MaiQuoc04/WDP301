@@ -6,6 +6,7 @@ const Room      = require('../models/roomModel')
 const RoomPrice = require('../models/roomPriceModel')
 const Booking   = require('../models/bookingModel')
 const Amenity   = require('../models/amenityModel')
+const RoomAmenity = require('../models/roomAmenityModel')
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 // Ném lỗi với HTTP status code (controller sẽ bắt và trả về client)
@@ -310,7 +311,7 @@ exports.updateAmenity = async (id, data, branchId) => {
   return am.save()
 }
 
-// Đổi trạng thái tiện nghi thành inactive (Deactivate) và tự động gỡ khỏi RoomTypes
+// Đổi trạng thái tiện nghi thành inactive (Deactivate) và tự động gỡ khỏi RoomTypes & RoomAmenities
 exports.deactivateAmenity = async (id, branchId) => {
   const am = await Amenity.findOne({ _id: id, branch: branchId })
   if (!am) fail('Tiện nghi không tồn tại', 404)
@@ -323,6 +324,9 @@ exports.deactivateAmenity = async (id, branchId) => {
     { branch: branchId },
     { $pull: { amenities: id } }
   )
+
+  // Tự động gỡ tiện nghi này khỏi tất cả phòng vật lý (RoomAmenity)
+  await RoomAmenity.deleteMany({ amenity: id })
 
   return am
 }

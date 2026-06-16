@@ -11,6 +11,7 @@ const Branch = require('../src/models/branchModel')
 const Room = require('../src/models/roomModel')
 const RoomType = require('../src/models/roomTypeModel')
 const RoomPrice = require('../src/models/roomPriceModel')
+const RoomAmenity = require('../src/models/roomAmenityModel')
 const { execSync } = require('child_process')
 
 // Helper assert đơn giản
@@ -280,7 +281,7 @@ async function runTests() {
     console.log('✅ Pass: Chặn gán tiện nghi khác chi nhánh thành công')
   }
 
-  // Case 5: Deactivate Amenity & Tự động gỡ khỏi RoomType
+  // Case 5: Deactivate Amenity & Tự động gỡ khỏi RoomType & RoomAmenity
   const standardAmBefore = await managerService.getRoomTypeAmenities(standardRT._id, branch._id)
   const amToDeactivate = standardAmBefore[0]
 
@@ -294,7 +295,12 @@ async function runTests() {
   const activeOptions = await managerService.getAmenityOptions(branch._id)
   const isOptionVisible = activeOptions.some(a => a._id.toString() === amToDeactivate._id.toString())
   assert(!isOptionVisible, 'Tiện nghi bị deactive không được hiển thị trong options dropdown')
-  console.log('✅ Pass: Deactivate tiện nghi tự động gỡ khỏi RoomType và ẩn khỏi dropdown thành công')
+
+  // Xác minh đã gỡ sạch khỏi RoomAmenity vật lý của các phòng
+  const physicalRoomAmCount = await RoomAmenity.countDocuments({ amenity: amToDeactivate._id })
+  assert(physicalRoomAmCount === 0, 'Tất cả RoomAmenity liên quan phải bị xóa khi deactivate')
+
+  console.log('✅ Pass: Deactivate tiện nghi tự động gỡ khỏi RoomType, RoomAmenity và ẩn khỏi dropdown thành công')
 
 
   // =========================================================================
