@@ -397,9 +397,132 @@ async function runTests() {
   }
 
   // =========================================================================
-  // 9. Cleanup & Restore Database
+  // 9. Kiểm tra Sự Cố Phòng (Room Issue - UC70) & Branch Isolation
   // =========================================================================
-  console.log('\n--- Test 9: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 9: Sự Cố Phòng (Room Issue - UC70) & Branch Isolation ---')
+
+  const RoomIssue = require('../src/models/roomIssueModel')
+
+  // Lấy phòng 201 đang available
+  const room201 = await Room.findOne({ roomNumber: '201', branch: branch._id })
+  assert(room201, 'Phòng 201 phải tồn tại')
+  assert(room201.status === 'available', 'Phòng 201 ban đầu phải ở trạng thái available')
+
+  // Case 1: Tạo mới sự cố và xác minh trạng thái phòng chuyển sang maintenance
+  const issueA = await managerService.createRoomIssue({
+    room: room201._id,
+    description: 'Hỏng vòi hoa sen',
+    severity: 'medium'
+  }, branch._id, managerAcc._id)
+
+  assert(issueA, 'Phải tạo thành công sự cố A')
+  assert(issueA.status === 'open', 'Trạng thái sự cố A mới tạo phải là open')
+  assert(issueA.severity === 'medium', 'Mức độ nghiêm trọng phải là medium')
+
+  const room201AfterA = await Room.findById(room201._id)
+  assert(room201AfterA.status === 'maintenance', 'Phòng 201 phải tự động chuyển sang maintenance')
+  console.log('✅ Pass: Tạo sự cố mới tự động chuyển trạng thái phòng sang maintenance')
+
+  // Case 2: Tạo thêm sự cố B trên cùng phòng 201 (Multiple Open Issues)
+  const issueB = await managerService.createRoomIssue({
+    room: room201._id,
+    description: 'Điều hòa không lạnh',
+    severity: 'high'
+  }, branch._id, managerAcc._id)
+
+  assert(issueB, 'Phải tạo thành công sự cố B')
+  
+  // Resolve sự cố A → Xác minh phòng vẫn ở trạng thái maintenance vì sự cố B vẫn đang open
+  await managerService.resolveRoomIssue(issueA._id, {
+    resolutionNote: 'Đã thay vòi hoa sen mới'
+  }, branch._id, managerAcc._id)
+
+  const room201AfterResolveA = await Room.findById(room201._id)
+  assert(room201AfterResolveA.status === 'maintenance', 'Phòng 201 vẫn phải là maintenance do sự cố B còn mở')
+  console.log('✅ Pass: Giải quyết 1 sự cố khi vẫn còn sự cố khác mở, phòng vẫn giữ trạng thái maintenance')
+
+  // Case 3: Chặn giải quyết sự cố đã xử lý (Validation)
+  try {
+    await managerService.resolveRoomIssue(issueA._id, {
+      resolutionNote: 'Resolve lại lần nữa'
+    }, branch._id, managerAcc._id)
+    assert(false, 'Resolve sự cố đã giải quyết phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Sự cố đã được xử lý', 'Thông báo lỗi phải là "Sự cố đã được xử lý"')
+    console.log('✅ Pass: Chặn resolve sự cố đã được đóng từ trước thành công')
+  }
+
+  // Case 4: Lấy danh sách sự cố và lọc theo open/resolved
+  const openIssues = await managerService.getRoomIssues(branch._id, { status: 'open' })
+  assert(openIssues.length > 0, 'Danh sách sự cố open phải chứa ít nhất 1 phần tử (sự cố B)')
+  assert(openIssues.every(i => i.status === 'open'), 'Tất cả các sự cố trong danh sách open phải có status là open')
+
+  const resolvedIssues = await managerService.getRoomIssues(branch._id, { status: 'resolved' })
+  assert(resolvedIssues.length > 0, 'Danh sách sự cố resolved phải chứa ít nhất 1 phần tử (sự cố A)')
+  assert(resolvedIssues.every(i => i.status === 'resolved'), 'Tất cả các sự cố trong danh sách resolved phải có status là resolved')
+  console.log('✅ Pass: Lấy danh sách sự cố phòng và áp dụng bộ lọc thành công')
+
+  // Case 5: Branch Isolation khi Xem chi tiết / Xử lý sự cố
+  const diffBranchId2 = new mongoose.Types.ObjectId()
+  
+  // Xem chi tiết sự cố của HN01 bằng branchId khác phải lỗi 404
+  try {
+    await managerService.getRoomIssueById(issueB._id, diffBranchId2)
+    assert(false, 'Xem chi tiết sự cố của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo sự cố không tồn tại (404)')
+    console.log('✅ Pass: Chặn xem chi tiết sự cố của chi nhánh khác')
+  }
+
+  // Xử lý sự cố của HN01 bằng branchId khác phải lỗi 404
+  try {
+    await managerService.resolveRoomIssue(issueB._id, {
+      resolutionNote: 'Hack resolve'
+    }, diffBranchId2, managerAcc._id)
+    assert(false, 'Xử lý sự cố của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo sự cố không tồn tại (404)')
+    console.log('✅ Pass: Chặn giải quyết sự cố của chi nhánh khác')
+  }
+
+  // Case 6: Giải quyết sự cố B (sự cố cuối cùng) → Xác minh phòng trở lại trạng thái available
+  await managerService.resolveRoomIssue(issueB._id, {
+    resolutionNote: 'Đã sửa quạt gió điều hòa và nạp ga'
+  }, branch._id, managerAcc._id)
+
+  const room201AfterResolveB = await Room.findById(room201._id)
+  assert(room201AfterResolveB.status === 'available', 'Phòng 201 phải tự động chuyển lại thành available khi hết sự cố open')
+  console.log('✅ Pass: Giải quyết sự cố cuối cùng, phòng khôi phục trạng thái available thành công')
+
+  // Case 7: Báo sự cố trên phòng occupied không ghi đè trạng thái occupied
+  const room102 = await Room.findOne({ roomNumber: '102', branch: branch._id })
+  assert(room102, 'Phòng 102 phải tồn tại')
+  // Giả lập phòng 102 đang occupied
+  room102.status = 'occupied'
+  await room102.save()
+
+  const issueC = await managerService.createRoomIssue({
+    room: room102._id,
+    description: 'Tivi bị sọc màn hình',
+    severity: 'low'
+  }, branch._id, managerAcc._id)
+
+  const room102AfterC = await Room.findById(room102._id)
+  assert(room102AfterC.status === 'occupied', 'Trạng thái phòng occupied phải được giữ nguyên không ghi đè')
+
+  // Resolve sự cố C
+  await managerService.resolveRoomIssue(issueC._id, {
+    resolutionNote: 'Đã thay tivi mới'
+  }, branch._id, managerAcc._id)
+
+  const room102AfterResolveC = await Room.findById(room102._id)
+  assert(room102AfterResolveC.status === 'occupied', 'Giải quyết sự cố xong phòng vẫn phải giữ nguyên trạng thái occupied')
+  console.log('✅ Pass: Báo sự cố và giải quyết sự cố trên phòng occupied không ghi đè trạng thái occupied')
+
+  // =========================================================================
+  // 10. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 10: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   
@@ -414,3 +537,4 @@ runTests().catch(err => {
   console.error('\n❌ PHÁT SINH LỖI KHI CHẠY TEST:', err.message)
   process.exit(1)
 })
+

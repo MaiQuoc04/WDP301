@@ -45,5 +45,12 @@ router.post('/services', managerController.createService)
 router.put('/services/:id', managerController.updateService)
 router.patch('/services/:id/deactivate', managerController.deactivateService)
 
+// ─── Room Issues ───────────────────────────────────────────────────────────────
+router.get('/room-issues', managerController.getRoomIssues)
+router.get('/room-issues/:id', managerController.getRoomIssueById)
+router.post('/room-issues', managerController.createRoomIssue)
+router.patch('/room-issues/:id/resolve', managerController.resolveRoomIssue)
+
 module.exports = router
+
 

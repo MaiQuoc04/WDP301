@@ -50,3 +50,10 @@ exports.createService     = handle((req) => svc.createService(req.body, req.bran
 exports.updateService     = handle((req) => svc.updateService(req.params.id, req.body, req.branchId))
 exports.deactivateService = handle((req) => svc.deactivateService(req.params.id, req.branchId))
 
+// ─── RoomIssue ──────────────────────────────────────────────────────────────────
+exports.getRoomIssues    = handle((req) => svc.getRoomIssues(req.branchId, req.query))
+exports.getRoomIssueById  = handle((req) => svc.getRoomIssueById(req.params.id, req.branchId))
+exports.createRoomIssue  = handle((req) => svc.createRoomIssue(req.body, req.branchId, req.user.id), 201)
+exports.resolveRoomIssue = handle((req) => svc.resolveRoomIssue(req.params.id, req.body, req.branchId, req.user.id))
+
+

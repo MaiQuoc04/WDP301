@@ -8,6 +8,8 @@ const Booking   = require('../models/bookingModel')
 const Amenity   = require('../models/amenityModel')
 const RoomAmenity = require('../models/roomAmenityModel')
 const Service   = require('../models/serviceModel')
+const RoomIssue = require('../models/roomIssueModel')
+
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 // Ném lỗi với HTTP status code (controller sẽ bắt và trả về client)
@@ -460,5 +462,106 @@ exports.deactivateService = async (id, branchId) => {
   svc.status = 'inactive'
   return svc.save()
 }
+
+// ─── RoomIssue (CRUD & Workflow - UC70) ──────────────────────────────────────────
+
+// Lấy danh sách sự cố phòng của chi nhánh
+exports.getRoomIssues = async (branchId, query = {}) => {
+  const filter = { branch: branchId }
+
+  if (query.status) {
+    if (['open', 'resolved'].includes(query.status)) {
+      filter.status = query.status
+    }
+  }
+  if (query.room) {
+    filter.room = query.room
+  }
+  if (query.severity) {
+    if (['low', 'medium', 'high'].includes(query.severity)) {
+      filter.severity = query.severity
+    }
+  }
+
+  return RoomIssue.find(filter)
+    .populate('room', 'roomNumber status')
+    .populate('reporter', 'email')
+    .populate('resolvedBy', 'email')
+    .sort({ createdAt: -1 })
+}
+
+// Lấy thông tin chi tiết sự cố phòng
+exports.getRoomIssueById = async (id, branchId) => {
+  const issue = await RoomIssue.findOne({ _id: id, branch: branchId })
+    .populate('room', 'roomNumber status')
+    .populate('reporter', 'email')
+    .populate('resolvedBy', 'email')
+
+  if (!issue) fail('Sự cố không tồn tại', 404)
+  return issue
+}
+
+// Tạo mới sự cố phòng
+exports.createRoomIssue = async (data, branchId, reporterId) => {
+  const { room: roomId, description, severity } = data
+
+  if (!roomId) fail('ID phòng không được để trống')
+  if (!description?.trim()) fail('Mô tả sự cố không được để trống')
+
+  // Xác minh phòng thuộc chi nhánh và chưa bị xóa
+  const room = await Room.findOne({ _id: roomId, branch: branchId, isDeleted: { $ne: true } })
+  if (!room) fail('Phòng không tồn tại', 404)
+
+  const issue = await RoomIssue.create({
+    branch: branchId,
+    room: roomId,
+    reporter: reporterId,
+    description: description.trim(),
+    severity: severity || 'medium',
+    status: 'open'
+  })
+
+  // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
+  // Không ghi đè nếu phòng đang 'occupied' (khách đang ở)
+  if (['available', 'cleaning'].includes(room.status)) {
+    room.status = 'maintenance'
+    await room.save()
+  }
+
+  return issue
+}
+
+// Giải quyết sự cố phòng
+exports.resolveRoomIssue = async (id, data, branchId, managerId) => {
+  const { resolutionNote } = data
+
+  // Tìm sự cố và cô lập theo chi nhánh
+  const issue = await RoomIssue.findOne({ _id: id, branch: branchId })
+  if (!issue) fail('Sự cố không tồn tại', 404)
+
+  // Chặn giải quyết sự cố đã xử lý xong
+  if (issue.status === 'resolved') {
+    fail('Sự cố đã được xử lý')
+  }
+
+  issue.status = 'resolved'
+  issue.resolvedBy = managerId
+  issue.resolvedAt = new Date()
+  issue.resolutionNote = resolutionNote?.trim() || ''
+  await issue.save()
+
+  // Kiểm tra xem phòng còn sự cố nào khác đang mở không
+  const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' })
+  if (openCount === 0) {
+    const room = await Room.findOne({ _id: issue.room, branch: branchId })
+    if (room && room.status === 'maintenance') {
+      room.status = 'available'
+      await room.save()
+    }
+  }
+
+  return issue
+}
+
 
 

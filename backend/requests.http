@@ -358,4 +358,46 @@ PATCH {{base}}/manager/services/{{newServiceId}}/deactivate
 Authorization: Bearer {{mToken}}
 
 
+### =========================================================================
+### ROOM ISSUE APIs (UC-70)
+### =========================================================================
+
+### 30) Lấy toàn bộ danh sách sự cố phòng của chi nhánh
+GET {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+
+### 31) Lấy danh sách sự cố phòng có bộ lọc (ví dụ: đang mở, mức độ cao)
+GET {{base}}/manager/room-issues?status=open&severity=high
+Authorization: Bearer {{mToken}}
+
+### 32) Tạo mới sự cố phòng (Ví dụ báo hỏng bóng đèn phòng 102)
+# @name createRoomIssue
+POST {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "room": "660c1c875d5e5e23c015b102",
+  "description": "Bóng đèn ngủ bị cháy không sáng",
+  "severity": "low"
+}
+
+###
+@newIssueId = {{createRoomIssue.response.body.$.data._id}}
+
+### 33) Lấy chi tiết sự cố phòng
+GET {{base}}/manager/room-issues/{{newIssueId}}
+Authorization: Bearer {{mToken}}
+
+### 34) Giải quyết sự cố phòng (Resolve)
+PATCH {{base}}/manager/room-issues/{{newIssueId}}/resolve
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "resolutionNote": "Đã thay bóng đèn ngủ LED mới loại 5W"
+}
+
+
+
 
