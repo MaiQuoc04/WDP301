@@ -221,9 +221,86 @@ async function runTests() {
   }
 
   // =========================================================================
-  // 7. Cleanup & Restore Database
+  // 7. Kiểm tra Tiện Nghi (Amenity) & Gán Tiện Nghi cho RoomType (RoomAmenity)
   // =========================================================================
-  console.log('\n--- Test 7: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 7: Tiện Nghi & RoomType-Amenity Mapping ---')
+
+  const AmenityModel = require('../src/models/amenityModel')
+
+  // Case 1: Tạo Amenity mới thành công
+  const testAmenity = await managerService.createAmenity({
+    name: 'Loa Bluetooth',
+    missingPrice: 300000,
+    unit: 'cái'
+  }, branch._id)
+  assert(testAmenity, 'Phải tạo được tiện nghi Loa Bluetooth')
+  assert(testAmenity.status === 'active', 'Trạng thái mặc định phải là active')
+  console.log('✅ Pass: Tạo tiện nghi mới thành công')
+
+  // Case 2: Chặn tạo trùng tên tiện nghi trên cùng chi nhánh (Unique Index)
+  try {
+    await managerService.createAmenity({
+      name: 'Loa Bluetooth',
+      missingPrice: 400000
+    }, branch._id)
+    assert(false, 'Tạo tiện nghi trùng tên trong chi nhánh phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('đã tồn tại') || err.code === 11000, 'Lỗi phải trả về đúng thông báo trùng hoặc trùng index')
+    console.log('✅ Pass: Chặn tạo tiện nghi trùng tên thành công')
+  }
+
+  // Case 3: Gán danh sách tiện nghi cho RoomType (Replace/Ghi đè)
+  const seededAmenities = await managerService.getAmenityOptions(branch._id)
+  const amenityIds = seededAmenities.slice(0, 3).map(a => a._id.toString()) // 3 tiện nghi đầu
+
+  const updatedRtAmenities = await managerService.updateRoomTypeAmenities(standardRT._id, amenityIds, branch._id)
+  assert(updatedRtAmenities.length === 3, 'Danh sách tiện nghi sau khi gán phải đúng bằng 3')
+  
+  // Kiểm tra duplicate id trong input gán tiện nghi (Deduplicate)
+  const dupInputIds = [...amenityIds, amenityIds[0], amenityIds[0]]
+  const deduplicatedAmenities = await managerService.updateRoomTypeAmenities(standardRT._id, dupInputIds, branch._id)
+  assert(deduplicatedAmenities.length === 3, 'Deduplicate: Gán danh sách chứa phần tử trùng lặp phải được loại bỏ tự động')
+  console.log('✅ Pass: Gán tiện nghi cho RoomType thành công với cơ chế ghi đè & deduplicate')
+
+  // Case 4: Chặn gán tiện nghi khác chi nhánh (Branch Isolation)
+  const otherBranchId = new mongoose.Types.ObjectId()
+  const otherAmenity = await AmenityModel.create({
+    branch: otherBranchId,
+    name: 'Tủ Lạnh DN01',
+    missingPrice: 1000000,
+    unit: 'cái',
+    status: 'active'
+  })
+  
+  try {
+    await managerService.updateRoomTypeAmenities(standardRT._id, [otherAmenity._id.toString()], branch._id)
+    assert(false, 'Gán tiện nghi thuộc chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không thuộc chi nhánh này'), 'Lỗi phải trả về đúng thông báo chặn')
+    console.log('✅ Pass: Chặn gán tiện nghi khác chi nhánh thành công')
+  }
+
+  // Case 5: Deactivate Amenity & Tự động gỡ khỏi RoomType
+  const standardAmBefore = await managerService.getRoomTypeAmenities(standardRT._id, branch._id)
+  const amToDeactivate = standardAmBefore[0]
+
+  await managerService.deactivateAmenity(amToDeactivate._id, branch._id)
+  console.log(`-> Đã deactivate tiện nghi "${amToDeactivate.name}"`)
+
+  const standardAmAfter = await managerService.getRoomTypeAmenities(standardRT._id, branch._id)
+  const isStillLinked = standardAmAfter.some(a => a._id.toString() === amToDeactivate._id.toString())
+  assert(!isStillLinked, 'Tiện nghi đã deactivate phải được tự động gỡ khỏi RoomType')
+
+  const activeOptions = await managerService.getAmenityOptions(branch._id)
+  const isOptionVisible = activeOptions.some(a => a._id.toString() === amToDeactivate._id.toString())
+  assert(!isOptionVisible, 'Tiện nghi bị deactive không được hiển thị trong options dropdown')
+  console.log('✅ Pass: Deactivate tiện nghi tự động gỡ khỏi RoomType và ẩn khỏi dropdown thành công')
+
+
+  // =========================================================================
+  // 8. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 8: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   

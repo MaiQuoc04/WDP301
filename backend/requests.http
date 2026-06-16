@@ -256,3 +256,59 @@ Content-Type: application/json
 DELETE {{base}}/manager/room-prices/{{priceId1}}
 Authorization: Bearer {{mToken}}
 
+
+### =========================================================================
+### AMENITY & ROOM AMENITY APIs (UC-63→65)
+### =========================================================================
+
+### 17) Lấy toàn bộ danh sách Amenities của chi nhánh
+GET {{base}}/manager/amenities
+Authorization: Bearer {{mToken}}
+
+### 18) Lấy danh sách options Amenities đang hoạt động (dropdown)
+GET {{base}}/manager/amenities/options
+Authorization: Bearer {{mToken}}
+
+### 19) Tạo mới Amenity
+# @name createAmenity
+POST {{base}}/manager/amenities
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Loa Bluetooth cao cấp",
+  "missingPrice": 500000,
+  "unit": "cái"
+}
+
+###
+@newAmenityId = {{createAmenity.response.body.$.data._id}}
+
+### 20) Cập nhật Amenity
+PUT {{base}}/manager/amenities/{{newAmenityId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "missingPrice": 550000,
+  "unit": "bộ"
+}
+
+### 21) Gán danh sách Amenities cho RoomType (Ghi đè)
+PUT {{base}}/manager/room-types/{{newRtId}}/amenities
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "amenityIds": ["{{newAmenityId}}"]
+}
+
+### 22) Lấy danh sách Amenities đã gán cho RoomType
+GET {{base}}/manager/room-types/{{newRtId}}/amenities
+Authorization: Bearer {{mToken}}
+
+### 23) Deactivate Amenity (Ẩn và tự động gỡ khỏi RoomType)
+PATCH {{base}}/manager/amenities/{{newAmenityId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+

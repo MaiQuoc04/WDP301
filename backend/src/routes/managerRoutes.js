@@ -26,4 +26,15 @@ router.get('/room-prices', managerController.getRoomPrices)
 router.post('/room-prices', managerController.createOrUpdateRoomPrice)
 router.delete('/room-prices/:id', managerController.deleteRoomPrice)
 
+// ─── Amenities ─────────────────────────────────────────────────────────────────
+router.get('/amenities', managerController.getAmenities)
+router.get('/amenities/options', managerController.getAmenityOptions)
+router.post('/amenities', managerController.createAmenity)
+router.put('/amenities/:id', managerController.updateAmenity)
+router.patch('/amenities/:id/deactivate', managerController.deactivateAmenity)
+
+// ─── RoomType Amenities mapping ────────────────────────────────────────────────
+router.get('/room-types/:id/amenities', managerController.getRoomTypeAmenities)
+router.put('/room-types/:id/amenities', managerController.updateRoomTypeAmenities)
+
 module.exports = router

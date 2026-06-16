@@ -5,6 +5,7 @@ const RoomType  = require('../models/roomTypeModel')
 const Room      = require('../models/roomModel')
 const RoomPrice = require('../models/roomPriceModel')
 const Booking   = require('../models/bookingModel')
+const Amenity   = require('../models/amenityModel')
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 // Ném lỗi với HTTP status code (controller sẽ bắt và trả về client)
@@ -249,3 +250,121 @@ exports.deleteRoomPrice = async (id, branchId) => {
   await rp.deleteOne()
   return { message: 'Đã xóa cấu hình giá' }
 }
+
+// ─── Amenity (CRUD) ────────────────────────────────────────────────────────────
+
+// Lấy danh sách toàn bộ tiện nghi của chi nhánh
+exports.getAmenities = async (branchId) => {
+  return Amenity.find({ branch: branchId }).sort({ createdAt: -1 })
+}
+
+// Lấy danh sách rút gọn tiện nghi đang hoạt động phục vụ dropdown (chỉ lấy name)
+exports.getAmenityOptions = async (branchId) => {
+  return Amenity.find({ branch: branchId, status: 'active' }, '_id name').sort({ name: 1 })
+}
+
+// Tạo mới tiện nghi
+exports.createAmenity = async (data, branchId) => {
+  const { name, missingPrice, unit } = data
+
+  if (!name?.trim()) fail('Tên tiện nghi không được để trống')
+  if (missingPrice != null && missingPrice < 0) fail('Giá phạt khi mất mát phải >= 0')
+
+  // Đảm bảo tên tiện nghi độc nhất trong cùng chi nhánh
+  const trimmedName = name.trim()
+  const exists = await Amenity.findOne({ branch: branchId, name: trimmedName })
+  if (exists) fail(`Tiện nghi "${trimmedName}" đã tồn tại trong chi nhánh`)
+
+  return Amenity.create({
+    branch: branchId,
+    name: trimmedName,
+    missingPrice: missingPrice || 0,
+    unit: unit || 'cái',
+    status: 'active'
+  })
+}
+
+// Cập nhật thông tin tiện nghi
+exports.updateAmenity = async (id, data, branchId) => {
+  const am = await Amenity.findOne({ _id: id, branch: branchId })
+  if (!am) fail('Tiện nghi không tồn tại', 404)
+
+  const { name, missingPrice, unit } = data
+
+  if (name != null) {
+    const trimmed = name.trim()
+    if (!trimmed) fail('Tên tiện nghi không được để trống')
+    // Kiểm tra trùng tên với Amenity khác trong cùng chi nhánh
+    const dup = await Amenity.findOne({ branch: branchId, name: trimmed, _id: { $ne: id } })
+    if (dup) fail(`Tên tiện nghi "${trimmed}" đã tồn tại trong chi nhánh`)
+    am.name = trimmed
+  }
+
+  if (missingPrice != null) {
+    if (missingPrice < 0) fail('Giá phạt khi mất mát phải >= 0')
+    am.missingPrice = missingPrice
+  }
+
+  if (unit != null) am.unit = unit
+
+  return am.save()
+}
+
+// Đổi trạng thái tiện nghi thành inactive (Deactivate) và tự động gỡ khỏi RoomTypes
+exports.deactivateAmenity = async (id, branchId) => {
+  const am = await Amenity.findOne({ _id: id, branch: branchId })
+  if (!am) fail('Tiện nghi không tồn tại', 404)
+
+  am.status = 'inactive'
+  await am.save()
+
+  // Tự động gỡ tiện nghi này ra khỏi mảng amenities của mọi RoomType trong chi nhánh
+  await RoomType.updateMany(
+    { branch: branchId },
+    { $pull: { amenities: id } }
+  )
+
+  return am
+}
+
+// ─── RoomType Amenities mapping ────────────────────────────────────────────────
+
+// Lấy danh sách tiện nghi của một RoomType cụ thể
+exports.getRoomTypeAmenities = async (roomTypeId, branchId) => {
+  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+    .populate('amenities', 'name missingPrice unit status')
+  if (!rt) fail('Loại phòng không tồn tại', 404)
+
+  return rt.amenities
+}
+
+// Cập nhật danh sách tiện nghi cho một RoomType
+exports.updateRoomTypeAmenities = async (roomTypeId, amenityIds, branchId) => {
+  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+  if (!rt) fail('Loại phòng không tồn tại', 404)
+
+  if (!Array.isArray(amenityIds)) fail('Danh sách ID tiện nghi không hợp lệ')
+
+  // Loại bỏ các ID trùng lặp
+  const uniqueIds = [...new Set(amenityIds.map(String))]
+
+  // Kiểm tra xem tất cả các tiện nghi có thuộc chi nhánh này và đang hoạt động (active) hay không
+  const validAmenitiesCount = await Amenity.countDocuments({
+    _id: { $in: uniqueIds },
+    branch: branchId,
+    status: 'active'
+  })
+
+  if (validAmenitiesCount !== uniqueIds.length) {
+    fail('Một hoặc nhiều tiện nghi không hợp lệ hoặc không thuộc chi nhánh này hoặc đang bị ngưng hoạt động')
+  }
+
+  rt.amenities = uniqueIds
+  await rt.save()
+
+  // Trả về danh sách đã được populate
+  const updatedRt = await RoomType.findById(roomTypeId).populate('amenities', 'name missingPrice unit status')
+  return updatedRt.amenities
+}
+
+
