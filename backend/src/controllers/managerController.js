@@ -30,3 +30,23 @@ exports.deactivateRoom  = handle((req) => svc.deactivateRoom(req.params.id, req.
 exports.getRoomPrices           = handle((req) => svc.getRoomPrices(req.branchId))
 exports.createOrUpdateRoomPrice = handle((req) => svc.createOrUpdateRoomPrice(req.body, req.branchId), 201)
 exports.deleteRoomPrice         = handle((req) => svc.deleteRoomPrice(req.params.id, req.branchId))
+
+// ─── Amenity ──────────────────────────────────────────────────────────────────
+exports.getAmenities      = handle((req) => svc.getAmenities(req.branchId))
+exports.getAmenityOptions = handle((req) => svc.getAmenityOptions(req.branchId))
+exports.createAmenity     = handle((req) => svc.createAmenity(req.body, req.branchId), 201)
+exports.updateAmenity     = handle((req) => svc.updateAmenity(req.params.id, req.body, req.branchId))
+exports.deactivateAmenity = handle((req) => svc.deactivateAmenity(req.params.id, req.branchId))
+
+// ─── RoomType Amenities mapping ────────────────────────────────────────────────
+exports.getRoomTypeAmenities    = handle((req) => svc.getRoomTypeAmenities(req.params.id, req.branchId))
+exports.updateRoomTypeAmenities = handle((req) => svc.updateRoomTypeAmenities(req.params.id, req.body.amenityIds, req.branchId))
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+exports.getServices      = handle((req) => svc.getServices(req.branchId))
+exports.getServiceById   = handle((req) => svc.getServiceById(req.params.id, req.branchId))
+exports.getServiceOptions = handle((req) => svc.getServiceOptions(req.branchId))
+exports.createService     = handle((req) => svc.createService(req.body, req.branchId), 201)
+exports.updateService     = handle((req) => svc.updateService(req.params.id, req.body, req.branchId))
+exports.deactivateService = handle((req) => svc.deactivateService(req.params.id, req.branchId))
+

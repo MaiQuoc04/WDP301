@@ -11,6 +11,7 @@ const roomTypeSchema = new mongoose.Schema({
   description: { type: String, trim: true },
   images:      [{ type: String }],
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
+  amenities:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Amenity' }],
 }, { timestamps: true })
 
 roomTypeSchema.index({ branch: 1, name: 1 }, { unique: true })

@@ -148,29 +148,87 @@ async function seed() {
       { roomType: r.roomType._id, floor: r.floor, status: 'available' }, `Room ${r.roomNumber}`))
   }
 
-  // 6) Amenity + gán vào từng phòng (RoomAmenity)
+  // 6) Amenity + gán vào từng phòng (RoomAmenity) & RoomType
   const amenitySpecs = [
     { name: 'Khăn tắm', missingPrice: 50000 },
     { name: 'Dép', missingPrice: 30000 },
     { name: 'Nước suối', missingPrice: 15000 },
+    { name: 'Wifi', missingPrice: 0 },
+    { name: 'TV', missingPrice: 2000000 },
+    { name: 'Air Conditioner', missingPrice: 5000000 },
+    { name: 'Mini Bar', missingPrice: 1500000 },
+    { name: 'Bathtub', missingPrice: 4000000 },
+    { name: 'Breakfast', missingPrice: 0 },
+    { name: 'Balcony', missingPrice: 0 },
+    { name: 'Safe Box', missingPrice: 1000000 },
   ]
   const amenityDocs = []
   for (const a of amenitySpecs) {
     amenityDocs.push(await ensure(Amenity, { branch: branch._id, name: a.name },
       { missingPrice: a.missingPrice, unit: 'cái', status: 'active' }, `Amenity ${a.name}`))
   }
+
+  const wifi = amenityDocs.find(a => a.name === 'Wifi')
+  const tv = amenityDocs.find(a => a.name === 'TV')
+  const ac = amenityDocs.find(a => a.name === 'Air Conditioner')
+  const miniBar = amenityDocs.find(a => a.name === 'Mini Bar')
+  const bathtub = amenityDocs.find(a => a.name === 'Bathtub')
+  const breakfast = amenityDocs.find(a => a.name === 'Breakfast')
+  const balcony = amenityDocs.find(a => a.name === 'Balcony')
+  const safeBox = amenityDocs.find(a => a.name === 'Safe Box')
+
+  // Gán tiện nghi tiêu chuẩn cho RoomType
+  standard.amenities = [wifi._id, tv._id]
+  await standard.save()
+
+  deluxeTwin.amenities = [wifi._id, tv._id, ac._id]
+  await deluxeTwin.save()
+
+  deluxeDouble.amenities = [wifi._id, tv._id, ac._id, miniBar._id]
+  await deluxeDouble.save()
+
+  familySuite.amenities = [wifi._id, tv._id, ac._id, bathtub._id, breakfast._id]
+  await familySuite.save()
+
+  execSuite.amenities = [wifi._id, tv._id, ac._id, miniBar._id, bathtub._id, breakfast._id, balcony._id, safeBox._id]
+  await execSuite.save()
+
+  // Gán RoomAmenity vật lý cho phòng (bao gồm Khăn tắm, Dép, Nước suối + các tiện nghi của RoomType đó)
+  const baseAmenities = amenityDocs.filter(a => ['Khăn tắm', 'Dép', 'Nước suối'].includes(a.name))
+
   for (const room of roomDocs) {
-    for (const am of amenityDocs) {
-      await ensure(RoomAmenity, { room: room._id, amenity: am._id },
-        { quantity: 2, condition: 'active' }, `RoomAmenity ${room.roomNumber}/${am.name}`)
+    // Tìm RoomType của room này để lấy amenities tiêu chuẩn
+    let rtAmenities = []
+    if (room.roomType.toString() === standard._id.toString()) rtAmenities = standard.amenities
+    else if (room.roomType.toString() === deluxeTwin._id.toString()) rtAmenities = deluxeTwin.amenities
+    else if (room.roomType.toString() === deluxeDouble._id.toString()) rtAmenities = deluxeDouble.amenities
+    else if (room.roomType.toString() === familySuite._id.toString()) rtAmenities = familySuite.amenities
+    else if (room.roomType.toString() === execSuite._id.toString()) rtAmenities = execSuite.amenities
+
+    // Các amenities cần gán cho room vật lý này
+    const allRoomAmIds = [...baseAmenities.map(a => a._id), ...rtAmenities]
+    
+    for (const amId of allRoomAmIds) {
+      const amObj = amenityDocs.find(a => a._id.toString() === amId.toString())
+      await ensure(RoomAmenity, { room: room._id, amenity: amId },
+        { quantity: 2, condition: 'active' }, `RoomAmenity ${room.roomNumber}/${amObj.name}`)
     }
   }
 
   // 7) Extra Service
-  await ensure(Service, { branch: branch._id, name: 'Massage' },
-    { price: 300000, status: 'active', description: 'Dịch vụ massage 60 phút' }, 'Service Massage')
-  await ensure(Service, { branch: branch._id, name: 'Ăn sáng' },
-    { price: 100000, status: 'active', description: 'Buffet sáng' }, 'Service Ăn sáng')
+  await ensure(Service, { branch: branch._id, name: 'Breakfast Buffet' },
+    { price: 150000, status: 'active', description: 'Buffet sáng tự chọn' }, 'Service Breakfast Buffet')
+  await ensure(Service, { branch: branch._id, name: 'Airport Transfer' },
+    { price: 300000, status: 'active', description: 'Đưa đón sân bay' }, 'Service Airport Transfer')
+  await ensure(Service, { branch: branch._id, name: 'Laundry Service' },
+    { price: 50000, status: 'active', description: 'Dịch vụ giặt ủi' }, 'Service Laundry Service')
+  await ensure(Service, { branch: branch._id, name: 'Spa Package' },
+    { price: 500000, status: 'active', description: 'Gói trị liệu Spa toàn thân' }, 'Service Spa Package')
+  await ensure(Service, { branch: branch._id, name: 'Extra Bed' },
+    { price: 350000, status: 'active', description: 'Kê thêm giường phụ' }, 'Service Extra Bed')
+  await ensure(Service, { branch: branch._id, name: 'Mini Bar Combo' },
+    { price: 120000, status: 'active', description: 'Combo nước ngọt và snack tại phòng' }, 'Service Mini Bar Combo')
+
 
   console.log('\n🌱 Seed hoàn tất.')
   console.log('Tài khoản test: admin@hbms.com/Admin@123 · receptionist@hbms.com/Recept@123 · housekeeper@hbms.com/House@123 · manager@hbms.com/Manager@123 · customer@hbms.com/Customer@123')

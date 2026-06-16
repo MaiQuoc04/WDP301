@@ -11,6 +11,7 @@ const Branch = require('../src/models/branchModel')
 const Room = require('../src/models/roomModel')
 const RoomType = require('../src/models/roomTypeModel')
 const RoomPrice = require('../src/models/roomPriceModel')
+const RoomAmenity = require('../src/models/roomAmenityModel')
 const { execSync } = require('child_process')
 
 // Helper assert đơn giản
@@ -221,9 +222,184 @@ async function runTests() {
   }
 
   // =========================================================================
-  // 7. Cleanup & Restore Database
+  // 7. Kiểm tra Tiện Nghi (Amenity) & Gán Tiện Nghi cho RoomType (RoomAmenity)
   // =========================================================================
-  console.log('\n--- Test 7: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 7: Tiện Nghi & RoomType-Amenity Mapping ---')
+
+  const AmenityModel = require('../src/models/amenityModel')
+
+  // Case 1: Tạo Amenity mới thành công
+  const testAmenity = await managerService.createAmenity({
+    name: 'Loa Bluetooth',
+    missingPrice: 300000,
+    unit: 'cái'
+  }, branch._id)
+  assert(testAmenity, 'Phải tạo được tiện nghi Loa Bluetooth')
+  assert(testAmenity.status === 'active', 'Trạng thái mặc định phải là active')
+  console.log('✅ Pass: Tạo tiện nghi mới thành công')
+
+  // Case 2: Chặn tạo trùng tên tiện nghi trên cùng chi nhánh (Unique Index)
+  try {
+    await managerService.createAmenity({
+      name: 'Loa Bluetooth',
+      missingPrice: 400000
+    }, branch._id)
+    assert(false, 'Tạo tiện nghi trùng tên trong chi nhánh phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('đã tồn tại') || err.code === 11000, 'Lỗi phải trả về đúng thông báo trùng hoặc trùng index')
+    console.log('✅ Pass: Chặn tạo tiện nghi trùng tên thành công')
+  }
+
+  // Case 3: Gán danh sách tiện nghi cho RoomType (Replace/Ghi đè)
+  const seededAmenities = await managerService.getAmenityOptions(branch._id)
+  const amenityIds = seededAmenities.slice(0, 3).map(a => a._id.toString()) // 3 tiện nghi đầu
+
+  const updatedRtAmenities = await managerService.updateRoomTypeAmenities(standardRT._id, amenityIds, branch._id)
+  assert(updatedRtAmenities.length === 3, 'Danh sách tiện nghi sau khi gán phải đúng bằng 3')
+  
+  // Kiểm tra duplicate id trong input gán tiện nghi (Deduplicate)
+  const dupInputIds = [...amenityIds, amenityIds[0], amenityIds[0]]
+  const deduplicatedAmenities = await managerService.updateRoomTypeAmenities(standardRT._id, dupInputIds, branch._id)
+  assert(deduplicatedAmenities.length === 3, 'Deduplicate: Gán danh sách chứa phần tử trùng lặp phải được loại bỏ tự động')
+  console.log('✅ Pass: Gán tiện nghi cho RoomType thành công với cơ chế ghi đè & deduplicate')
+
+  // Case 4: Chặn gán tiện nghi khác chi nhánh (Branch Isolation)
+  const otherBranchId = new mongoose.Types.ObjectId()
+  const otherAmenity = await AmenityModel.create({
+    branch: otherBranchId,
+    name: 'Tủ Lạnh DN01',
+    missingPrice: 1000000,
+    unit: 'cái',
+    status: 'active'
+  })
+  
+  try {
+    await managerService.updateRoomTypeAmenities(standardRT._id, [otherAmenity._id.toString()], branch._id)
+    assert(false, 'Gán tiện nghi thuộc chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không thuộc chi nhánh này'), 'Lỗi phải trả về đúng thông báo chặn')
+    console.log('✅ Pass: Chặn gán tiện nghi khác chi nhánh thành công')
+  }
+
+  // Case 5: Deactivate Amenity & Tự động gỡ khỏi RoomType & RoomAmenity
+  const standardAmBefore = await managerService.getRoomTypeAmenities(standardRT._id, branch._id)
+  const amToDeactivate = standardAmBefore[0]
+
+  await managerService.deactivateAmenity(amToDeactivate._id, branch._id)
+  console.log(`-> Đã deactivate tiện nghi "${amToDeactivate.name}"`)
+
+  const standardAmAfter = await managerService.getRoomTypeAmenities(standardRT._id, branch._id)
+  const isStillLinked = standardAmAfter.some(a => a._id.toString() === amToDeactivate._id.toString())
+  assert(!isStillLinked, 'Tiện nghi đã deactivate phải được tự động gỡ khỏi RoomType')
+
+  const activeOptions = await managerService.getAmenityOptions(branch._id)
+  const isOptionVisible = activeOptions.some(a => a._id.toString() === amToDeactivate._id.toString())
+  assert(!isOptionVisible, 'Tiện nghi bị deactive không được hiển thị trong options dropdown')
+
+  // Xác minh đã gỡ sạch khỏi RoomAmenity vật lý của các phòng
+  const physicalRoomAmCount = await RoomAmenity.countDocuments({ amenity: amToDeactivate._id })
+  assert(physicalRoomAmCount === 0, 'Tất cả RoomAmenity liên quan phải bị xóa khi deactivate')
+
+  console.log('✅ Pass: Deactivate tiện nghi tự động gỡ khỏi RoomType, RoomAmenity và ẩn khỏi dropdown thành công')
+
+
+  // =========================================================================
+  // 8. Kiểm tra Dịch vụ (Service CRUD - UC66→68) & Branch Isolation
+  // =========================================================================
+  console.log('\n--- Test 8: Dịch Vụ (Service CRUD) & Branch Isolation ---')
+
+  // Case 1: Tạo mới dịch vụ thành công
+  const testService = await managerService.createService({
+    name: 'Dịch vụ Ủi đồ',
+    price: 45000,
+    description: 'Giặt ủi là nhanh'
+  }, branch._id)
+  assert(testService, 'Phải tạo được dịch vụ mới')
+  assert(testService.status === 'active', 'Trạng thái mặc định phải là active')
+  console.log('✅ Pass: Tạo dịch vụ mới thành công')
+
+  // Case 2: Xem chi tiết dịch vụ
+  const serviceDetail = await managerService.getServiceById(testService._id, branch._id)
+  assert(serviceDetail, 'Phải lấy được chi tiết dịch vụ')
+  assert(serviceDetail.name === 'Dịch vụ Ủi đồ', 'Tên dịch vụ chi tiết phải khớp')
+  console.log('✅ Pass: Lấy chi tiết dịch vụ thành công')
+
+  // Case 3: Chặn tạo trùng tên dịch vụ (lỗi E11000 index hoặc check trong service)
+  // Phải trả về thông báo nghiệp vụ rõ ràng
+  try {
+    await managerService.createService({
+      name: 'Dịch vụ Ủi đồ',
+      price: 60000
+    }, branch._id)
+    assert(false, 'Tạo trùng tên dịch vụ phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Dịch vụ đã tồn tại trong chi nhánh', 'Lỗi trả về phải là "Dịch vụ đã tồn tại trong chi nhánh"')
+    console.log('✅ Pass: Chặn trùng tên dịch vụ với message nghiệp vụ rõ ràng')
+  }
+
+  // Case 4: Cập nhật thông tin dịch vụ
+  const updatedService = await managerService.updateService(testService._id, {
+    price: 50000,
+    description: 'Giặt ủi là nhanh siêu sạch'
+  }, branch._id)
+  assert(updatedService.price === 50000, 'Giá dịch vụ sau khi update phải là 50000')
+  console.log('✅ Pass: Cập nhật dịch vụ thành công')
+
+  // Case 5: Chặn cập nhật giá trị âm / không hợp lệ
+  try {
+    await managerService.updateService(testService._id, {
+      price: -100
+    }, branch._id)
+    assert(false, 'Cập nhật giá âm phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('lớn hơn 0'), 'Lỗi trả về phải báo giá lớn hơn 0')
+    console.log('✅ Pass: Chặn cập nhật giá trị không hợp lệ')
+  }
+
+  // Case 6: Deactivate và kiểm tra dropdown options loại trừ
+  await managerService.deactivateService(testService._id, branch._id)
+  const serviceOptions = await managerService.getServiceOptions(branch._id)
+  const isSvcInOptions = serviceOptions.some(s => s._id.toString() === testService._id.toString())
+  assert(!isSvcInOptions, 'Dịch vụ đã deactivate không được xuất hiện trong dropdown options')
+  console.log('✅ Pass: Dịch vụ deactivate đã bị ẩn khỏi dropdown options')
+
+
+  // Kiểm tra sort dropdown options theo name tăng dần
+  let isSorted = true
+  for (let i = 0; i < serviceOptions.length - 1; i++) {
+    if (serviceOptions[i].name.localeCompare(serviceOptions[i+1].name) > 0) {
+      isSorted = false
+      break
+    }
+  }
+  assert(isSorted, 'Danh sách dropdown options phải được sắp xếp theo tên (A-Z)')
+  console.log('✅ Pass: Dropdown options dịch vụ được sắp xếp tăng dần theo tên')
+
+  // Case 7: Branch Isolation
+  const diffBranchId = new mongoose.Types.ObjectId()
+  
+  // Thử cập nhật dịch vụ của HN01 bằng branchId khác
+  try {
+    await managerService.updateService(testService._id, { price: 90000 }, diffBranchId)
+    assert(false, 'Manager chi nhánh khác không được phép cập nhật dịch vụ')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải là không tồn tại dịch vụ (404)')
+    console.log('✅ Pass: Chặn cập nhật dịch vụ từ chi nhánh khác')
+  }
+
+  // Thử deactivate dịch vụ của HN01 bằng branchId khác
+  try {
+    await managerService.deactivateService(testService._id, diffBranchId)
+    assert(false, 'Manager chi nhánh khác không được phép deactivate dịch vụ')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải là không tồn tại dịch vụ (404)')
+    console.log('✅ Pass: Chặn deactivate dịch vụ từ chi nhánh khác')
+  }
+
+  // =========================================================================
+  // 9. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 9: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   
