@@ -431,7 +431,25 @@ Content-Type: application/json
 PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/urgent
 Authorization: Bearer {{mToken}}
 
+### 40) Tạo sự cố phòng từ Housekeeping Task
+# @name createIssueFromTask
+POST {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
 
+{
+  "description": "Điều hòa chảy nước ở dàn lạnh",
+  "severity": "medium"
+}
 
+###
+@taskIssueId = {{createIssueFromTask.response.body.$.data._id}}
 
+### 41) Hủy bỏ sự cố phòng (Cancel)
+PATCH {{base}}/manager/room-issues/{{taskIssueId}}/cancel
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
 
+{
+  "cancellationReason": "Báo cáo nhầm, đã kiểm tra lại dàn lạnh hoạt động bình thường"
+}

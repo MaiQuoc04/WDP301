@@ -55,12 +55,14 @@ exports.getRoomIssues    = handle((req) => svc.getRoomIssues(req.branchId, req.q
 exports.getRoomIssueById  = handle((req) => svc.getRoomIssueById(req.params.id, req.branchId))
 exports.createRoomIssue  = handle((req) => svc.createRoomIssue(req.body, req.branchId, req.user.id), 201)
 exports.resolveRoomIssue = handle((req) => svc.resolveRoomIssue(req.params.id, req.body, req.branchId, req.user.id))
+exports.cancelRoomIssue  = handle((req) => svc.cancelRoomIssue(req.params.id, req.body, req.branchId, req.user.id))
 
 // ─── Housekeeping ───────────────────────────────────────────────────────────────
 exports.getHousekeepingTasks       = handle((req) => svc.getHousekeepingTasks(req.branchId, req.query))
 exports.getHousekeepingTaskById     = handle((req) => svc.getHousekeepingTaskById(req.params.id, req.branchId))
 exports.assignHousekeepingTask     = handle((req) => svc.assignHousekeepingTask(req.params.id, req.body.assignedTo, req.branchId, req.user.id))
 exports.markHousekeepingTaskUrgent = handle((req) => svc.markHousekeepingTaskUrgent(req.params.id, req.branchId))
+exports.createRoomIssueFromTask    = handle((req) => svc.createRoomIssueFromTask(req.params.taskId, req.body, req.branchId, req.user.id), 201)
 
 
 
