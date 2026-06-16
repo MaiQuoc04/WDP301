@@ -304,9 +304,102 @@ async function runTests() {
 
 
   // =========================================================================
-  // 8. Cleanup & Restore Database
+  // 8. Kiểm tra Dịch vụ (Service CRUD - UC66→68) & Branch Isolation
   // =========================================================================
-  console.log('\n--- Test 8: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 8: Dịch Vụ (Service CRUD) & Branch Isolation ---')
+
+  // Case 1: Tạo mới dịch vụ thành công
+  const testService = await managerService.createService({
+    name: 'Dịch vụ Ủi đồ',
+    price: 45000,
+    description: 'Giặt ủi là nhanh'
+  }, branch._id)
+  assert(testService, 'Phải tạo được dịch vụ mới')
+  assert(testService.status === 'active', 'Trạng thái mặc định phải là active')
+  console.log('✅ Pass: Tạo dịch vụ mới thành công')
+
+  // Case 2: Xem chi tiết dịch vụ
+  const serviceDetail = await managerService.getServiceById(testService._id, branch._id)
+  assert(serviceDetail, 'Phải lấy được chi tiết dịch vụ')
+  assert(serviceDetail.name === 'Dịch vụ Ủi đồ', 'Tên dịch vụ chi tiết phải khớp')
+  console.log('✅ Pass: Lấy chi tiết dịch vụ thành công')
+
+  // Case 3: Chặn tạo trùng tên dịch vụ (lỗi E11000 index hoặc check trong service)
+  // Phải trả về thông báo nghiệp vụ rõ ràng
+  try {
+    await managerService.createService({
+      name: 'Dịch vụ Ủi đồ',
+      price: 60000
+    }, branch._id)
+    assert(false, 'Tạo trùng tên dịch vụ phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Dịch vụ đã tồn tại trong chi nhánh', 'Lỗi trả về phải là "Dịch vụ đã tồn tại trong chi nhánh"')
+    console.log('✅ Pass: Chặn trùng tên dịch vụ với message nghiệp vụ rõ ràng')
+  }
+
+  // Case 4: Cập nhật thông tin dịch vụ
+  const updatedService = await managerService.updateService(testService._id, {
+    price: 50000,
+    description: 'Giặt ủi là nhanh siêu sạch'
+  }, branch._id)
+  assert(updatedService.price === 50000, 'Giá dịch vụ sau khi update phải là 50000')
+  console.log('✅ Pass: Cập nhật dịch vụ thành công')
+
+  // Case 5: Chặn cập nhật giá trị âm / không hợp lệ
+  try {
+    await managerService.updateService(testService._id, {
+      price: -100
+    }, branch._id)
+    assert(false, 'Cập nhật giá âm phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('lớn hơn 0'), 'Lỗi trả về phải báo giá lớn hơn 0')
+    console.log('✅ Pass: Chặn cập nhật giá trị không hợp lệ')
+  }
+
+  // Case 6: Deactivate và kiểm tra dropdown options loại trừ
+  await managerService.deactivateService(testService._id, branch._id)
+  const serviceOptions = await managerService.getServiceOptions(branch._id)
+  const isSvcInOptions = serviceOptions.some(s => s._id.toString() === testService._id.toString())
+  assert(!isSvcInOptions, 'Dịch vụ đã deactivate không được xuất hiện trong dropdown options')
+  console.log('✅ Pass: Dịch vụ deactivate đã bị ẩn khỏi dropdown options')
+
+
+  // Kiểm tra sort dropdown options theo name tăng dần
+  let isSorted = true
+  for (let i = 0; i < serviceOptions.length - 1; i++) {
+    if (serviceOptions[i].name.localeCompare(serviceOptions[i+1].name) > 0) {
+      isSorted = false
+      break
+    }
+  }
+  assert(isSorted, 'Danh sách dropdown options phải được sắp xếp theo tên (A-Z)')
+  console.log('✅ Pass: Dropdown options dịch vụ được sắp xếp tăng dần theo tên')
+
+  // Case 7: Branch Isolation
+  const diffBranchId = new mongoose.Types.ObjectId()
+  
+  // Thử cập nhật dịch vụ của HN01 bằng branchId khác
+  try {
+    await managerService.updateService(testService._id, { price: 90000 }, diffBranchId)
+    assert(false, 'Manager chi nhánh khác không được phép cập nhật dịch vụ')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải là không tồn tại dịch vụ (404)')
+    console.log('✅ Pass: Chặn cập nhật dịch vụ từ chi nhánh khác')
+  }
+
+  // Thử deactivate dịch vụ của HN01 bằng branchId khác
+  try {
+    await managerService.deactivateService(testService._id, diffBranchId)
+    assert(false, 'Manager chi nhánh khác không được phép deactivate dịch vụ')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải là không tồn tại dịch vụ (404)')
+    console.log('✅ Pass: Chặn deactivate dịch vụ từ chi nhánh khác')
+  }
+
+  // =========================================================================
+  // 9. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 9: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   

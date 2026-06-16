@@ -216,10 +216,19 @@ async function seed() {
   }
 
   // 7) Extra Service
-  await ensure(Service, { branch: branch._id, name: 'Massage' },
-    { price: 300000, status: 'active', description: 'Dịch vụ massage 60 phút' }, 'Service Massage')
-  await ensure(Service, { branch: branch._id, name: 'Ăn sáng' },
-    { price: 100000, status: 'active', description: 'Buffet sáng' }, 'Service Ăn sáng')
+  await ensure(Service, { branch: branch._id, name: 'Breakfast Buffet' },
+    { price: 150000, status: 'active', description: 'Buffet sáng tự chọn' }, 'Service Breakfast Buffet')
+  await ensure(Service, { branch: branch._id, name: 'Airport Transfer' },
+    { price: 300000, status: 'active', description: 'Đưa đón sân bay' }, 'Service Airport Transfer')
+  await ensure(Service, { branch: branch._id, name: 'Laundry Service' },
+    { price: 50000, status: 'active', description: 'Dịch vụ giặt ủi' }, 'Service Laundry Service')
+  await ensure(Service, { branch: branch._id, name: 'Spa Package' },
+    { price: 500000, status: 'active', description: 'Gói trị liệu Spa toàn thân' }, 'Service Spa Package')
+  await ensure(Service, { branch: branch._id, name: 'Extra Bed' },
+    { price: 350000, status: 'active', description: 'Kê thêm giường phụ' }, 'Service Extra Bed')
+  await ensure(Service, { branch: branch._id, name: 'Mini Bar Combo' },
+    { price: 120000, status: 'active', description: 'Combo nước ngọt và snack tại phòng' }, 'Service Mini Bar Combo')
+
 
   console.log('\n🌱 Seed hoàn tất.')
   console.log('Tài khoản test: admin@hbms.com/Admin@123 · receptionist@hbms.com/Recept@123 · housekeeper@hbms.com/House@123 · manager@hbms.com/Manager@123 · customer@hbms.com/Customer@123')

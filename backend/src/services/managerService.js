@@ -7,6 +7,7 @@ const RoomPrice = require('../models/roomPriceModel')
 const Booking   = require('../models/bookingModel')
 const Amenity   = require('../models/amenityModel')
 const RoomAmenity = require('../models/roomAmenityModel')
+const Service   = require('../models/serviceModel')
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 // Ném lỗi với HTTP status code (controller sẽ bắt và trả về client)
@@ -369,6 +370,95 @@ exports.updateRoomTypeAmenities = async (roomTypeId, amenityIds, branchId) => {
   // Trả về danh sách đã được populate
   const updatedRt = await RoomType.findById(roomTypeId).populate('amenities', 'name missingPrice unit status')
   return updatedRt.amenities
+}
+
+// ─── Service (CRUD) ────────────────────────────────────────────────────────────
+
+// Lấy danh sách toàn bộ dịch vụ của chi nhánh
+exports.getServices = async (branchId) => {
+  return Service.find({ branch: branchId }).sort({ createdAt: -1 })
+}
+
+// Lấy thông tin chi tiết một dịch vụ
+exports.getServiceById = async (id, branchId) => {
+  const svc = await Service.findOne({ _id: id, branch: branchId })
+  if (!svc) fail('Dịch vụ không tồn tại', 404)
+  return svc
+}
+
+// Lấy danh sách rút gọn dịch vụ đang hoạt động phục vụ dropdown (sắp xếp theo tên)
+exports.getServiceOptions = async (branchId) => {
+  return Service.find({ branch: branchId, status: 'active' }, '_id name price').sort({ name: 1 })
+}
+
+// Tạo mới dịch vụ
+exports.createService = async (data, branchId) => {
+  const { name, price, description } = data
+
+  if (!name?.trim()) fail('Tên dịch vụ không được để trống')
+  if (price == null || price <= 0) fail('Giá dịch vụ phải lớn hơn 0')
+
+  // Đảm bảo tên dịch vụ độc nhất trong cùng chi nhánh
+  const trimmedName = name.trim()
+  const exists = await Service.findOne({ branch: branchId, name: trimmedName })
+  if (exists) fail('Dịch vụ đã tồn tại trong chi nhánh')
+
+  try {
+    return await Service.create({
+      branch: branchId,
+      name: trimmedName,
+      price,
+      description,
+      status: 'active'
+    })
+  } catch (err) {
+    if (err.code === 11000) {
+      fail('Dịch vụ đã tồn tại trong chi nhánh')
+    }
+    throw err;
+  }
+}
+
+// Cập nhật thông tin dịch vụ
+exports.updateService = async (id, data, branchId) => {
+  const svc = await Service.findOne({ _id: id, branch: branchId })
+  if (!svc) fail('Dịch vụ không tồn tại', 404)
+
+  const { name, price, description } = data
+
+  if (name != null) {
+    const trimmed = name.trim()
+    if (!trimmed) fail('Tên dịch vụ không được để trống')
+    // Kiểm tra trùng tên với Service khác trong cùng chi nhánh
+    const dup = await Service.findOne({ branch: branchId, name: trimmed, _id: { $ne: id } })
+    if (dup) fail('Dịch vụ đã tồn tại trong chi nhánh')
+    svc.name = trimmed
+  }
+
+  if (price != null) {
+    if (price <= 0) fail('Giá dịch vụ phải lớn hơn 0')
+    svc.price = price
+  }
+
+  if (description !== undefined) svc.description = description
+
+  try {
+    return await svc.save()
+  } catch (err) {
+    if (err.code === 11000) {
+      fail('Dịch vụ đã tồn tại trong chi nhánh')
+    }
+    throw err
+  }
+}
+
+// Đổi trạng thái dịch vụ sang inactive (Deactivate)
+exports.deactivateService = async (id, branchId) => {
+  const svc = await Service.findOne({ _id: id, branch: branchId })
+  if (!svc) fail('Dịch vụ không tồn tại', 404)
+
+  svc.status = 'inactive'
+  return svc.save()
 }
 
 

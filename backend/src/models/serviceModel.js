@@ -9,4 +9,6 @@ const serviceSchema = new mongoose.Schema({
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
 }, { timestamps: true })
 
+serviceSchema.index({ branch: 1, name: 1 }, { unique: true })
+
 module.exports = mongoose.model('Service', serviceSchema)

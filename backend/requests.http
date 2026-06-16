@@ -312,3 +312,50 @@ PATCH {{base}}/manager/amenities/{{newAmenityId}}/deactivate
 Authorization: Bearer {{mToken}}
 
 
+### =========================================================================
+### SERVICE APIs (UC-66→68)
+### =========================================================================
+
+### 24) Lấy toàn bộ danh sách Services của chi nhánh
+GET {{base}}/manager/services
+Authorization: Bearer {{mToken}}
+
+### 25) Lấy danh sách options Services đang hoạt động (dropdown)
+GET {{base}}/manager/services/options
+Authorization: Bearer {{mToken}}
+
+### 26) Tạo mới Service
+# @name createService
+POST {{base}}/manager/services
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Dịch vụ giặt sấy nhanh",
+  "price": 60000,
+  "description": "Giặt sấy quần áo lấy ngay trong 2 tiếng"
+}
+
+###
+@newServiceId = {{createService.response.body.$.data._id}}
+
+### 27) Lấy chi tiết Service
+GET {{base}}/manager/services/{{newServiceId}}
+Authorization: Bearer {{mToken}}
+
+### 28) Cập nhật Service
+PUT {{base}}/manager/services/{{newServiceId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "price": 70000,
+  "description": "Giặt sấy quần áo lấy ngay trong 2 tiếng (siêu sạch)"
+}
+
+### 29) Deactivate Service (Ngưng hoạt động)
+PATCH {{base}}/manager/services/{{newServiceId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+
+

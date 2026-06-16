@@ -37,4 +37,13 @@ router.patch('/amenities/:id/deactivate', managerController.deactivateAmenity)
 router.get('/room-types/:id/amenities', managerController.getRoomTypeAmenities)
 router.put('/room-types/:id/amenities', managerController.updateRoomTypeAmenities)
 
+// ─── Services ──────────────────────────────────────────────────────────────────
+router.get('/services', managerController.getServices)
+router.get('/services/options', managerController.getServiceOptions)
+router.get('/services/:id', managerController.getServiceById)
+router.post('/services', managerController.createService)
+router.put('/services/:id', managerController.updateService)
+router.patch('/services/:id/deactivate', managerController.deactivateService)
+
 module.exports = router
+
