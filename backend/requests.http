@@ -358,4 +358,98 @@ PATCH {{base}}/manager/services/{{newServiceId}}/deactivate
 Authorization: Bearer {{mToken}}
 
 
+### =========================================================================
+### ROOM ISSUE APIs (UC-70)
+### =========================================================================
 
+### 30) Lấy toàn bộ danh sách sự cố phòng của chi nhánh
+GET {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+
+### 31) Lấy danh sách sự cố phòng có bộ lọc (ví dụ: đang mở, mức độ cao)
+GET {{base}}/manager/room-issues?status=open&severity=high
+Authorization: Bearer {{mToken}}
+
+### 32) Tạo mới sự cố phòng (Ví dụ báo hỏng bóng đèn phòng 102)
+# @name createRoomIssue
+POST {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "room": "660c1c875d5e5e23c015b102",
+  "description": "Bóng đèn ngủ bị cháy không sáng",
+  "severity": "low"
+}
+
+###
+@newIssueId = {{createRoomIssue.response.body.$.data._id}}
+
+### 33) Lấy chi tiết sự cố phòng
+GET {{base}}/manager/room-issues/{{newIssueId}}
+Authorization: Bearer {{mToken}}
+
+### 34) Giải quyết sự cố phòng (Resolve)
+PATCH {{base}}/manager/room-issues/{{newIssueId}}/resolve
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "resolutionNote": "Đã thay bóng đèn ngủ LED mới loại 5W"
+}
+
+
+### =========================================================================
+### HOUSEKEEPING MONITOR APIs (UC-69)
+### =========================================================================
+
+### 35) Lấy toàn bộ danh sách task dọn phòng của chi nhánh (sắp xếp Urgent lên trước)
+GET {{base}}/manager/housekeeping/tasks
+Authorization: Bearer {{mToken}}
+
+### 36) Lấy danh sách task dọn phòng có bộ lọc (ví dụ: chưa phân công status=pending)
+GET {{base}}/manager/housekeeping/tasks?status=pending&assignedTo=null
+Authorization: Bearer {{mToken}}
+
+###
+@tempTaskId = 660c1c875d5e5e23c015b302
+
+### 37) Lấy chi tiết task dọn phòng
+GET {{base}}/manager/housekeeping/tasks/{{tempTaskId}}
+Authorization: Bearer {{mToken}}
+
+### 38) Phân công task dọn phòng cho housekeeper
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/assign
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "assignedTo": "660c1c875d5e5e23c015b001"
+}
+
+### 39) Đánh dấu khẩn cấp cho task dọn phòng (Urgent Toggle)
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/urgent
+Authorization: Bearer {{mToken}}
+
+### 40) Tạo sự cố phòng từ Housekeeping Task
+# @name createIssueFromTask
+POST {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "description": "Điều hòa chảy nước ở dàn lạnh",
+  "severity": "medium"
+}
+
+###
+@taskIssueId = {{createIssueFromTask.response.body.$.data._id}}
+
+### 41) Hủy bỏ sự cố phòng (Cancel)
+PATCH {{base}}/manager/room-issues/{{taskIssueId}}/cancel
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "cancellationReason": "Báo cáo nhầm, đã kiểm tra lại dàn lạnh hoạt động bình thường"
+}

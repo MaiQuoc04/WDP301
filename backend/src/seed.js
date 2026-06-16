@@ -16,6 +16,9 @@ const Amenity = require('./models/amenityModel')
 const RoomAmenity = require('./models/roomAmenityModel')
 const Service = require('./models/serviceModel')
 const RoomPrice = require('./models/roomPriceModel')
+const RoomIssue = require('./models/roomIssueModel')
+const HousekeepingTask = require('./models/housekeepingTaskModel')
+
 
 // Tạo nếu chưa có (theo `query`), trả về document.
 async function ensure(Model, query, data, label) {
@@ -103,6 +106,10 @@ async function seed() {
   await RoomType.deleteMany({})
   await Amenity.deleteMany({})
   await Service.deleteMany({})
+  await RoomIssue.deleteMany({})
+  await HousekeepingTask.deleteMany({})
+
+
 
   const standard = await ensure(RoomType, { branch: branch._id, name: 'Standard' },
     { bedType: 'double', capacity: 2, area: 20, basePrice: 800000, status: 'active',

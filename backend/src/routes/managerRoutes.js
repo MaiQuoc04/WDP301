@@ -45,5 +45,21 @@ router.post('/services', managerController.createService)
 router.put('/services/:id', managerController.updateService)
 router.patch('/services/:id/deactivate', managerController.deactivateService)
 
+// ─── Room Issues ───────────────────────────────────────────────────────────────
+router.get('/room-issues', managerController.getRoomIssues)
+router.get('/room-issues/:id', managerController.getRoomIssueById)
+router.post('/room-issues', managerController.createRoomIssue)
+router.patch('/room-issues/:id/resolve', managerController.resolveRoomIssue)
+router.patch('/room-issues/:id/cancel', managerController.cancelRoomIssue)
+
+// ─── Housekeeping ──────────────────────────────────────────────────────────────
+router.get('/housekeeping/tasks', managerController.getHousekeepingTasks)
+router.get('/housekeeping/tasks/:id', managerController.getHousekeepingTaskById)
+router.patch('/housekeeping/tasks/:id/assign', managerController.assignHousekeepingTask)
+router.patch('/housekeeping/tasks/:id/urgent', managerController.markHousekeepingTaskUrgent)
+router.post('/housekeeping/tasks/:taskId/issues', managerController.createRoomIssueFromTask)
+
 module.exports = router
+
+
 

@@ -3,14 +3,18 @@
 //    Amenity thiếu ghi ngược vào Booking (Quốc định nghĩa). Giao việc qua assignedTo (null = chưa nhận - BR-38).
 const mongoose = require('mongoose')
 
-const TASK_STATUS = ['pending', 'in_progress', 'urgent', 'completed', 'missed']
+const TASK_STATUS = ['pending', 'in_progress', 'completed', 'missed']
 
 const housekeepingTaskSchema = new mongoose.Schema({
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   room:       { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
   booking:    { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // null = chưa ai claim
+  assignedAt: { type: Date },
+  assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
   status:     { type: String, enum: TASK_STATUS, default: 'pending' },
+  isUrgent:   { type: Boolean, default: false },
+
 
   // Báo cáo kiểm kê amenity (UC-49→51, BR-41/42)
   amenityReport: [{

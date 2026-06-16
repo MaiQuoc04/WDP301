@@ -1,6 +1,7 @@
 // Owner: Hoàng — Branch Manager service layer (UC-57→62 + RoomPrice)
 // Toàn bộ hàm nhận branchId từ req.branchId (do middleware getBranchManagerBranch gán).
 // KHÔNG bao giờ tin body.branchId từ client — chỉ dùng branchId từ tham số hàm.
+const mongoose  = require('mongoose')
 const RoomType  = require('../models/roomTypeModel')
 const Room      = require('../models/roomModel')
 const RoomPrice = require('../models/roomPriceModel')
@@ -8,8 +9,23 @@ const Booking   = require('../models/bookingModel')
 const Amenity   = require('../models/amenityModel')
 const RoomAmenity = require('../models/roomAmenityModel')
 const Service   = require('../models/serviceModel')
+const RoomIssue = require('../models/roomIssueModel')
+const HousekeepingTask = require('../models/housekeepingTaskModel')
+const RoleAssignment = require('../models/roleAssignmentModel')
+const Account = require('../models/accountModel')
+
+const supportsTransactions = process.env.ENABLE_TRANSACTIONS === 'true'
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
+// Tìm một entity thuộc chi nhánh (Branch Isolation Helper)
+const findBranchEntity = (model, id, branchId, populate = null) => {
+  let query = model.findOne({ _id: id, branch: branchId })
+  if (populate) {
+    query = query.populate(populate)
+  }
+  return query
+}
+
 // Ném lỗi với HTTP status code (controller sẽ bắt và trả về client)
 function fail(msg, code = 400) {
   const e = new Error(msg)
@@ -34,7 +50,7 @@ exports.getRoomTypeOptions = async (branchId) => {
 
 // Chi tiết 1 RoomType (chặn xem chéo chi nhánh)
 exports.getRoomTypeById = async (id, branchId) => {
-  const rt = await RoomType.findOne({ _id: id, branch: branchId })
+  const rt = await findBranchEntity(RoomType, id, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
   return rt
 }
@@ -56,7 +72,7 @@ exports.createRoomType = async (data, branchId) => {
 
 // UC-58: Cập nhật RoomType
 exports.updateRoomType = async (id, data, branchId) => {
-  const rt = await RoomType.findOne({ _id: id, branch: branchId })
+  const rt = await findBranchEntity(RoomType, id, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
 
   const { name, bedType, capacity, area, basePrice, description, images } = data
@@ -87,7 +103,7 @@ exports.updateRoomType = async (id, data, branchId) => {
 
 // UC-59: Đổi trạng thái RoomType (active ↔ inactive) — Soft delete khi inactive
 exports.updateRoomTypeStatus = async (id, status, branchId) => {
-  const rt = await RoomType.findOne({ _id: id, branch: branchId })
+  const rt = await findBranchEntity(RoomType, id, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
   if (!['active', 'inactive'].includes(status)) fail('Trạng thái không hợp lệ (active | inactive)')
 
@@ -133,7 +149,7 @@ exports.createRoom = async (data, branchId) => {
   if (floor != null && floor < 1) fail('Số tầng phải >= 1')
 
   // Đảm bảo roomType thuộc chi nhánh này
-  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+  const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
   if (!rt) fail('Loại phòng không tồn tại hoặc không thuộc chi nhánh này', 404)
   if (rt.status !== 'active') fail('Không thể tạo phòng cho loại phòng đang ngưng hoạt động')
 
@@ -159,7 +175,7 @@ exports.updateRoom = async (id, data, branchId) => {
     room.roomNumber = trimmed
   }
   if (roomTypeId != null) {
-    const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+    const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
     if (!rt) fail('Loại phòng không tồn tại hoặc không thuộc chi nhánh này', 404)
     room.roomType = roomTypeId
   }
@@ -218,7 +234,7 @@ exports.createOrUpdateRoomPrice = async (data, branchId) => {
   if (date && dayType) fail('Chỉ được chỉ định 1 trong 2: ngày cụ thể (date) hoặc loại ngày (dayType)')
 
   // Đảm bảo roomType thuộc chi nhánh
-  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+    const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
   if (!rt) fail('Loại phòng không tồn tại hoặc không thuộc chi nhánh này', 404)
 
   if (date) {
@@ -288,7 +304,7 @@ exports.createAmenity = async (data, branchId) => {
 
 // Cập nhật thông tin tiện nghi
 exports.updateAmenity = async (id, data, branchId) => {
-  const am = await Amenity.findOne({ _id: id, branch: branchId })
+  const am = await findBranchEntity(Amenity, id, branchId)
   if (!am) fail('Tiện nghi không tồn tại', 404)
 
   const { name, missingPrice, unit } = data
@@ -314,7 +330,7 @@ exports.updateAmenity = async (id, data, branchId) => {
 
 // Đổi trạng thái tiện nghi thành inactive (Deactivate) và tự động gỡ khỏi RoomTypes & RoomAmenities
 exports.deactivateAmenity = async (id, branchId) => {
-  const am = await Amenity.findOne({ _id: id, branch: branchId })
+  const am = await findBranchEntity(Amenity, id, branchId)
   if (!am) fail('Tiện nghi không tồn tại', 404)
 
   am.status = 'inactive'
@@ -336,7 +352,7 @@ exports.deactivateAmenity = async (id, branchId) => {
 
 // Lấy danh sách tiện nghi của một RoomType cụ thể
 exports.getRoomTypeAmenities = async (roomTypeId, branchId) => {
-  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+  const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
     .populate('amenities', 'name missingPrice unit status')
   if (!rt) fail('Loại phòng không tồn tại', 404)
 
@@ -345,7 +361,7 @@ exports.getRoomTypeAmenities = async (roomTypeId, branchId) => {
 
 // Cập nhật danh sách tiện nghi cho một RoomType
 exports.updateRoomTypeAmenities = async (roomTypeId, amenityIds, branchId) => {
-  const rt = await RoomType.findOne({ _id: roomTypeId, branch: branchId })
+  const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
 
   if (!Array.isArray(amenityIds)) fail('Danh sách ID tiện nghi không hợp lệ')
@@ -381,7 +397,7 @@ exports.getServices = async (branchId) => {
 
 // Lấy thông tin chi tiết một dịch vụ
 exports.getServiceById = async (id, branchId) => {
-  const svc = await Service.findOne({ _id: id, branch: branchId })
+  const svc = await findBranchEntity(Service, id, branchId)
   if (!svc) fail('Dịch vụ không tồn tại', 404)
   return svc
 }
@@ -421,7 +437,7 @@ exports.createService = async (data, branchId) => {
 
 // Cập nhật thông tin dịch vụ
 exports.updateService = async (id, data, branchId) => {
-  const svc = await Service.findOne({ _id: id, branch: branchId })
+  const svc = await findBranchEntity(Service, id, branchId)
   if (!svc) fail('Dịch vụ không tồn tại', 404)
 
   const { name, price, description } = data
@@ -454,11 +470,418 @@ exports.updateService = async (id, data, branchId) => {
 
 // Đổi trạng thái dịch vụ sang inactive (Deactivate)
 exports.deactivateService = async (id, branchId) => {
-  const svc = await Service.findOne({ _id: id, branch: branchId })
+  const svc = await findBranchEntity(Service, id, branchId)
   if (!svc) fail('Dịch vụ không tồn tại', 404)
 
   svc.status = 'inactive'
   return svc.save()
 }
+
+// ─── RoomIssue (CRUD & Workflow - UC70) ──────────────────────────────────────────
+
+// Lấy danh sách sự cố phòng của chi nhánh
+exports.getRoomIssues = async (branchId, query = {}) => {
+  const filter = { branch: branchId }
+
+  if (query.status) {
+    if (['open', 'resolved'].includes(query.status)) {
+      filter.status = query.status
+    }
+  }
+  if (query.room) {
+    filter.room = query.room
+  }
+  if (query.severity) {
+    if (['low', 'medium', 'high'].includes(query.severity)) {
+      filter.severity = query.severity
+    }
+  }
+
+  return RoomIssue.find(filter)
+    .populate('room', 'roomNumber status')
+    .populate('reporter', 'email')
+    .populate('resolvedBy', 'email')
+    .sort({ createdAt: -1 })
+}
+
+// Lấy thông tin chi tiết sự cố phòng
+exports.getRoomIssueById = async (id, branchId) => {
+  const issue = await findBranchEntity(RoomIssue, id, branchId)
+    .populate('room', 'roomNumber status')
+    .populate('reporter', 'email')
+    .populate('resolvedBy', 'email')
+
+  if (!issue) fail('Sự cố không tồn tại', 404)
+  return issue
+}
+
+// Tạo mới sự cố phòng
+exports.createRoomIssue = async (data, branchId, reporterId) => {
+  const { room: roomId, description, severity } = data
+
+  if (!roomId) fail('ID phòng không được để trống')
+  if (!description?.trim()) fail('Mô tả sự cố không được để trống')
+
+  // Xác minh phòng thuộc chi nhánh và chưa bị xóa
+  const room = await Room.findOne({ _id: roomId, branch: branchId, isDeleted: { $ne: true } })
+  if (!room) fail('Phòng không tồn tại', 404)
+
+  const issue = await RoomIssue.create({
+    branch: branchId,
+    room: roomId,
+    reporter: reporterId,
+    description: description.trim(),
+    severity: severity || 'medium',
+    status: 'open'
+  })
+
+  // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
+  // Không ghi đè nếu phòng đang 'occupied' (khách đang ở)
+  if (['available', 'cleaning'].includes(room.status)) {
+    room.status = 'maintenance'
+    await room.save()
+  }
+
+  return issue
+}
+
+// Giải quyết sự cố phòng
+exports.resolveRoomIssue = async (id, data, branchId, managerId) => {
+  const { resolutionNote } = data
+
+  if (supportsTransactions) {
+    let session
+    try {
+      session = await mongoose.startSession()
+      session.startTransaction()
+      const issue = await RoomIssue.findOne({ _id: id, branch: branchId }).session(session)
+      if (!issue) fail('Sự cố không tồn tại', 404)
+
+      if (issue.status !== 'open') {
+        fail('Chỉ có thể giải quyết sự cố đang mở')
+      }
+
+      issue.status = 'resolved'
+      issue.resolvedBy = managerId
+      issue.resolvedAt = new Date()
+      issue.resolutionNote = resolutionNote?.trim() || ''
+      await issue.save({ session })
+
+      // Kiểm tra xem phòng còn sự cố nào khác đang mở không
+      const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' }).session(session)
+      if (openCount === 0) {
+        const room = await Room.findOne({ _id: issue.room, branch: branchId }).session(session)
+        if (room && room.status === 'maintenance') {
+          room.status = 'available'
+          await room.save({ session })
+        }
+      }
+
+      await session.commitTransaction()
+      session.endSession()
+      return issue
+    } catch (error) {
+      if (session) {
+        if (session.inTransaction()) {
+          await session.abortTransaction()
+        }
+        session.endSession()
+      }
+      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
+        throw new Error('Transactions are enabled but MongoDB does not support them')
+      }
+      throw error
+    }
+  } else {
+    const issue = await findBranchEntity(RoomIssue, id, branchId)
+    if (!issue) fail('Sự cố không tồn tại', 404)
+
+    if (issue.status !== 'open') {
+      fail('Chỉ có thể giải quyết sự cố đang mở')
+    }
+
+    issue.status = 'resolved'
+    issue.resolvedBy = managerId
+    issue.resolvedAt = new Date()
+    issue.resolutionNote = resolutionNote?.trim() || ''
+    await issue.save()
+
+    // Kiểm tra xem phòng còn sự cố nào khác đang mở không
+    const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' })
+    if (openCount === 0) {
+      const room = await findBranchEntity(Room, issue.room, branchId)
+      if (room && room.status === 'maintenance') {
+        room.status = 'available'
+        await room.save()
+      }
+    }
+
+    return issue
+  }
+}
+
+// Hủy bỏ sự cố phòng (Cancelled status)
+exports.cancelRoomIssue = async (id, data, branchId, managerId) => {
+  const { cancellationReason } = data
+
+  if (supportsTransactions) {
+    let session
+    try {
+      session = await mongoose.startSession()
+      session.startTransaction()
+      const issue = await RoomIssue.findOne({ _id: id, branch: branchId }).session(session)
+      if (!issue) fail('Sự cố không tồn tại', 404)
+
+      if (issue.status !== 'open') {
+        fail('Chỉ có thể hủy sự cố đang mở')
+      }
+
+      issue.status = 'cancelled'
+      issue.cancelledBy = managerId
+      issue.cancelledAt = new Date()
+      issue.cancellationReason = cancellationReason?.trim() || ''
+      await issue.save({ session })
+
+      // Kiểm tra xem phòng còn sự cố nào khác đang mở không
+      const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' }).session(session)
+      if (openCount === 0) {
+        const room = await Room.findOne({ _id: issue.room, branch: branchId }).session(session)
+        if (room && room.status === 'maintenance') {
+          room.status = 'available'
+          await room.save({ session })
+        }
+      }
+
+      await session.commitTransaction()
+      session.endSession()
+      return issue
+    } catch (error) {
+      if (session) {
+        if (session.inTransaction()) {
+          await session.abortTransaction()
+        }
+        session.endSession()
+      }
+      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
+        throw new Error('Transactions are enabled but MongoDB does not support them')
+      }
+      throw error
+    }
+  } else {
+    const issue = await findBranchEntity(RoomIssue, id, branchId)
+    if (!issue) fail('Sự cố không tồn tại', 404)
+
+    if (issue.status !== 'open') {
+      fail('Chỉ có thể hủy sự cố đang mở')
+    }
+
+    issue.status = 'cancelled'
+    issue.cancelledBy = managerId
+    issue.cancelledAt = new Date()
+    issue.cancellationReason = cancellationReason?.trim() || ''
+    await issue.save()
+
+    // Kiểm tra xem phòng còn sự cố nào khác đang mở không
+    const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' })
+    if (openCount === 0) {
+      const room = await findBranchEntity(Room, issue.room, branchId)
+      if (room && room.status === 'maintenance') {
+        room.status = 'available'
+        await room.save()
+      }
+    }
+
+    return issue
+  }
+}
+
+// Báo cáo sự cố phòng phát sinh từ Housekeeping Task
+exports.createRoomIssueFromTask = async (taskId, data, branchId, reporterId) => {
+  const { description, severity } = data
+
+  if (!description?.trim()) fail('Mô tả sự cố không được để trống')
+
+  // Tìm task dọn phòng và cô lập theo chi nhánh
+  const task = await findBranchEntity(HousekeepingTask, taskId, branchId)
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+
+  // Kiểm tra trùng lặp sự cố đang mở cùng mô tả cho task này
+  const exists = await RoomIssue.exists({
+    housekeepingTask: taskId,
+    status: 'open',
+    description: description.trim()
+  })
+  if (exists) {
+    fail('Sự cố này đã được báo cáo và đang chờ xử lý')
+  }
+
+  // Xác minh phòng thuộc chi nhánh và chưa bị xóa
+  const room = await Room.findOne({ _id: task.room, branch: branchId, isDeleted: { $ne: true } })
+  if (!room) fail('Phòng không tồn tại', 404)
+
+  if (supportsTransactions) {
+    let session
+    try {
+      session = await mongoose.startSession()
+      session.startTransaction()
+      const issue = await RoomIssue.create([{
+        branch: branchId,
+        room: task.room,
+        reporter: reporterId,
+        description: description.trim(),
+        severity: severity || 'medium',
+        status: 'open',
+        housekeepingTask: taskId
+      }], { session }).then(res => res[0])
+
+      // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
+      if (['available', 'cleaning'].includes(room.status)) {
+        room.status = 'maintenance'
+        await room.save({ session })
+      }
+
+      // Nối thêm/cập nhật issueNote của task dọn dẹp
+      if (task.issueNote) {
+        task.issueNote = `${task.issueNote}\n- ${description.trim()}`
+      } else {
+        task.issueNote = description.trim()
+      }
+      await task.save({ session })
+
+      await session.commitTransaction()
+      session.endSession()
+      return issue
+    } catch (error) {
+      if (session) {
+        if (session.inTransaction()) {
+          await session.abortTransaction()
+        }
+        session.endSession()
+      }
+      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
+        throw new Error('Transactions are enabled but MongoDB does not support them')
+      }
+      throw error
+    }
+  } else {
+    const issue = await RoomIssue.create({
+      branch: branchId,
+      room: task.room,
+      reporter: reporterId,
+      description: description.trim(),
+      severity: severity || 'medium',
+      status: 'open',
+      housekeepingTask: taskId
+    })
+
+    // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
+    if (['available', 'cleaning'].includes(room.status)) {
+      room.status = 'maintenance'
+      await room.save()
+    }
+
+    // Nối thêm/cập nhật issueNote của task dọn dẹp
+    if (task.issueNote) {
+      task.issueNote = `${task.issueNote}\n- ${description.trim()}`
+    } else {
+      task.issueNote = description.trim()
+    }
+    await task.save()
+
+    return issue
+  }
+}
+
+// ─── Housekeeping Monitor (UC69) ──────────────────────────────────────────────────
+
+// Lấy danh sách công việc dọn phòng của chi nhánh
+exports.getHousekeepingTasks = async (branchId, query = {}) => {
+  const filter = { branch: branchId }
+
+  if (query.status) {
+    if (HousekeepingTask.TASK_STATUS.includes(query.status)) {
+      filter.status = query.status
+    }
+  }
+
+  if (query.assignedTo !== undefined) {
+    filter.assignedTo = query.assignedTo === 'null' ? null : query.assignedTo
+  }
+
+  if (query.room) {
+    filter.room = query.room
+  }
+
+  return HousekeepingTask.find(filter)
+    .populate('room', 'roomNumber status')
+    .populate('assignedTo', 'email')
+    .populate('assignedBy', 'email')
+    .sort({ isUrgent: -1, createdAt: 1 })
+}
+
+// Xem chi tiết công việc dọn phòng
+exports.getHousekeepingTaskById = async (id, branchId) => {
+  const task = await findBranchEntity(HousekeepingTask, id, branchId)
+    .populate('room', 'roomNumber status')
+    .populate('assignedTo', 'email')
+    .populate('assignedBy', 'email')
+    .populate('booking')
+
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+  return task
+}
+
+// Phân công công việc dọn phòng cho housekeeper (Reassign/Option A)
+exports.assignHousekeepingTask = async (id, assignedToAccountId, branchId, managerId) => {
+  const task = await findBranchEntity(HousekeepingTask, id, branchId)
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+
+  // Chặn phân công cho task đã kết thúc
+  if (['completed', 'missed'].includes(task.status)) {
+    fail('Không thể phân công task đã kết thúc')
+  }
+
+  if (assignedToAccountId) {
+    // Chặn phân công cho chính quản lý
+    if (String(assignedToAccountId) === String(managerId)) {
+      fail('Không thể phân công task cho quản lý')
+    }
+
+    // Kiểm tra tài khoản housekeeper tồn tại và active
+    const housekeeperAcc = await Account.findOne({ _id: assignedToAccountId, isActive: true })
+    if (!housekeeperAcc) fail('Tài khoản nhân viên không tồn tại hoặc bị khóa')
+
+    // Kiểm tra RoleAssignment active, đúng role 'housekeeper' và đúng chi nhánh
+    const roleAssign = await RoleAssignment.findOne({
+      account: assignedToAccountId,
+      branch: branchId,
+      role: 'housekeeper',
+      isActive: true
+    })
+    if (!roleAssign) fail('Nhân viên dọn phòng không hợp lệ hoặc không thuộc chi nhánh này')
+
+    task.assignedTo = assignedToAccountId
+    task.assignedBy = managerId
+    task.assignedAt = new Date()
+  } else {
+    // Unassign task
+    task.assignedTo = null
+    task.assignedBy = null
+    task.assignedAt = null
+  }
+
+  return task.save()
+}
+
+// Đánh dấu/bỏ đánh dấu khẩn cấp cho task dọn phòng
+exports.markHousekeepingTaskUrgent = async (id, branchId) => {
+  const task = await findBranchEntity(HousekeepingTask, id, branchId)
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+
+  task.isUrgent = !task.isUrgent
+  return task.save()
+}
+
+
 
 

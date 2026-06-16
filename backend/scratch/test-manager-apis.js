@@ -397,9 +397,436 @@ async function runTests() {
   }
 
   // =========================================================================
-  // 9. Cleanup & Restore Database
+  // 9. Kiểm tra Sự Cố Phòng (Room Issue - UC70) & Branch Isolation
   // =========================================================================
-  console.log('\n--- Test 9: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 9: Sự Cố Phòng (Room Issue - UC70) & Branch Isolation ---')
+
+  const RoomIssue = require('../src/models/roomIssueModel')
+
+  // Lấy phòng 201 đang available
+  const room201 = await Room.findOne({ roomNumber: '201', branch: branch._id })
+  assert(room201, 'Phòng 201 phải tồn tại')
+  assert(room201.status === 'available', 'Phòng 201 ban đầu phải ở trạng thái available')
+
+  // Case 1: Tạo mới sự cố và xác minh trạng thái phòng chuyển sang maintenance
+  const issueA = await managerService.createRoomIssue({
+    room: room201._id,
+    description: 'Hỏng vòi hoa sen',
+    severity: 'medium'
+  }, branch._id, managerAcc._id)
+
+  assert(issueA, 'Phải tạo thành công sự cố A')
+  assert(issueA.status === 'open', 'Trạng thái sự cố A mới tạo phải là open')
+  assert(issueA.severity === 'medium', 'Mức độ nghiêm trọng phải là medium')
+
+  const room201AfterA = await Room.findById(room201._id)
+  assert(room201AfterA.status === 'maintenance', 'Phòng 201 phải tự động chuyển sang maintenance')
+  console.log('✅ Pass: Tạo sự cố mới tự động chuyển trạng thái phòng sang maintenance')
+
+  // Case 2: Tạo thêm sự cố B trên cùng phòng 201 (Multiple Open Issues)
+  const issueB = await managerService.createRoomIssue({
+    room: room201._id,
+    description: 'Điều hòa không lạnh',
+    severity: 'high'
+  }, branch._id, managerAcc._id)
+
+  assert(issueB, 'Phải tạo thành công sự cố B')
+  
+  // Resolve sự cố A → Xác minh phòng vẫn ở trạng thái maintenance vì sự cố B vẫn đang open
+  await managerService.resolveRoomIssue(issueA._id, {
+    resolutionNote: 'Đã thay vòi hoa sen mới'
+  }, branch._id, managerAcc._id)
+
+  const room201AfterResolveA = await Room.findById(room201._id)
+  assert(room201AfterResolveA.status === 'maintenance', 'Phòng 201 vẫn phải là maintenance do sự cố B còn mở')
+  console.log('✅ Pass: Giải quyết 1 sự cố khi vẫn còn sự cố khác mở, phòng vẫn giữ trạng thái maintenance')
+
+  // Case 3: Chặn giải quyết sự cố đã xử lý (Validation)
+  try {
+    await managerService.resolveRoomIssue(issueA._id, {
+      resolutionNote: 'Resolve lại lần nữa'
+    }, branch._id, managerAcc._id)
+    assert(false, 'Resolve sự cố đã giải quyết phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Chỉ có thể giải quyết sự cố đang mở', 'Thông báo lỗi phải là "Chỉ có thể giải quyết sự cố đang mở"')
+    console.log('✅ Pass: Chặn resolve sự cố đã được đóng từ trước thành công')
+  }
+
+  // Case 4: Lấy danh sách sự cố và lọc theo open/resolved
+  const openIssues = await managerService.getRoomIssues(branch._id, { status: 'open' })
+  assert(openIssues.length > 0, 'Danh sách sự cố open phải chứa ít nhất 1 phần tử (sự cố B)')
+  assert(openIssues.every(i => i.status === 'open'), 'Tất cả các sự cố trong danh sách open phải có status là open')
+
+  const resolvedIssues = await managerService.getRoomIssues(branch._id, { status: 'resolved' })
+  assert(resolvedIssues.length > 0, 'Danh sách sự cố resolved phải chứa ít nhất 1 phần tử (sự cố A)')
+  assert(resolvedIssues.every(i => i.status === 'resolved'), 'Tất cả các sự cố trong danh sách resolved phải có status là resolved')
+  console.log('✅ Pass: Lấy danh sách sự cố phòng và áp dụng bộ lọc thành công')
+
+  // Case 5: Branch Isolation khi Xem chi tiết / Xử lý sự cố
+  const diffBranchId2 = new mongoose.Types.ObjectId()
+  
+  // Xem chi tiết sự cố của HN01 bằng branchId khác phải lỗi 404
+  try {
+    await managerService.getRoomIssueById(issueB._id, diffBranchId2)
+    assert(false, 'Xem chi tiết sự cố của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo sự cố không tồn tại (404)')
+    console.log('✅ Pass: Chặn xem chi tiết sự cố của chi nhánh khác')
+  }
+
+  // Xử lý sự cố của HN01 bằng branchId khác phải lỗi 404
+  try {
+    await managerService.resolveRoomIssue(issueB._id, {
+      resolutionNote: 'Hack resolve'
+    }, diffBranchId2, managerAcc._id)
+    assert(false, 'Xử lý sự cố của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo sự cố không tồn tại (404)')
+    console.log('✅ Pass: Chặn giải quyết sự cố của chi nhánh khác')
+  }
+
+  // Case 6: Giải quyết sự cố B (sự cố cuối cùng) → Xác minh phòng trở lại trạng thái available
+  await managerService.resolveRoomIssue(issueB._id, {
+    resolutionNote: 'Đã sửa quạt gió điều hòa và nạp ga'
+  }, branch._id, managerAcc._id)
+
+  const room201AfterResolveB = await Room.findById(room201._id)
+  assert(room201AfterResolveB.status === 'available', 'Phòng 201 phải tự động chuyển lại thành available khi hết sự cố open')
+  console.log('✅ Pass: Giải quyết sự cố cuối cùng, phòng khôi phục trạng thái available thành công')
+
+  // Case 7: Báo sự cố trên phòng occupied không ghi đè trạng thái occupied
+  const room102 = await Room.findOne({ roomNumber: '102', branch: branch._id })
+  assert(room102, 'Phòng 102 phải tồn tại')
+  // Giả lập phòng 102 đang occupied
+  room102.status = 'occupied'
+  await room102.save()
+
+  const issueC = await managerService.createRoomIssue({
+    room: room102._id,
+    description: 'Tivi bị sọc màn hình',
+    severity: 'low'
+  }, branch._id, managerAcc._id)
+
+  const room102AfterC = await Room.findById(room102._id)
+  assert(room102AfterC.status === 'occupied', 'Trạng thái phòng occupied phải được giữ nguyên không ghi đè')
+
+  // Resolve sự cố C
+  await managerService.resolveRoomIssue(issueC._id, {
+    resolutionNote: 'Đã thay tivi mới'
+  }, branch._id, managerAcc._id)
+
+  const room102AfterResolveC = await Room.findById(room102._id)
+  assert(room102AfterResolveC.status === 'occupied', 'Giải quyết sự cố xong phòng vẫn phải giữ nguyên trạng thái occupied')
+  console.log('✅ Pass: Báo sự cố và giải quyết sự cố trên phòng occupied không ghi đè trạng thái occupied')
+
+  // =========================================================================
+  // 9.5. Kiểm tra Hủy Sự Cố, Linkage Task & Ngăn trùng lặp (Phase 4.5)
+  // =========================================================================
+  console.log('\n--- Test 9.5: Hủy Sự Cố, Linkage Task & Ngăn trùng lặp (Phase 4.5) ---')
+
+  const HousekeepingTask = require('../src/models/housekeepingTaskModel')
+
+  // 1. Kiểm tra Hủy sự cố phòng thành công & Trả phòng về available
+  const room201Fresh = await Room.findById(room201._id)
+  assert(room201Fresh.status === 'available', 'Phòng 201 trước test 9.5 phải ở trạng thái available')
+
+  const issueCancelTest = await managerService.createRoomIssue({
+    room: room201Fresh._id,
+    description: 'Hỏng khóa cửa',
+    severity: 'high'
+  }, branch._id, managerAcc._id)
+
+  const room201InMaintenance = await Room.findById(room201Fresh._id)
+  assert(room201InMaintenance.status === 'maintenance', 'Phòng 201 phải chuyển sang maintenance khi có sự cố mở')
+
+  // Thực hiện Hủy sự cố
+  const cancelledIssue = await managerService.cancelRoomIssue(issueCancelTest._id, {
+    cancellationReason: 'Khách báo nhầm, khóa bình thường'
+  }, branch._id, managerAcc._id)
+
+  assert(cancelledIssue.status === 'cancelled', 'Trạng thái sự cố phải là cancelled')
+  assert(cancelledIssue.cancelledBy.toString() === managerAcc._id.toString(), 'cancelledBy phải lưu đúng ID manager')
+  assert(cancelledIssue.cancelledAt instanceof Date, 'cancelledAt phải lưu đúng thời gian hủy')
+  assert(cancelledIssue.cancellationReason === 'Khách báo nhầm, khóa bình thường', 'cancellationReason phải khớp')
+
+  const room201Recovered = await Room.findById(room201Fresh._id)
+  assert(room201Recovered.status === 'available', 'Phòng 201 phải quay lại trạng thái available sau khi hủy sự cố duy nhất')
+  console.log('✅ Pass: Hủy sự cố phòng thành công và tự động hồi phục trạng thái phòng')
+
+  // 2. Validation: Chỉ có thể hủy sự cố đang mở
+  // Thử hủy lại sự cố đã hủy ở trên
+  try {
+    await managerService.cancelRoomIssue(issueCancelTest._id, {
+      cancellationReason: 'Hủy lại lần nữa'
+    }, branch._id, managerAcc._id)
+    assert(false, 'Hủy sự cố đã hủy phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Chỉ có thể hủy sự cố đang mở', 'Lỗi trả về phải là "Chỉ có thể hủy sự cố đang mở"')
+  }
+
+  // Thử hủy sự cố đã resolved (ví dụ: issueB đã resolved ở test 9)
+  try {
+    await managerService.cancelRoomIssue(issueB._id, {
+      cancellationReason: 'Hủy sự cố đã resolve'
+    }, branch._id, managerAcc._id)
+    assert(false, 'Hủy sự cố đã resolved phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Chỉ có thể hủy sự cố đang mở', 'Lỗi trả về phải là "Chỉ có thể hủy sự cố đang mở"')
+  }
+  console.log('✅ Pass: Validation chặn hủy sự cố đã resolve hoặc đã hủy hoạt động chính xác')
+
+  // 3. Linkage 1-N & Phòng chống trùng lặp sự cố từ Housekeeping Task
+  // Tạo task dọn phòng giả lập
+  const testTask = await HousekeepingTask.create({
+    branch: branch._id,
+    room: room201Fresh._id,
+    status: 'pending'
+  })
+
+  // Tạo sự cố thứ 1 liên kết với task
+  const issueTask1 = await managerService.createRoomIssueFromTask(testTask._id, {
+    description: 'Hỏng bóng đèn ngủ',
+    severity: 'low'
+  }, branch._id, managerAcc._id)
+
+  assert(issueTask1.housekeepingTask.toString() === testTask._id.toString(), 'housekeepingTask phải liên kết chính xác')
+  assert(issueTask1.status === 'open', 'Sự cố tạo từ task phải có trạng thái open')
+
+  const testTaskAfter1 = await HousekeepingTask.findById(testTask._id)
+  assert(testTaskAfter1.issueNote === 'Hỏng bóng đèn ngủ', 'issueNote của task phải được cập nhật mô tả sự cố')
+
+  // Tạo sự cố thứ 2 khác mô tả trên cùng 1 task (hỗ trợ quan hệ 1-N)
+  const issueTask2 = await managerService.createRoomIssueFromTask(testTask._id, {
+    description: 'Rách rèm cửa',
+    severity: 'medium'
+  }, branch._id, managerAcc._id)
+
+  assert(issueTask2.housekeepingTask.toString() === testTask._id.toString(), 'Sự cố 2 phải liên kết cùng task')
+  const testTaskAfter2 = await HousekeepingTask.findById(testTask._id)
+  assert(testTaskAfter2.issueNote.includes('Rách rèm cửa'), 'issueNote của task phải chứa mô tả của sự cố 2')
+
+  // Thử tạo sự cố trùng lặp (trùng mô tả và cùng trạng thái open cho task này) -> phải bị chặn
+  try {
+    await managerService.createRoomIssueFromTask(testTask._id, {
+      description: 'Hỏng bóng đèn ngủ',
+      severity: 'low'
+    }, branch._id, managerAcc._id)
+    assert(false, 'Tạo sự cố trùng lặp mô tả cho cùng task phải báo lỗi')
+  } catch (err) {
+    assert(err.message === 'Sự cố này đã được báo cáo và đang chờ xử lý', 'Lỗi trả về phải báo sự cố đã báo cáo')
+  }
+  console.log('✅ Pass: Linkage 1-N và phòng ngừa trùng lặp sự cố từ task dọn phòng hoạt động hoàn hảo')
+
+  // Cancel issueTask1 and issueTask2 to restore room 201 to available status before Case A
+  await managerService.cancelRoomIssue(issueTask1._id, { cancellationReason: 'Clean up' }, branch._id, managerAcc._id)
+  await managerService.cancelRoomIssue(issueTask2._id, { cancellationReason: 'Clean up' }, branch._id, managerAcc._id)
+
+  // 4. Case A – Multiple Open Issues + Cancel
+  const room201CaseA = await Room.findById(room201Fresh._id)
+  assert(room201CaseA.status === 'available', 'Phòng 201 trước Case A phải ở trạng thái available')
+
+  const issueCaseA1 = await managerService.createRoomIssue({
+    room: room201Fresh._id,
+    description: 'Hỏng vòi rửa tay',
+    severity: 'low'
+  }, branch._id, managerAcc._id)
+
+  const issueCaseA2 = await managerService.createRoomIssue({
+    room: room201Fresh._id,
+    description: 'Hỏng vòi xịt vệ sinh',
+    severity: 'medium'
+  }, branch._id, managerAcc._id)
+
+  const room201CaseAMaint = await Room.findById(room201Fresh._id)
+  assert(room201CaseAMaint.status === 'maintenance', 'Phòng 201 phải ở trạng thái maintenance')
+
+  // Hủy sự cố 1 (Issue A1) -> phòng vẫn phải ở trạng thái maintenance vì Issue A2 còn mở
+  await managerService.cancelRoomIssue(issueCaseA1._id, {
+    cancellationReason: 'Báo trùng hoặc nhầm'
+  }, branch._id, managerAcc._id)
+
+  const room201CaseAStillMaint = await Room.findById(room201Fresh._id)
+  assert(room201CaseAStillMaint.status === 'maintenance', 'Phòng 201 vẫn phải là maintenance sau khi hủy 1 trong 2 sự cố mở')
+
+  // Resolve sự cố 2 (Issue A2) -> phòng phải khôi phục về available vì không còn sự cố mở nào
+  await managerService.resolveRoomIssue(issueCaseA2._id, {
+    resolutionNote: 'Đã sửa vòi xịt vệ sinh'
+  }, branch._id, managerAcc._id)
+
+  const room201CaseAAvail = await Room.findById(room201Fresh._id)
+  assert(room201CaseAAvail.status === 'available', 'Phòng 201 phải phục hồi về available sau khi giải quyết sự cố mở cuối cùng')
+  console.log('✅ Pass: Multiple Open Issues + Cancel (đếm chính xác số lượng issue mở) hoạt động đúng')
+
+  // 5. Case B – Transaction error guard test
+  // Set ENABLE_TRANSACTIONS = true để kích hoạt transaction và kích hoạt lỗi cấu hình transaction
+  process.env.ENABLE_TRANSACTIONS = 'true'
+  try {
+    // Thử tạo một issue từ task khi ENABLE_TRANSACTIONS = true
+    // Trong môi trường local không có replica set, thao tác này chắc chắn sẽ bắn ra lỗi replica set/session.
+    // Lỗi này phải được bắt và dịch thành thông báo cấu hình lỗi chuẩn xác.
+    await managerService.createRoomIssueFromTask(testTask._id, {
+      description: 'Test transaction error guard',
+      severity: 'low'
+    }, branch._id, managerAcc._id)
+    console.log('ℹ️ Note: Môi trường test hỗ trợ transaction, test case transaction thành công')
+  } catch (err) {
+    assert(err.message === 'Transactions are enabled but MongoDB does not support them', 'Lỗi ném ra phải được guard và chuyển dịch đúng định dạng')
+    console.log('✅ Pass: Transaction replica set guard bắt lỗi cấu hình chính xác')
+  }
+  // Trả ENABLE_TRANSACTIONS về false để tiếp tục chạy các bài test không phụ thuộc replica set
+  process.env.ENABLE_TRANSACTIONS = 'false'
+
+  // Dọn dẹp dữ liệu test của Test 9.5
+  await RoomIssue.deleteMany({ _id: { $in: [issueCancelTest._id, issueTask1._id, issueTask2._id, issueCaseA1._id, issueCaseA2._id] } })
+  await HousekeepingTask.deleteOne({ _id: testTask._id })
+  console.log('🧹 Đã dọn dẹp các bản ghi tạm thời của Test 9.5')
+
+  // =========================================================================
+  // 10. Kiểm tra Giám Sát Hoạt Động Buồng Phòng (Monitor Housekeeping - UC69)
+  // =========================================================================
+  console.log('\n--- Test 10: Giám Sát Hoạt Động Buồng Phòng (Monitor Housekeeping - UC69) ---')
+  const RoleAssignment = require('../src/models/roleAssignmentModel')
+
+  const housekeeperAcc = await Account.findOne({ email: 'housekeeper@hbms.com' })
+  assert(housekeeperAcc, 'Tài khoản housekeeper phải tồn tại')
+
+  const receptionistAcc = await Account.findOne({ email: 'receptionist@hbms.com' })
+  assert(receptionistAcc, 'Tài khoản receptionist phải tồn tại')
+
+  // Giả lập tạo 1 task dọn dẹp cho phòng 202
+  const room202 = await Room.findOne({ roomNumber: '202', branch: branch._id })
+  const taskA = await HousekeepingTask.create({
+    branch: branch._id,
+    room: room202._id,
+    status: 'pending',
+    isUrgent: false
+  })
+  assert(taskA, 'Phải tạo thành công task dọn phòng A')
+
+  // Case 1: Xem chi tiết task dọn phòng
+  const taskDetail = await managerService.getHousekeepingTaskById(taskA._id, branch._id)
+  assert(taskDetail, 'Phải lấy được chi tiết task dọn phòng')
+  assert(taskDetail.room.roomNumber === '202', 'Số phòng trong chi tiết phải là 202')
+  console.log('✅ Pass: Lấy chi tiết task dọn phòng thành công')
+
+  // Case 2: Phân công task dọn phòng cho housekeeper chi nhánh (HK-A)
+  const assignedTaskA = await managerService.assignHousekeepingTask(taskA._id, housekeeperAcc._id, branch._id, managerAcc._id)
+  assert(assignedTaskA.assignedTo.toString() === housekeeperAcc._id.toString(), 'Phân công dọn phòng cho housekeeperAcc phải thành công')
+  assert(assignedTaskA.assignedBy.toString() === managerAcc._id.toString(), 'Người phân công phải là managerAcc')
+  assert(assignedTaskA.assignedAt instanceof Date, 'Thời gian phân công phải được lưu nhận')
+  console.log('✅ Pass: Phân công task dọn phòng thành công cho housekeeper hợp lệ')
+
+  // Case 3: Reassignment Test (Option A - chuyển từ HK-A sang housekeeper mới)
+  // Tạo 1 housekeeper mới trong cùng chi nhánh
+  const newHKAcc = await Account.create({
+    email: 'newhk@hbms.com',
+    password: 'Password@123',
+    role: 'housekeeper',
+    isVerified: true,
+    isActive: true
+  })
+  await RoleAssignment.create({
+    account: newHKAcc._id,
+    branch: branch._id,
+    role: 'housekeeper',
+    isActive: true
+  })
+
+  const reassignedTask = await managerService.assignHousekeepingTask(taskA._id, newHKAcc._id, branch._id, managerAcc._id)
+  assert(reassignedTask.assignedTo.toString() === newHKAcc._id.toString(), 'Reassignment: Phải chuyển sang housekeeper mới thành công')
+  console.log('✅ Pass: Phân công lại (reassign) cho housekeeper khác thành công')
+
+  // Case 4: Chặn phân công cho housekeeper thuộc chi nhánh khác hoặc nhân viên role khác
+  // Phân công cho receptionist (sai role) -> phải báo lỗi
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, receptionistAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho nhân viên sai role phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('không hợp lệ'), 'Lỗi trả về phải là housekeeper không hợp lệ')
+    console.log('✅ Pass: Chặn phân công cho nhân viên sai role thành công')
+  }
+
+  // Chặn phân công cho chính quản lý
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, managerAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho chính quản lý phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('cho quản lý'), 'Lỗi trả về phải là không thể phân công cho quản lý')
+    console.log('✅ Pass: Chặn phân công cho chính quản lý thành công')
+  }
+
+  // Case 5: Chặn phân công cho task đã kết thúc (completed/missed)
+  taskA.status = 'completed'
+  await taskA.save()
+
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, housekeeperAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho task completed phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('đã kết thúc'), 'Lỗi trả về phải báo không thể phân công task đã kết thúc')
+    console.log('✅ Pass: Chặn phân công cho task đã hoàn thành (completed) thành công')
+  }
+
+  // Case 6: Đánh dấu/bỏ đánh dấu khẩn cấp cho task dọn phòng và kiểm tra sắp xếp
+  // Tạo 2 task mới: task B (bình thường), task C (bình thường)
+  const room203 = await Room.findOne({ roomNumber: '203', branch: branch._id })
+  const taskB = await HousekeepingTask.create({ branch: branch._id, room: room203._id, status: 'pending', isUrgent: false })
+
+  const room204 = await Room.findOne({ roomNumber: '204', branch: branch._id })
+  const taskC = await HousekeepingTask.create({ branch: branch._id, room: room204._id, status: 'pending', isUrgent: false })
+
+  // Đánh dấu task C khẩn cấp
+  const urgentTaskC = await managerService.markHousekeepingTaskUrgent(taskC._id, branch._id)
+  assert(urgentTaskC.isUrgent === true, 'Task C phải được đánh dấu isUrgent = true')
+
+  // Lấy danh sách task và kiểm tra sort (task C phải đứng đầu vì isUrgent = true)
+  const tasksList = await managerService.getHousekeepingTasks(branch._id)
+  assert(tasksList[0]._id.toString() === taskC._id.toString(), 'Task C (khẩn cấp) phải nằm ở vị trí đầu tiên trong danh sách')
+  console.log('✅ Pass: Đánh dấu khẩn cấp (isUrgent) và sắp xếp thứ tự chính xác')
+
+  // Bỏ đánh dấu khẩn cấp task C
+  const normalTaskC = await managerService.markHousekeepingTaskUrgent(taskC._id, branch._id)
+  assert(normalTaskC.isUrgent === false, 'Task C phải được khôi phục isUrgent = false')
+  console.log('✅ Pass: Bỏ đánh dấu khẩn cấp thành công')
+
+  // Case 7: Branch Isolation
+  const otherBranchId3 = new mongoose.Types.ObjectId()
+  
+  // Xem chi tiết task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.getHousekeepingTaskById(taskB._id, otherBranchId3)
+    assert(false, 'Xem chi tiết task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn xem chi tiết task của chi nhánh khác')
+  }
+
+  // Phân công task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.assignHousekeepingTask(taskB._id, housekeeperAcc._id, otherBranchId3, managerAcc._id)
+    assert(false, 'Phân công task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn phân công task của chi nhánh khác')
+  }
+
+  // Đổi trạng thái khẩn cấp task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.markHousekeepingTaskUrgent(taskB._id, otherBranchId3)
+    assert(false, 'Đổi khẩn cấp task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn đổi độ khẩn cấp task của chi nhánh khác')
+  }
+
+  // Xóa tài khoản newHKAcc để tránh rác DB
+  await Account.deleteOne({ _id: newHKAcc._id })
+  await RoleAssignment.deleteOne({ account: newHKAcc._id })
+
+  // =========================================================================
+  // 11. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 11: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   
@@ -414,3 +841,5 @@ runTests().catch(err => {
   console.error('\n❌ PHÁT SINH LỖI KHI CHẠY TEST:', err.message)
   process.exit(1)
 })
+
+
