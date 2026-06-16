@@ -51,6 +51,13 @@ router.get('/room-issues/:id', managerController.getRoomIssueById)
 router.post('/room-issues', managerController.createRoomIssue)
 router.patch('/room-issues/:id/resolve', managerController.resolveRoomIssue)
 
+// ─── Housekeeping ──────────────────────────────────────────────────────────────
+router.get('/housekeeping/tasks', managerController.getHousekeepingTasks)
+router.get('/housekeeping/tasks/:id', managerController.getHousekeepingTaskById)
+router.patch('/housekeeping/tasks/:id/assign', managerController.assignHousekeepingTask)
+router.patch('/housekeeping/tasks/:id/urgent', managerController.markHousekeepingTaskUrgent)
+
 module.exports = router
+
 
 

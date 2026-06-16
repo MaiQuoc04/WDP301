@@ -9,6 +9,10 @@ const Amenity   = require('../models/amenityModel')
 const RoomAmenity = require('../models/roomAmenityModel')
 const Service   = require('../models/serviceModel')
 const RoomIssue = require('../models/roomIssueModel')
+const HousekeepingTask = require('../models/housekeepingTaskModel')
+const RoleAssignment = require('../models/roleAssignmentModel')
+const Account = require('../models/accountModel')
+
 
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -562,6 +566,97 @@ exports.resolveRoomIssue = async (id, data, branchId, managerId) => {
 
   return issue
 }
+
+// ─── Housekeeping Monitor (UC69) ──────────────────────────────────────────────────
+
+// Lấy danh sách công việc dọn phòng của chi nhánh
+exports.getHousekeepingTasks = async (branchId, query = {}) => {
+  const filter = { branch: branchId }
+
+  if (query.status) {
+    if (HousekeepingTask.TASK_STATUS.includes(query.status)) {
+      filter.status = query.status
+    }
+  }
+
+  if (query.assignedTo !== undefined) {
+    filter.assignedTo = query.assignedTo === 'null' ? null : query.assignedTo
+  }
+
+  if (query.room) {
+    filter.room = query.room
+  }
+
+  return HousekeepingTask.find(filter)
+    .populate('room', 'roomNumber status')
+    .populate('assignedTo', 'email')
+    .populate('assignedBy', 'email')
+    .sort({ isUrgent: -1, createdAt: 1 })
+}
+
+// Xem chi tiết công việc dọn phòng
+exports.getHousekeepingTaskById = async (id, branchId) => {
+  const task = await HousekeepingTask.findOne({ _id: id, branch: branchId })
+    .populate('room', 'roomNumber status')
+    .populate('assignedTo', 'email')
+    .populate('assignedBy', 'email')
+    .populate('booking')
+
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+  return task
+}
+
+// Phân công công việc dọn phòng cho housekeeper (Reassign/Option A)
+exports.assignHousekeepingTask = async (id, assignedToAccountId, branchId, managerId) => {
+  const task = await HousekeepingTask.findOne({ _id: id, branch: branchId })
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+
+  // Chặn phân công cho task đã kết thúc
+  if (['completed', 'missed'].includes(task.status)) {
+    fail('Không thể phân công task đã kết thúc')
+  }
+
+  if (assignedToAccountId) {
+    // Chặn phân công cho chính quản lý
+    if (String(assignedToAccountId) === String(managerId)) {
+      fail('Không thể phân công task cho quản lý')
+    }
+
+    // Kiểm tra tài khoản housekeeper tồn tại và active
+    const housekeeperAcc = await Account.findOne({ _id: assignedToAccountId, isActive: true })
+    if (!housekeeperAcc) fail('Tài khoản nhân viên không tồn tại hoặc bị khóa')
+
+    // Kiểm tra RoleAssignment active, đúng role 'housekeeper' và đúng chi nhánh
+    const roleAssign = await RoleAssignment.findOne({
+      account: assignedToAccountId,
+      branch: branchId,
+      role: 'housekeeper',
+      isActive: true
+    })
+    if (!roleAssign) fail('Nhân viên dọn phòng không hợp lệ hoặc không thuộc chi nhánh này')
+
+    task.assignedTo = assignedToAccountId
+    task.assignedBy = managerId
+    task.assignedAt = new Date()
+  } else {
+    // Unassign task
+    task.assignedTo = null
+    task.assignedBy = null
+    task.assignedAt = null
+  }
+
+  return task.save()
+}
+
+// Đánh dấu/bỏ đánh dấu khẩn cấp cho task dọn phòng
+exports.markHousekeepingTaskUrgent = async (id, branchId) => {
+  const task = await HousekeepingTask.findOne({ _id: id, branch: branchId })
+  if (!task) fail('Công việc dọn phòng không tồn tại', 404)
+
+  task.isUrgent = !task.isUrgent
+  return task.save()
+}
+
 
 
 

@@ -399,5 +399,39 @@ Content-Type: application/json
 }
 
 
+### =========================================================================
+### HOUSEKEEPING MONITOR APIs (UC-69)
+### =========================================================================
+
+### 35) Lấy toàn bộ danh sách task dọn phòng của chi nhánh (sắp xếp Urgent lên trước)
+GET {{base}}/manager/housekeeping/tasks
+Authorization: Bearer {{mToken}}
+
+### 36) Lấy danh sách task dọn phòng có bộ lọc (ví dụ: chưa phân công status=pending)
+GET {{base}}/manager/housekeeping/tasks?status=pending&assignedTo=null
+Authorization: Bearer {{mToken}}
+
+###
+@tempTaskId = 660c1c875d5e5e23c015b302
+
+### 37) Lấy chi tiết task dọn phòng
+GET {{base}}/manager/housekeeping/tasks/{{tempTaskId}}
+Authorization: Bearer {{mToken}}
+
+### 38) Phân công task dọn phòng cho housekeeper
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/assign
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "assignedTo": "660c1c875d5e5e23c015b001"
+}
+
+### 39) Đánh dấu khẩn cấp cho task dọn phòng (Urgent Toggle)
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/urgent
+Authorization: Bearer {{mToken}}
+
+
+
 
 

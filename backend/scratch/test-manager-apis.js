@@ -520,9 +520,153 @@ async function runTests() {
   console.log('✅ Pass: Báo sự cố và giải quyết sự cố trên phòng occupied không ghi đè trạng thái occupied')
 
   // =========================================================================
-  // 10. Cleanup & Restore Database
+  // 10. Kiểm tra Giám Sát Hoạt Động Buồng Phòng (Monitor Housekeeping - UC69)
   // =========================================================================
-  console.log('\n--- Test 10: Phục hồi cơ sở dữ liệu ---')
+  console.log('\n--- Test 10: Giám Sát Hoạt Động Buồng Phòng (Monitor Housekeeping - UC69) ---')
+
+  const HousekeepingTask = require('../src/models/housekeepingTaskModel')
+  const RoleAssignment = require('../src/models/roleAssignmentModel')
+
+  const housekeeperAcc = await Account.findOne({ email: 'housekeeper@hbms.com' })
+  assert(housekeeperAcc, 'Tài khoản housekeeper phải tồn tại')
+
+  const receptionistAcc = await Account.findOne({ email: 'receptionist@hbms.com' })
+  assert(receptionistAcc, 'Tài khoản receptionist phải tồn tại')
+
+  // Giả lập tạo 1 task dọn dẹp cho phòng 202
+  const room202 = await Room.findOne({ roomNumber: '202', branch: branch._id })
+  const taskA = await HousekeepingTask.create({
+    branch: branch._id,
+    room: room202._id,
+    status: 'pending',
+    isUrgent: false
+  })
+  assert(taskA, 'Phải tạo thành công task dọn phòng A')
+
+  // Case 1: Xem chi tiết task dọn phòng
+  const taskDetail = await managerService.getHousekeepingTaskById(taskA._id, branch._id)
+  assert(taskDetail, 'Phải lấy được chi tiết task dọn phòng')
+  assert(taskDetail.room.roomNumber === '202', 'Số phòng trong chi tiết phải là 202')
+  console.log('✅ Pass: Lấy chi tiết task dọn phòng thành công')
+
+  // Case 2: Phân công task dọn phòng cho housekeeper chi nhánh (HK-A)
+  const assignedTaskA = await managerService.assignHousekeepingTask(taskA._id, housekeeperAcc._id, branch._id, managerAcc._id)
+  assert(assignedTaskA.assignedTo.toString() === housekeeperAcc._id.toString(), 'Phân công dọn phòng cho housekeeperAcc phải thành công')
+  assert(assignedTaskA.assignedBy.toString() === managerAcc._id.toString(), 'Người phân công phải là managerAcc')
+  assert(assignedTaskA.assignedAt instanceof Date, 'Thời gian phân công phải được lưu nhận')
+  console.log('✅ Pass: Phân công task dọn phòng thành công cho housekeeper hợp lệ')
+
+  // Case 3: Reassignment Test (Option A - chuyển từ HK-A sang housekeeper mới)
+  // Tạo 1 housekeeper mới trong cùng chi nhánh
+  const newHKAcc = await Account.create({
+    email: 'newhk@hbms.com',
+    password: 'Password@123',
+    role: 'housekeeper',
+    isVerified: true,
+    isActive: true
+  })
+  await RoleAssignment.create({
+    account: newHKAcc._id,
+    branch: branch._id,
+    role: 'housekeeper',
+    isActive: true
+  })
+
+  const reassignedTask = await managerService.assignHousekeepingTask(taskA._id, newHKAcc._id, branch._id, managerAcc._id)
+  assert(reassignedTask.assignedTo.toString() === newHKAcc._id.toString(), 'Reassignment: Phải chuyển sang housekeeper mới thành công')
+  console.log('✅ Pass: Phân công lại (reassign) cho housekeeper khác thành công')
+
+  // Case 4: Chặn phân công cho housekeeper thuộc chi nhánh khác hoặc nhân viên role khác
+  // Phân công cho receptionist (sai role) -> phải báo lỗi
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, receptionistAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho nhân viên sai role phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('không hợp lệ'), 'Lỗi trả về phải là housekeeper không hợp lệ')
+    console.log('✅ Pass: Chặn phân công cho nhân viên sai role thành công')
+  }
+
+  // Chặn phân công cho chính quản lý
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, managerAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho chính quản lý phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('cho quản lý'), 'Lỗi trả về phải là không thể phân công cho quản lý')
+    console.log('✅ Pass: Chặn phân công cho chính quản lý thành công')
+  }
+
+  // Case 5: Chặn phân công cho task đã kết thúc (completed/missed)
+  taskA.status = 'completed'
+  await taskA.save()
+
+  try {
+    await managerService.assignHousekeepingTask(taskA._id, housekeeperAcc._id, branch._id, managerAcc._id)
+    assert(false, 'Phân công cho task completed phải báo lỗi')
+  } catch (err) {
+    assert(err.message.includes('đã kết thúc'), 'Lỗi trả về phải báo không thể phân công task đã kết thúc')
+    console.log('✅ Pass: Chặn phân công cho task đã hoàn thành (completed) thành công')
+  }
+
+  // Case 6: Đánh dấu/bỏ đánh dấu khẩn cấp cho task dọn phòng và kiểm tra sắp xếp
+  // Tạo 2 task mới: task B (bình thường), task C (bình thường)
+  const room203 = await Room.findOne({ roomNumber: '203', branch: branch._id })
+  const taskB = await HousekeepingTask.create({ branch: branch._id, room: room203._id, status: 'pending', isUrgent: false })
+
+  const room204 = await Room.findOne({ roomNumber: '204', branch: branch._id })
+  const taskC = await HousekeepingTask.create({ branch: branch._id, room: room204._id, status: 'pending', isUrgent: false })
+
+  // Đánh dấu task C khẩn cấp
+  const urgentTaskC = await managerService.markHousekeepingTaskUrgent(taskC._id, branch._id)
+  assert(urgentTaskC.isUrgent === true, 'Task C phải được đánh dấu isUrgent = true')
+
+  // Lấy danh sách task và kiểm tra sort (task C phải đứng đầu vì isUrgent = true)
+  const tasksList = await managerService.getHousekeepingTasks(branch._id)
+  assert(tasksList[0]._id.toString() === taskC._id.toString(), 'Task C (khẩn cấp) phải nằm ở vị trí đầu tiên trong danh sách')
+  console.log('✅ Pass: Đánh dấu khẩn cấp (isUrgent) và sắp xếp thứ tự chính xác')
+
+  // Bỏ đánh dấu khẩn cấp task C
+  const normalTaskC = await managerService.markHousekeepingTaskUrgent(taskC._id, branch._id)
+  assert(normalTaskC.isUrgent === false, 'Task C phải được khôi phục isUrgent = false')
+  console.log('✅ Pass: Bỏ đánh dấu khẩn cấp thành công')
+
+  // Case 7: Branch Isolation
+  const otherBranchId3 = new mongoose.Types.ObjectId()
+  
+  // Xem chi tiết task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.getHousekeepingTaskById(taskB._id, otherBranchId3)
+    assert(false, 'Xem chi tiết task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn xem chi tiết task của chi nhánh khác')
+  }
+
+  // Phân công task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.assignHousekeepingTask(taskB._id, housekeeperAcc._id, otherBranchId3, managerAcc._id)
+    assert(false, 'Phân công task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn phân công task của chi nhánh khác')
+  }
+
+  // Đổi trạng thái khẩn cấp task của chi nhánh khác phải lỗi 404
+  try {
+    await managerService.markHousekeepingTaskUrgent(taskB._id, otherBranchId3)
+    assert(false, 'Đổi khẩn cấp task dọn dẹp của chi nhánh khác phải lỗi')
+  } catch (err) {
+    assert(err.message.includes('không tồn tại'), 'Lỗi trả về phải báo không tồn tại (404)')
+    console.log('✅ Pass: Chặn đổi độ khẩn cấp task của chi nhánh khác')
+  }
+
+  // Xóa tài khoản newHKAcc để tránh rác DB
+  await Account.deleteOne({ _id: newHKAcc._id })
+  await RoleAssignment.deleteOne({ account: newHKAcc._id })
+
+  // =========================================================================
+  // 11. Cleanup & Restore Database
+  // =========================================================================
+  console.log('\n--- Test 11: Phục hồi cơ sở dữ liệu ---')
   await mongoose.disconnect()
   console.log('🔌 Đã ngắt kết nối test DB')
   
@@ -537,4 +681,5 @@ runTests().catch(err => {
   console.error('\n❌ PHÁT SINH LỖI KHI CHẠY TEST:', err.message)
   process.exit(1)
 })
+
 
