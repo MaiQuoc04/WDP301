@@ -4,6 +4,8 @@ const Room = require('../models/roomModel')
 const Payment = require('../models/paymentModel')
 const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
 const RoleAssignment = require('../models/roleAssignmentModel')
+const Service = require('../models/serviceModel')
+const Amenity = require('../models/amenityModel')
 const bookingService = require('./bookingService')
 
 // Các branchId mà lễ tân được gán (BR-30: chỉ quản lý chi nhánh của mình)
@@ -14,6 +16,16 @@ async function myBranchIds(accountId) {
   return ids
 }
 exports.myBranchIds = myBranchIds
+
+// Danh mục dịch vụ / thiết bị của chi nhánh (cho dropdown bill)
+exports.listServices = async (accountId) => {
+  const branches = await myBranchIds(accountId)
+  return Service.find({ branch: { $in: branches }, status: 'active' }).sort('name').lean()
+}
+exports.listAmenities = async (accountId) => {
+  const branches = await myBranchIds(accountId)
+  return Amenity.find({ branch: { $in: branches }, status: 'active' }).sort('name').lean()
+}
 
 // UC-26: danh sách phòng + trạng thái trong chi nhánh
 exports.listRooms = async (accountId, { status } = {}) => {

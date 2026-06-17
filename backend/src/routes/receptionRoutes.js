@@ -6,6 +6,10 @@ const c = require('../controllers/receptionController')
 
 router.use(protect, authorize('receptionist'))
 
+// Danh mục (cho dropdown bill)
+router.get('/services', c.listServices)
+router.get('/amenities', c.listAmenities)
+
 // Giai đoạn 1 — đọc dữ liệu
 router.get('/rooms', c.listRooms)                 // UC-26 danh sách phòng + trạng thái
 router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
