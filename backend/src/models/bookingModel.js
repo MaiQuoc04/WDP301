@@ -24,7 +24,9 @@ const bookingSchema = new mongoose.Schema({
   guestPhone:{ type: String, trim: true },
   checkIn:   { type: Date, required: true },
   checkOut:  { type: Date, required: true },
-  guests:    { type: Number, default: 1 },
+  guests:    { type: Number, default: 1 },   // tổng = adults + children
+  adults:    { type: Number, default: 1, min: 1 },
+  children:  { type: Number, default: 0, min: 0 },
   source:    { type: String, enum: ['online', 'walk_in'], default: 'online' },
   status:        { type: String, enum: BOOKING_STATUS, default: 'pending' },
   paymentStatus: { type: String, enum: PAYMENT_PROGRESS, default: 'unpaid' }, // BR-33
@@ -34,6 +36,8 @@ const bookingSchema = new mongoose.Schema({
   depositAmount:         { type: Number, default: 0 },
   extraServicesTotal:    { type: Number, default: 0 },
   missingAmenitiesTotal: { type: Number, default: 0 },
+  bedSurcharge:          { type: Number, default: 0 },      // phụ phí giường phụ (ước tính, theo §9.7)
+  bedSurchargeApplied:   { type: Boolean, default: false }, // đã cộng vào bill chưa (tự áp khi check-in)
   totalAmount:           { type: Number, default: 0 },
   paidAmount:            { type: Number, default: 0 },
   remainingAmount:       { type: Number, default: 0 },
@@ -56,7 +60,8 @@ const bookingSchema = new mongoose.Schema({
   }],
 
   creditApplied: { type: Number, default: 0 },     // credit từ booking trước áp lúc checkout (BR-34)
-  cancelReason:  { type: String, trim: true },     // vd 'payment_timeout' khi HoldRoom hết hạn
+  cancelReason:  { type: String, trim: true },     // vd 'payment_timeout' khi quá hạn cọc
+  expiresAt:     { type: Date },                    // hạn thanh toán cọc (online); quá hạn -> job tự huỷ
   notes:     { type: String, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân (walk-in)
 }, { timestamps: true })
