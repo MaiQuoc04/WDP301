@@ -44,7 +44,7 @@ const OCCUPYING = ['pending', 'confirmed', 'checked_in']
 // Số phòng còn trống của 1 roomType trong khoảng [checkIn, checkOut)
 // = tổng phòng - số booking đang chiếm trùng lịch (mỗi pending đã kèm 1 HoldRoom nên không đếm hold riêng để khỏi trùng).
 async function countAvailableRooms(roomTypeId, branchId, checkIn, checkOut) {
-  const totalRooms = await Room.countDocuments({ roomType: roomTypeId, branch: branchId })
+  const totalRooms = await Room.countDocuments({ roomType: roomTypeId, branch: branchId, isDeleted: { $ne: true } })
   const overlap = await Booking.countDocuments({
     roomType: roomTypeId,
     status: { $in: OCCUPYING },

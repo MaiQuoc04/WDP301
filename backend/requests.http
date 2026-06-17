@@ -107,3 +107,349 @@ POST {{base}}/auth/register
 Content-Type: application/json
 
 { "email": "{{email}}", "password": "{{password}}", "fullName": "Trung" }
+
+
+### =========================================================================
+### BRANCH MANAGER APIs (UC-57→62 + RoomPrice)
+### =========================================================================
+
+### 1) Đăng nhập Branch Manager (manager@hbms.com / Manager@123)
+# @name managerLogin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager@hbms.com",
+  "password": "Manager@123"
+}
+
+###
+@mToken = {{managerLogin.response.body.$.data.token}}
+
+### 2) Lấy danh sách Room Types của chi nhánh
+GET {{base}}/manager/room-types
+Authorization: Bearer {{mToken}}
+
+### 3) Lấy danh sách options Room Types (Dropdown - chỉ active)
+GET {{base}}/manager/room-types/options
+Authorization: Bearer {{mToken}}
+
+### 4) Tạo mới Room Type
+# @name createRT
+POST {{base}}/manager/room-types
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Suite Deluxe",
+  "bedType": "king",
+  "capacity": 2,
+  "area": 45,
+  "basePrice": 2200000,
+  "description": "Phòng Suite cao cấp có ban công rộng rãi"
+}
+
+###
+@newRtId = {{createRT.response.body.$.data._id}}
+
+### 5) Cập nhật Room Type
+PUT {{base}}/manager/room-types/{{newRtId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "basePrice": 2300000,
+  "description": "Phòng Suite cao cấp hướng biển kèm ban công rộng rãi"
+}
+
+### 6) Đổi trạng thái Room Type sang inactive (Soft Delete)
+PATCH {{base}}/manager/room-types/{{newRtId}}/status
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+### 7) Lấy danh sách Rooms của chi nhánh
+GET {{base}}/manager/rooms
+Authorization: Bearer {{mToken}}
+
+### 8) Lấy danh sách Rooms có bộ lọc (ví dụ: tầng 2, Deluxe Double)
+GET {{base}}/manager/rooms?floor=2
+Authorization: Bearer {{mToken}}
+
+### 9) Tạo mới Room
+# @name createRoom
+POST {{base}}/manager/rooms
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "roomNumber": "501",
+  "floor": 5,
+  "notes": "Phòng VIP tầng thượng"
+}
+
+###
+@newRoomId = {{createRoom.response.body.$.data._id}}
+
+### 10) Cập nhật Room
+PUT {{base}}/manager/rooms/{{newRoomId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "notes": "Phòng VIP tầng thượng hướng Đông Nam"
+}
+
+### 11) Thay đổi trạng thái Room nhanh (ví dụ sang bảo trì)
+PATCH {{base}}/manager/rooms/{{newRoomId}}/status
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "status": "maintenance"
+}
+
+### 12) Deactivate Room (Soft Delete)
+PATCH {{base}}/manager/rooms/{{newRoomId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+### 13) Lấy danh sách cấu hình giá động (RoomPrice)
+GET {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+
+### 14) Tạo cấu hình giá động theo ngày cụ thể (ví dụ Giáng Sinh 2026)
+# @name createPriceDate
+POST {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "date": "2026-12-25",
+  "price": 3500000,
+  "discount": 10
+}
+
+###
+@priceId1 = {{createPriceDate.response.body.$.data._id}}
+
+### 15) Tạo cấu hình giá động theo loại ngày (ví dụ weekend)
+# @name createPriceDayType
+POST {{base}}/manager/room-prices
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "roomType": "{{newRtId}}",
+  "dayType": "weekend",
+  "price": 2800000
+}
+
+###
+@priceId2 = {{createPriceDayType.response.body.$.data._id}}
+
+### 16) Xóa cấu hình giá động
+DELETE {{base}}/manager/room-prices/{{priceId1}}
+Authorization: Bearer {{mToken}}
+
+
+### =========================================================================
+### AMENITY & ROOM AMENITY APIs (UC-63→65)
+### =========================================================================
+
+### 17) Lấy toàn bộ danh sách Amenities của chi nhánh
+GET {{base}}/manager/amenities
+Authorization: Bearer {{mToken}}
+
+### 18) Lấy danh sách options Amenities đang hoạt động (dropdown)
+GET {{base}}/manager/amenities/options
+Authorization: Bearer {{mToken}}
+
+### 19) Tạo mới Amenity
+# @name createAmenity
+POST {{base}}/manager/amenities
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Loa Bluetooth cao cấp",
+  "missingPrice": 500000,
+  "unit": "cái"
+}
+
+###
+@newAmenityId = {{createAmenity.response.body.$.data._id}}
+
+### 20) Cập nhật Amenity
+PUT {{base}}/manager/amenities/{{newAmenityId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "missingPrice": 550000,
+  "unit": "bộ"
+}
+
+### 21) Gán danh sách Amenities cho RoomType (Ghi đè)
+PUT {{base}}/manager/room-types/{{newRtId}}/amenities
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "amenityIds": ["{{newAmenityId}}"]
+}
+
+### 22) Lấy danh sách Amenities đã gán cho RoomType
+GET {{base}}/manager/room-types/{{newRtId}}/amenities
+Authorization: Bearer {{mToken}}
+
+### 23) Deactivate Amenity (Ẩn và tự động gỡ khỏi RoomType)
+PATCH {{base}}/manager/amenities/{{newAmenityId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+
+### =========================================================================
+### SERVICE APIs (UC-66→68)
+### =========================================================================
+
+### 24) Lấy toàn bộ danh sách Services của chi nhánh
+GET {{base}}/manager/services
+Authorization: Bearer {{mToken}}
+
+### 25) Lấy danh sách options Services đang hoạt động (dropdown)
+GET {{base}}/manager/services/options
+Authorization: Bearer {{mToken}}
+
+### 26) Tạo mới Service
+# @name createService
+POST {{base}}/manager/services
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "name": "Dịch vụ giặt sấy nhanh",
+  "price": 60000,
+  "description": "Giặt sấy quần áo lấy ngay trong 2 tiếng"
+}
+
+###
+@newServiceId = {{createService.response.body.$.data._id}}
+
+### 27) Lấy chi tiết Service
+GET {{base}}/manager/services/{{newServiceId}}
+Authorization: Bearer {{mToken}}
+
+### 28) Cập nhật Service
+PUT {{base}}/manager/services/{{newServiceId}}
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "price": 70000,
+  "description": "Giặt sấy quần áo lấy ngay trong 2 tiếng (siêu sạch)"
+}
+
+### 29) Deactivate Service (Ngưng hoạt động)
+PATCH {{base}}/manager/services/{{newServiceId}}/deactivate
+Authorization: Bearer {{mToken}}
+
+
+### =========================================================================
+### ROOM ISSUE APIs (UC-70)
+### =========================================================================
+
+### 30) Lấy toàn bộ danh sách sự cố phòng của chi nhánh
+GET {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+
+### 31) Lấy danh sách sự cố phòng có bộ lọc (ví dụ: đang mở, mức độ cao)
+GET {{base}}/manager/room-issues?status=open&severity=high
+Authorization: Bearer {{mToken}}
+
+### 32) Tạo mới sự cố phòng (Ví dụ báo hỏng bóng đèn phòng 102)
+# @name createRoomIssue
+POST {{base}}/manager/room-issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "room": "660c1c875d5e5e23c015b102",
+  "description": "Bóng đèn ngủ bị cháy không sáng",
+  "severity": "low"
+}
+
+###
+@newIssueId = {{createRoomIssue.response.body.$.data._id}}
+
+### 33) Lấy chi tiết sự cố phòng
+GET {{base}}/manager/room-issues/{{newIssueId}}
+Authorization: Bearer {{mToken}}
+
+### 34) Giải quyết sự cố phòng (Resolve)
+PATCH {{base}}/manager/room-issues/{{newIssueId}}/resolve
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "resolutionNote": "Đã thay bóng đèn ngủ LED mới loại 5W"
+}
+
+
+### =========================================================================
+### HOUSEKEEPING MONITOR APIs (UC-69)
+### =========================================================================
+
+### 35) Lấy toàn bộ danh sách task dọn phòng của chi nhánh (sắp xếp Urgent lên trước)
+GET {{base}}/manager/housekeeping/tasks
+Authorization: Bearer {{mToken}}
+
+### 36) Lấy danh sách task dọn phòng có bộ lọc (ví dụ: chưa phân công status=pending)
+GET {{base}}/manager/housekeeping/tasks?status=pending&assignedTo=null
+Authorization: Bearer {{mToken}}
+
+###
+@tempTaskId = 660c1c875d5e5e23c015b302
+
+### 37) Lấy chi tiết task dọn phòng
+GET {{base}}/manager/housekeeping/tasks/{{tempTaskId}}
+Authorization: Bearer {{mToken}}
+
+### 38) Phân công task dọn phòng cho housekeeper
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/assign
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "assignedTo": "660c1c875d5e5e23c015b001"
+}
+
+### 39) Đánh dấu khẩn cấp cho task dọn phòng (Urgent Toggle)
+PATCH {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/urgent
+Authorization: Bearer {{mToken}}
+
+### 40) Tạo sự cố phòng từ Housekeeping Task
+# @name createIssueFromTask
+POST {{base}}/manager/housekeeping/tasks/{{tempTaskId}}/issues
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "description": "Điều hòa chảy nước ở dàn lạnh",
+  "severity": "medium"
+}
+
+###
+@taskIssueId = {{createIssueFromTask.response.body.$.data._id}}
+
+### 41) Hủy bỏ sự cố phòng (Cancel)
+PATCH {{base}}/manager/room-issues/{{taskIssueId}}/cancel
+Authorization: Bearer {{mToken}}
+Content-Type: application/json
+
+{
+  "cancellationReason": "Báo cáo nhầm, đã kiểm tra lại dàn lạnh hoạt động bình thường"
+}

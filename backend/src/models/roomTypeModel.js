@@ -13,7 +13,10 @@ const roomTypeSchema = new mongoose.Schema({
   description: { type: String, trim: true },
   images:      [{ type: String }],
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
-  bookingSeq:  { type: Number, default: 0 }, // nội bộ: token serialize chống đặt trùng (không sửa thủ công)
+  amenities:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Amenity' }], // Hoàng — gán amenity theo loại phòng
+  bookingSeq:  { type: Number, default: 0 }, // Quốc — token serialize chống đặt trùng (không sửa thủ công)
 }, { timestamps: true })
+
+roomTypeSchema.index({ branch: 1, name: 1 }, { unique: true })
 
 module.exports = mongoose.model('RoomType', roomTypeSchema)
