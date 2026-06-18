@@ -1,0 +1,125 @@
+.sp-page {
+  background-color: #fff;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: #333;
+}
+
+.sp-hero {
+  height: 70vh;
+  min-height: 500px;
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  -webkit-transform: translate3d(0,0,0);
+}
+
+.sp-hero-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+}
+
+.sp-hero h1 {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 60px;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  letter-spacing: 2px;
+  text-align: center;
+  animation: fadeInDown 1.5s ease-out;
+}
+
+.sp-container {
+  max-width: 1200px;
+  margin: 80px auto;
+  padding: 0 20px;
+}
+
+.sp-title {
+  text-align: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  margin-bottom: 20px;
+  color: #1a1a1a;
+}
+
+.sp-desc {
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto 60px;
+  color: #666;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.sp-grid-item {
+  margin-bottom: 80px;
+}
+
+.sp-grid-item-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px 60px;
+}
+
+.sp-grid-item h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 32px;
+  margin-bottom: 20px;
+  color: #cca550;
+}
+
+.sp-grid-item p {
+  color: #555;
+  line-height: 1.8;
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+.sp-image-wrap {
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.sp-image-wrap img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.8s ease;
+}
+
+.sp-image-wrap:hover img {
+  transform: scale(1.05);
+}
+
+.sp-gallery-grid {
+  margin-top: 40px;
+}
+
+.sp-gallery-item {
+  overflow: hidden;
+  border-radius: 4px;
+  cursor: pointer;
+  height: 250px;
+}
+
+.sp-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.sp-gallery-item:hover img {
+  transform: scale(1.1);
+}

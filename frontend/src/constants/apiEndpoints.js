@@ -6,6 +6,9 @@ export const ENDPOINTS = {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
     LOGOUT: '/auth/logout',
+    VERIFY_OTP: '/auth/verify-otp',
+    FORGOT_PASSWORD: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
   },
   PUBLIC: {},        // Khánh — Guest (UC-11→16)
   CUSTOMER: {},      // Khánh — Customer (UC-01→25)

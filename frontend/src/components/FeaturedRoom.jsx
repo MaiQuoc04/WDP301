@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { featuredRoomsData as rooms } from '../data/mockData'
 import './FeaturedRoom.css'
 
-const FeaturedRoom = () => {
+const FeaturedRoom = ({ rooms = [] }) => {
   const [current, setCurrent] = useState(0)
+
+  if (!rooms || rooms.length === 0) return null
 
   const handleNext = () => {
     setCurrent((prev) => (prev + 1) % rooms.length)
@@ -14,25 +15,33 @@ const FeaturedRoom = () => {
   return (
     <section className="featured-room">
       <div className="featured-room__content">
-        <div key={`text-${activeRoom.id}`} className="featured-room__text-wrap">
+        <div key={`text-${activeRoom._id}`} className="featured-room__text-wrap">
           <h2 className="featured-room__title">
-            {activeRoom.title.split('\n').map((line, i) => (
-              <span key={i}>{line}<br /></span>
-            ))}
+            {activeRoom.name}
           </h2>
           
           <ul className="featured-room__features">
-            {activeRoom.features.map((feature, i) => (
-              <li key={i} className="featured-room__feature">
+              <li className="featured-room__feature">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
-                  {feature.icon}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 10.5v-1.5a3 3 0 00-3-3h-10.5a3 3 0 00-3 3v1.5M3.75 18v-3a3 3 0 013-3h10.5a3 3 0 013 3v3m-16.5-6h16.5m-3-4.5h-4.5m-6 4.5h.008v.008H7.5V13.5zm6 0h.008v.008H13.5V13.5z" />
                 </svg>
-                {feature.text}
+                {activeRoom.bedType === 'king' ? 'Giường King' : activeRoom.bedType === 'double' ? 'Giường Đôi' : activeRoom.bedType === 'twin' ? '2 Giường Đơn' : 'Giường Đơn'}
               </li>
-            ))}
+              <li className="featured-room__feature">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                {activeRoom.capacity} Người lớn
+              </li>
+              <li className="featured-room__feature">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.412 15.655L9.75 21.75l3.745-4.012M9.257 13.5H3.75l2.659-2.849m2.048-2.194L14.25 2.25 12 8.25m0 0H17.25l-2.659 2.849m-2.048 2.194L9.257 13.5m0 0L14.25 21.75 12 15.75" />
+                </svg>
+                {activeRoom.area} m²
+              </li>
           </ul>
           
-          <a href={activeRoom.link} className="featured-room__link">Xem phòng</a>
+          <a href={`/rooms/${activeRoom._id}`} className="featured-room__link">Xem chi tiết</a>
         </div>
 
         <button className="featured-room__nav" onClick={handleNext} aria-label="Next room">
@@ -46,11 +55,11 @@ const FeaturedRoom = () => {
         <div className="featured-room__track">
           {rooms.map((room) => (
             <div 
-              key={room.id}
+              key={room._id}
               className="featured-room__slide"
               style={{ transform: `translateX(-${current * 100}%)` }}
             >
-              <img src={room.image} alt={room.title.replace('\n', ' ')} />
+              <img src={room.images && room.images.length > 0 ? room.images[0] : 'https://images.unsplash.com/photo-1590490359683-658d3d23f972?auto=format&fit=crop&w=1200&q=80'} alt={room.name} />
             </div>
           ))}
         </div>

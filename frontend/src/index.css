@@ -3,6 +3,12 @@
    ============================================================ */
 
 /* ---------- 1. Design Tokens (CSS Custom Properties) ---------- */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   /* Primary */
   --color-gold: #A18348;

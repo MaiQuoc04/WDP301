@@ -1,4 +1,3 @@
-import { testimonialsData as reviews } from '../data/mockData'
 import './Testimonials.css'
 
 const LotusWatermark = () => (
@@ -11,7 +10,9 @@ const LotusWatermark = () => (
   </svg>
 )
 
-const Testimonials = () => {
+const Testimonials = ({ reviews = [] }) => {
+  if (!reviews || reviews.length === 0) return null
+
   return (
     <section className="section testimonials">
       <div className="container" style={{ position: 'relative' }}>
@@ -26,20 +27,18 @@ const Testimonials = () => {
           
           <div className="testimonials__grid">
             {reviews.map(review => (
-              <div key={review.id} className="testimonial-card">
+              <div key={review._id} className="testimonial-card">
                 <LotusWatermark />
-                <h4 className="testimonial-card__title">{review.title}</h4>
-                <div className="testimonial-card__stars">★★★★★</div>
-                <p className="testimonial-card__text">{review.text}</p>
+                <h4 className="testimonial-card__title">Đánh giá {review.rating} sao</h4>
+                <div className="testimonial-card__stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                <p className="testimonial-card__text">"{review.comment}"</p>
                 
                 <div className="testimonial-card__footer">
                   <div className="testimonial-card__avatar">
-                    <span className="google-text">Google</span>
-                    <span className="google-stars">★★★★★</span>
+                    <span className="google-text">Customer</span>
                   </div>
                   <div className="testimonial-card__author-info">
-                    <span className="testimonial-card__author">— {review.author}</span>
-                    <span className="testimonial-card__location">{review.location}</span>
+                    <span className="testimonial-card__author">— {review.customer?.fullName || 'Khách hàng'}</span>
                   </div>
                 </div>
               </div>

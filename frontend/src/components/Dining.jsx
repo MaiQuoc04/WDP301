@@ -1,7 +1,8 @@
-import { diningData as diningItems } from '../data/mockData'
 import './Dining.css'
 
-const Dining = () => {
+const Dining = ({ dining = [] }) => {
+  if (!dining || dining.length === 0) return null
+
   return (
     <section className="section dining">
       <div className="container">
@@ -11,17 +12,17 @@ const Dining = () => {
         </p>
 
         <div className="dining__grid">
-          {diningItems.map((item) => (
-            <a href={item.link} className="dining-card" key={item.id}>
+          {dining.map((item) => (
+            <a href={`/dining/${item._id}`} className="dining-card" key={item._id}>
               <div className="dining-card__inner">
                 <div className="dining-card__front">
-                  <img src={item.image} alt={item.title} />
+                  <img src={item.image} alt={item.name} />
                   <div className="dining-card__overlay">
-                    <h3 className="dining-card__title">{item.title}</h3>
+                    <h3 className="dining-card__title">{item.name}</h3>
                   </div>
                 </div>
                 <div className="dining-card__back">
-                  <img src={item.image} alt={item.title} />
+                  <img src={item.image} alt={item.name} />
                   <div className="dining-card__btn">Xem thêm</div>
                 </div>
               </div>

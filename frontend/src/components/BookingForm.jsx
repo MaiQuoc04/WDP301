@@ -1,9 +1,29 @@
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import './BookingForm.css'
 
 const BookingForm = () => {
+  const navigate = useNavigate()
+  const { user } = useSelector((state) => state.auth)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const checkin = document.getElementById('checkin').value
+    const checkout = document.getElementById('checkout').value
+    const adults = document.getElementById('adults').value
+    const children = document.getElementById('children').value
+    const queryParams = `?checkin=${checkin}&checkout=${checkout}&adults=${adults}&children=${children}`
+
+    if (!user) {
+      navigate(`/login?redirect=/booking${queryParams}`)
+    } else {
+      navigate(`/booking${queryParams}`)
+    }
+  }
+
   return (
     <div className="booking-form-overlay">
-      <form className="booking-form" onSubmit={(e) => e.preventDefault()}>
+      <form className="booking-form" onSubmit={handleSubmit}>
         <div className="booking-form__group">
           <label className="booking-form__label" htmlFor="checkin">Ngày nhận phòng *</label>
           <input 
@@ -11,6 +31,7 @@ const BookingForm = () => {
             id="checkin"
             className="booking-form__input" 
             placeholder="Ngày nhận phòng" 
+            required
           />
         </div>
         
@@ -21,6 +42,7 @@ const BookingForm = () => {
             id="checkout"
             className="booking-form__input" 
             placeholder="Ngày trả phòng" 
+            required
           />
         </div>
         

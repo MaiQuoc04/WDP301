@@ -1,7 +1,8 @@
-import { specialOffersData as offers } from '../data/mockData'
 import './SpecialOffers.css'
 
-const SpecialOffers = () => {
+const SpecialOffers = ({ offers = [] }) => {
+  if (!offers || offers.length === 0) return null
+
   return (
     <section className="section special-offers">
       <div className="container">
@@ -13,8 +14,11 @@ const SpecialOffers = () => {
 
         <div className="special-offers__grid">
           {offers.map((offer, index) => (
-            <a key={offer.id || index} href={offer.link} className="offer-card">
+            <a key={offer._id || index} href={offer.link || '#'} className="offer-card">
               <img src={offer.image} alt={offer.title} />
+              <div style={{ position: 'absolute', bottom: '10px', left: '10px', color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', padding: '5px 10px', borderRadius: '4px' }}>
+                {offer.title}
+              </div>
             </a>
           ))}
         </div>
