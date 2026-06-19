@@ -883,6 +883,20 @@ exports.markHousekeepingTaskUrgent = async (id, branchId) => {
   return task.save()
 }
 
+// Lấy danh sách housekeeper thuộc chi nhánh
+exports.getHousekeepers = async (branchId) => {
+  const assignments = await RoleAssignment.find({
+    branch: branchId,
+    role: 'housekeeper',
+    isActive: true
+  }).populate('account', '_id email fullName isActive')
+
+  return assignments
+    .map(a => a.account)
+    .filter(acc => acc && acc.isActive)
+}
+
+
 
 
 

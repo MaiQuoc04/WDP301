@@ -58,8 +58,10 @@ router.get('/housekeeping/tasks/:id', managerController.getHousekeepingTaskById)
 router.patch('/housekeeping/tasks/:id/assign', managerController.assignHousekeepingTask)
 router.patch('/housekeeping/tasks/:id/urgent', managerController.markHousekeepingTaskUrgent)
 router.post('/housekeeping/tasks/:taskId/issues', managerController.createRoomIssueFromTask)
+router.get('/housekeepers', managerController.getHousekeepers)
 
 module.exports = router
+
 
 
 

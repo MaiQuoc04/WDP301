@@ -63,6 +63,8 @@ exports.getHousekeepingTaskById     = handle((req) => svc.getHousekeepingTaskByI
 exports.assignHousekeepingTask     = handle((req) => svc.assignHousekeepingTask(req.params.id, req.body.assignedTo, req.branchId, req.user.id))
 exports.markHousekeepingTaskUrgent = handle((req) => svc.markHousekeepingTaskUrgent(req.params.id, req.branchId))
 exports.createRoomIssueFromTask    = handle((req) => svc.createRoomIssueFromTask(req.params.taskId, req.body, req.branchId, req.user.id), 201)
+exports.getHousekeepers            = handle((req) => svc.getHousekeepers(req.branchId))
+
 
 
 
