@@ -322,6 +322,8 @@ exports.checkOut = async (bookingId, { method = 'cash', by } = {}) => {
   booking.paymentStatus = 'paid'
   await exports.transition(booking, 'checked_out', by, 'Khách trả phòng')
   if (booking.room) await Room.findByIdAndUpdate(booking.room, { status: 'cleaning' })
+  try { await require('./housekeepingService').markUrgentOnCheckOut(booking._id, booking.room) }
+  catch (e) { console.warn('[checkOut] markUrgentOnCheckOut chưa sẵn sàng:', e.message) }
   return booking
 }
 

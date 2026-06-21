@@ -3,7 +3,7 @@
 //    Amenity thiếu ghi ngược vào Booking (Quốc định nghĩa). Giao việc qua assignedTo (null = chưa nhận - BR-38).
 const mongoose = require('mongoose')
 
-const TASK_STATUS = ['pending', 'in_progress', 'completed', 'missed']
+const TASK_STATUS = ['pending', 'in_progress', 'urgent', 'completed', 'missed']
 
 const housekeepingTaskSchema = new mongoose.Schema({
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
@@ -24,6 +24,8 @@ const housekeepingTaskSchema = new mongoose.Schema({
     actual:    Number,
     missing:   Number,
     condition: { type: String, enum: ['active', 'broken', 'missing'], default: 'active' },
+    note:      { type: String, trim: true },
+    chargedAt: Date,
   }],
   amenityChecked: { type: Boolean, default: false }, // HK đã submit kiểm tra thiết bị chưa
   issueNote:      { type: String, trim: true },      // báo sự cố phòng (UC-52)
