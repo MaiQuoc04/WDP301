@@ -28,7 +28,7 @@ const defaultNavItems = [
   { label: 'TRANG CHỦ', href: '/', active: true },
   {
     label: 'HẠNG PHÒNG',
-    href: '/customer', // Trỏ đến trang danh sách phòng
+    href: '/rooms', // Trỏ đến trang danh sách phòng
     dropdown: [], // Sẽ được điền từ DB
   },
   {

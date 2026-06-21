@@ -177,7 +177,7 @@ exports.create = async (p) => {
   if (!(checkIn instanceof Date) || isNaN(checkIn) || isNaN(checkOut)) throw new Error('Ngày không hợp lệ')
   if (nightsBetween(checkIn, checkOut) < 1) throw new Error('Phải ở tối thiểu 1 đêm (check-out > check-in)')
   if (checkIn < startOfDay(new Date())) throw new Error('Không thể đặt cho ngày trong quá khứ')
-  if (source === 'online' && !p.customerId) throw new Error('Đặt online cần thông tin khách hàng')
+  if (source === 'online' && !p.customerId && !p.guestName) throw new Error('Đặt online cần thông tin khách hàng (Tên hoặc đăng nhập)')
   if (source === 'walk_in' && !p.guestName) throw new Error('Walk-in cần tên khách')
 
   const branch = await Branch.findById(p.branchId)
@@ -206,7 +206,7 @@ exports.create = async (p) => {
 
   // Transaction: re-check availability (BR-23) + tạo, NGUYÊN TỬ để chống đặt trùng (review #2).
   // $inc RoomType.bookingSeq buộc 2 giao dịch đồng thời cùng loại phòng xung đột -> 1 cái retry rồi thấy hết phòng.
-  return runInTransaction(async (session) => {
+  const resultBooking = await runInTransaction(async (session) => {
     const totalRooms = await Room.countDocuments({ roomType: roomType._id, branch: branch._id }).session(session)
     const overlap = await Booking.countDocuments({
       roomType: roomType._id, status: { $in: OCCUPYING },
@@ -231,6 +231,15 @@ exports.create = async (p) => {
     await RoomType.updateOne({ _id: roomType._id }, { $inc: { bookingSeq: 1 } }, { session }) // serialize chống đặt trùng
     return booking
   })
+
+  try {
+    const { getIO } = require('../config/socket')
+    getIO().emit('new_booking', { roomTypeId: roomType._id, branchId: branch._id })
+  } catch (err) {
+    console.warn('[Socket] Emit new_booking error:', err.message)
+  }
+
+  return resultBooking
 }
 
 // ---------- Vòng đời booking (GĐ2) ----------

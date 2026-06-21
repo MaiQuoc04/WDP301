@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { setCredentials } from '../../redux/slices/authSlice'
 import { authService } from '../../services/authService'
 import './LoginPage.css'
@@ -19,12 +19,15 @@ const LoginPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const redirectUrl = searchParams.get('redirect') || '/'
+  const from = location.state?.from || null
   const { user } = useSelector((state) => state.auth)
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'customer') navigate('/customer')
+      if (from) navigate(from)
+      else if (user.role === 'customer') navigate('/customer')
       else if (user.role === 'receptionist') navigate('/reception')
       else if (user.role === 'housekeeper') navigate('/housekeeping')
       else if (user.role === 'branch_manager') navigate('/manager')
@@ -75,8 +78,9 @@ const LoginPage = () => {
       
       setSuccess('Đăng nhập thành công!')
       setTimeout(() => {
-        // Điều hướng dựa trên role
-        if (user.role === 'customer') navigate('/customer')
+        // Điều hướng dựa trên role hoặc trang trước đó
+        if (from) navigate(from)
+        else if (user.role === 'customer') navigate('/customer')
         else if (user.role === 'receptionist') navigate('/reception')
         else if (user.role === 'housekeeper') navigate('/housekeeping')
         else if (user.role === 'branch_manager') navigate('/manager')

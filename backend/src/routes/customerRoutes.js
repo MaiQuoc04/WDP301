@@ -2,8 +2,10 @@
 const router = require('express').Router()
 // const { protect, authorize } = require('../middlewares/authMiddleware')
 
-// TODO(Khánh): register/otp/google/forgot (public) + (protect, authorize('customer')) cho:
-//   POST /bookings  -> gọi bookingService.create() (hợp đồng của Quốc)
-//   GET  /bookings, /bookings/:id/bill, /payments, POST /reviews ...
+const customerController = require('../controllers/customerController')
+
+router.post('/bookings', customerController.createBooking)
+router.get('/bookings/:id', customerController.getBookingDetail)
+router.post('/bookings/:id/payos-link', customerController.createPaymentLink)
 
 module.exports = router

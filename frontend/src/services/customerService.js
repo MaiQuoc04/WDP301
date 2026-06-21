@@ -10,5 +10,17 @@ export const customerService = {
     const response = await axiosInstance.get('/public/home-data')
     return response.data
   },
-  // TODO(Khánh): searchRooms, getRoomDetail, createBooking, getBookingHistory, getBill, review ...
+  createBooking: async (data) => {
+    const response = await axiosInstance.post('/customer/bookings', data)
+    return response.data
+  },
+  getBookingDetail: async (id) => {
+    const response = await axiosInstance.get(`/customer/bookings/${id}`)
+    return response.data
+  },
+  createPaymentLink: async (id, type) => {
+    const response = await axiosInstance.post(`/customer/bookings/${id}/payos-link`, { type })
+    return response.data
+  },
+  // TODO(Khánh): searchRooms, getRoomDetail, getBookingHistory, getBill, review ...
 }

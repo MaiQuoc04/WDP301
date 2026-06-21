@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { customerService } from '../../services';
 import './RoomList.css';
 
 const RoomList = () => {
+  const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,8 +96,8 @@ const RoomList = () => {
                 </div>
 
                 <div className="card-actions">
-                  <button className="action-btn">ĐẶT PHÒNG</button>
-                  <button className="action-btn outline">CHI TIẾT &rarr;</button>
+                  <button className="action-btn" onClick={() => navigate(`/booking?roomType=${room._id}`)}>ĐẶT PHÒNG</button>
+                  <button className="action-btn outline" onClick={() => navigate(`/rooms/${room._id}`)}>CHI TIẾT &rarr;</button>
                 </div>
               </div>
             </div>

@@ -6,6 +6,7 @@ import HomePage from '../pages/HomePage'
 import RoomDetail from '../pages/RoomDetail'
 import LoginPage from '../pages/auth/LoginPage'
 import BookingPage from '../pages/BookingPage'
+import BookingCheckout from '../pages/BookingCheckout'
 
 // --- STATIC PAGES ---
 import AsianRestaurant from '../pages/dining/AsianRestaurant'
@@ -28,9 +29,11 @@ const AppRoutes = () => (
     <Routes>
       {/* Public / Guest — Khánh */}
       <Route path="/" element={<HomePage />} />
+      <Route path="/rooms" element={<CustomerHome />} />
       <Route path="/rooms/:id" element={<RoomDetail />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/booking" element={<BookingPage />} />
+      <Route path="/checkout/:id" element={<BookingCheckout />} />
 
       {/* Static Pages Routes */}
       <Route path="/dining" element={<Navigate to="/dining/asian" replace />} />
