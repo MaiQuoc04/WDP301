@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { bookingService, vnd, fmtDate } from '../../services'
+import { bookingService, vnd, fmtDateTime } from '../../services'
 
 const STATUSES = ['', 'pending', 'confirmed', 'checked_in', 'checked_out', 'completed', 'cancelled', 'no_show']
 
@@ -40,8 +40,8 @@ export default function BookingsPage() {
               <td>{b.code}</td>
               <td>{b.customer?.fullName || b.guestName}</td>
               <td>{b.roomType?.name}</td>
-              <td>{fmtDate(b.checkIn)}</td>
-              <td>{fmtDate(b.checkOut)}</td>
+              <td>{fmtDateTime(b.checkIn)}</td>
+              <td>{fmtDateTime(b.checkOut)}</td>
               <td><span className={'rc-badge s-' + b.status}>{b.status}</span></td>
               <td>{vnd(b.totalAmount)}</td>
               <td><Link to={`/reception/bookings/${b._id}`}>Chi tiết</Link></td>

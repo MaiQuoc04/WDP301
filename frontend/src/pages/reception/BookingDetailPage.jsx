@@ -60,7 +60,7 @@ export default function BookingDetailPage() {
           <h3>Thông tin</h3>
           <p>Khách: <b>{b.customer?.fullName || b.guestName}</b>{b.guestPhone && ` · ${b.guestPhone}`}</p>
           <p>Loại phòng: {b.roomType?.name} · Phòng: {b.room?.roomNumber || '— (gán khi check-in)'}</p>
-          <p>Nhận {fmtDate(b.checkIn)} → Trả {fmtDate(b.checkOut)}</p>
+          <p>Nhận {fmtDateTime(b.checkIn)} → Trả {fmtDateTime(b.checkOut)}</p>
           <p>Số khách: {b.adults} người lớn + {b.children} trẻ em</p>
           <p>Thanh toán: <b>{b.paymentStatus}</b></p>
 

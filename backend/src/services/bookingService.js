@@ -169,8 +169,14 @@ exports.transition = async (booking, toStatus, by, note) => {
  */
 exports.create = async (p) => {
   const source = p.source || 'online'
-  const checkIn = startOfDay(p.checkIn)
-  const checkOut = startOfDay(p.checkOut)
+  // Giữ giờ check-in/out (datetime-local). Nếu chỉ truyền NGÀY (YYYY-MM-DD) -> mặc định giờ khách sạn: nhận 14:00, trả 12:00
+  const parseDT = (v, h, m) => {
+    const d = new Date(v)
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) d.setHours(h, m, 0, 0)
+    return d
+  }
+  const checkIn = parseDT(p.checkIn, 14, 0)
+  const checkOut = parseDT(p.checkOut, 12, 0)
 
   // Validate (BR-26)
   if (!p.branchId || !p.roomTypeId) throw new Error('Thiếu branch hoặc loại phòng')

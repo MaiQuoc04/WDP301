@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { bookingService, fmtDate } from '../../services'
+import { bookingService, fmtDate, fmtDateTime } from '../../services'
 
 export default function SchedulePage() {
   const [data, setData] = useState(null)
@@ -18,7 +18,7 @@ export default function SchedulePage() {
               <td>{r.roomNumber}</td>
               <td>{r.roomType?.name}</td>
               <td><span className={'rc-badge st-' + r.status}>{r.status}</span></td>
-              <td>{r.bookings.map((b) => `${b.code} (${fmtDate(b.checkIn)}→${fmtDate(b.checkOut)})`).join(', ') || '—'}</td>
+              <td>{r.bookings.map((b) => `${b.code} (${fmtDateTime(b.checkIn)}→${fmtDateTime(b.checkOut)})`).join(', ') || '—'}</td>
             </tr>
           ))}
         </tbody>

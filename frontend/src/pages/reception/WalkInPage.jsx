@@ -37,8 +37,8 @@ export default function WalkInPage() {
         </label>
         <label>Tên khách<input required value={form.guestName} onChange={(e) => set('guestName', e.target.value)} /></label>
         <label>SĐT<input value={form.guestPhone} onChange={(e) => set('guestPhone', e.target.value)} /></label>
-        <label>Nhận phòng<input required type="date" value={form.checkIn} onChange={(e) => set('checkIn', e.target.value)} /></label>
-        <label>Trả phòng<input required type="date" value={form.checkOut} onChange={(e) => set('checkOut', e.target.value)} /></label>
+        <label>Nhận phòng (ngày + giờ)<input required type="datetime-local" value={form.checkIn} onChange={(e) => set('checkIn', e.target.value)} /></label>
+        <label>Trả phòng (ngày + giờ)<input required type="datetime-local" value={form.checkOut} onChange={(e) => set('checkOut', e.target.value)} /></label>
         <div style={{ display: 'flex', gap: 8 }}>
           <label style={{ flex: 1 }}>Người lớn<input type="number" min={1} value={form.adults} onChange={(e) => set('adults', e.target.value)} /></label>
           <label style={{ flex: 1 }}>Trẻ em<input type="number" min={0} value={form.children} onChange={(e) => set('children', e.target.value)} /></label>
