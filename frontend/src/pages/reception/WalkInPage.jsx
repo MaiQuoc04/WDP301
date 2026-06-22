@@ -62,10 +62,17 @@ export default function WalkInPage() {
   return (
     <div style={{ maxWidth: 720 }}>
       <h2>Tạo booking tại quầy (Walk-in)</h2>
-      <div className="rc-steps">
-        <span className={step === 1 ? 'on' : ''}>1. Thông tin khách</span> ›
-        <span className={step === 2 ? 'on' : ''}> 2. Chọn phòng</span> ›
-        <span className={step === 3 ? 'on' : ''}> 3. Dịch vụ & tạo</span>
+      <div className="rc-stepper">
+        {['Thông tin khách', 'Chọn phòng', 'Dịch vụ & tạo'].map((label, i) => {
+          const n = i + 1
+          const cls = step === n ? 'active' : step > n ? 'done' : ''
+          return (
+            <div key={n} className={`rc-step ${cls}`}>
+              <span className="rc-step-no">{step > n ? '✓' : n}</span>
+              <span>{label}</span>
+            </div>
+          )
+        })}
       </div>
       {err && <p className="rc-err">{err}</p>}
 
@@ -118,21 +125,19 @@ export default function WalkInPage() {
           <button className="link" onClick={() => setStep(2)}>← Chọn phòng khác</button>
           <p>Phòng <b>{picked.roomNumber}</b> · {picked.roomType.name} · {fitLabel(picked).text} · Tiền phòng {vnd(picked.total)}</p>
           <h4>Khách có muốn dùng thêm dịch vụ?</h4>
-          <ul className="rc-lines">
-            {services.map((s) => (
-              <li key={s._id}>
-                <label>
-                  <input type="checkbox" checked={!!chosen[s._id]}
-                    onChange={(e) => setChosen((c) => ({ ...c, [s._id]: e.target.checked ? 1 : 0 }))} />
-                  {s.name} ({vnd(s.price)})
-                </label>
-                {chosen[s._id] > 0 && (
-                  <input type="number" min={1} value={chosen[s._id]} style={{ width: 50, marginLeft: 8 }}
-                    onChange={(e) => setChosen((c) => ({ ...c, [s._id]: Number(e.target.value) }))} />
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="rc-picker">
+            {services.map((s) => {
+              const sel = chosen[s._id] > 0
+              return (
+                <button type="button" key={s._id} className={'rc-chip' + (sel ? ' selected' : '')}
+                  onClick={() => setChosen((c) => ({ ...c, [s._id]: sel ? 0 : 1 }))}>
+                  <span>{s.name}{sel ? ` ×${chosen[s._id]}` : ''}</span>
+                  <small>+{vnd(s.price)}</small>
+                </button>
+              )
+            })}
+            {!services.length && <span style={{ color: '#999' }}>Chưa có dịch vụ</span>}
+          </div>
           <button disabled={loading} onClick={create}>{loading ? '...' : 'Tạo booking'}</button>
         </div>
       )}

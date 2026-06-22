@@ -102,7 +102,7 @@
 }
 
 /* ---------- Buttons (mọi nút trong main = gold; .link = text; header có style riêng) ---------- */
-.rc-main button:not(.link), .rc-btn {
+.rc-main button:not(.link):not(.rc-chip), .rc-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -116,11 +116,11 @@
   cursor: pointer;
   transition: background .2s ease, transform .1s ease, box-shadow .2s ease;
 }
-.rc-main button:not(.link):hover, .rc-btn:hover {
+.rc-main button:not(.link):not(.rc-chip):hover, .rc-btn:hover {
   background: var(--color-gold-hover, #8B6F3F);
   box-shadow: var(--shadow-raised, 0 4px 12px rgba(0,0,0,.08));
 }
-.rc-main button:not(.link):active { transform: translateY(1px); }
+.rc-main button:not(.link):not(.rc-chip):active { transform: translateY(1px); }
 .rc-actions button.danger { background: var(--color-magenta, #C21975); }
 .rc-actions button.danger:hover { background: var(--color-magenta-hover, #A91660); }
 .rc-main button:disabled { background: #ccc; color: #fff; cursor: not-allowed; box-shadow: none; transform: none; }
@@ -217,17 +217,35 @@
 .rc-form input, .rc-form select { display: block; width: 100%; box-sizing: border-box; margin-top: 5px; font-weight: 400; }
 .rc-form > button { margin-top: 16px; width: 100%; justify-content: center; }
 
-/* ---------- Walk-in steps ---------- */
-.rc-steps {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 8px 0 20px;
-  color: var(--color-pale-gray, #999);
-  font-size: 13px;
-  font-weight: 600;
+/* ---------- Walk-in stepper (thanh ngang) ---------- */
+.rc-stepper { display: flex; align-items: center; margin: 10px 0 26px; flex-wrap: wrap; }
+.rc-step { display: flex; align-items: center; gap: 10px; color: var(--color-pale-gray, #999); font-weight: 600; font-size: 14px; }
+.rc-step-no {
+  width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #ececec; color: #888; font-size: 13px; font-weight: 700;
+  transition: all .25s ease;
 }
-.rc-steps .on { color: var(--color-gold, #A18348); }
+.rc-step.active { color: var(--color-charcoal, #222); }
+.rc-step.active .rc-step-no { background: var(--color-gold, #A18348); color: #fff; box-shadow: 0 0 0 4px rgba(161,131,72,.18); }
+.rc-step.done { color: var(--color-gold, #A18348); }
+.rc-step.done .rc-step-no { background: var(--color-gold, #A18348); color: #fff; }
+.rc-step:not(:last-child)::after { content: ''; width: 56px; height: 2px; background: var(--color-border, #ddd); margin: 0 16px; transition: background .25s ease; }
+.rc-step.done:not(:last-child)::after { background: var(--color-gold, #A18348); }
+
+/* ---------- Picker chips (dịch vụ / thiết bị — bấm để chọn) ---------- */
+.rc-picker { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 18px; }
+.rc-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 16px; min-width: 132px;
+  background: #fff; border: 1px solid var(--color-border, #ddd); border-radius: 10px;
+  cursor: pointer; text-align: left;
+  font-family: var(--font-body, sans-serif); font-size: 14px; font-weight: 600; color: var(--color-charcoal, #222);
+  transition: all .15s ease;
+}
+.rc-chip:hover { border-color: var(--color-gold, #A18348); box-shadow: var(--shadow-raised, 0 4px 12px rgba(0,0,0,.08)); transform: translateY(-2px); }
+.rc-chip small { color: var(--color-gold, #A18348); font-weight: 700; font-size: 12px; }
+.rc-chip.selected { border-color: var(--color-gold, #A18348); background: #faf7f0; box-shadow: 0 0 0 2px rgba(161,131,72,.15); }
 
 /* ---------- Fit labels (walk-in room list) ---------- */
 .rc-fit { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }

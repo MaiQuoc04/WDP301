@@ -10,8 +10,6 @@ export default function BookingDetailPage() {
   const [amenities, setAmenities] = useState([])
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
-  const [svcSel, setSvcSel] = useState(''); const [svcQty, setSvcQty] = useState(1)
-  const [amSel, setAmSel] = useState(''); const [amQty, setAmQty] = useState(1)
 
   const reload = useCallback(async () => {
     setErr('')
@@ -98,32 +96,36 @@ export default function BookingDetailPage() {
             </label>}
 
           {editable && <>
-            <h4>Dịch vụ</h4>
-            <ul className="rc-lines">
-              {b.services.map((s) => <li key={s._id}>{s.name} ×{s.quantity} = {vnd(s.price * s.quantity)}
-                <button className="link" onClick={() => act(() => bookingService.removeService(id, s._id), 'Đã xoá')}>✕</button></li>)}
-            </ul>
-            <div className="rc-add">
-              <select value={svcSel} onChange={(e) => setSvcSel(e.target.value)}>
-                <option value="">+ dịch vụ</option>
-                {services.map((s) => <option key={s._id} value={s._id}>{s.name} ({vnd(s.price)})</option>)}
-              </select>
-              <input type="number" min={1} value={svcQty} onChange={(e) => setSvcQty(e.target.value)} style={{ width: 50 }} />
-              <button disabled={!svcSel} onClick={() => act(() => bookingService.addService(id, { serviceId: svcSel, quantity: Number(svcQty) }), 'Đã thêm')}>Thêm</button>
+            <h4>Dịch vụ {b.services.length > 0 && `· đã thêm ${b.services.length}`}</h4>
+            {b.services.length > 0 && (
+              <ul className="rc-lines">
+                {b.services.map((s) => <li key={s._id}>{s.name} ×{s.quantity} = {vnd(s.price * s.quantity)}
+                  <button className="link" onClick={() => act(() => bookingService.removeService(id, s._id), 'Đã xoá')}>✕</button></li>)}
+              </ul>
+            )}
+            <div className="rc-picker">
+              {services.map((s) => (
+                <button type="button" key={s._id} className="rc-chip"
+                  onClick={() => act(() => bookingService.addService(id, { serviceId: s._id, quantity: 1 }), `Đã thêm ${s.name}`)}>
+                  <span>+ {s.name}</span><small>{vnd(s.price)}</small>
+                </button>
+              ))}
             </div>
 
-            <h4>Thiết bị thiếu</h4>
-            <ul className="rc-lines">
-              {b.missingAmenities.map((a) => <li key={a._id}>{a.name} ×{a.quantity} = {vnd(a.price * a.quantity)}
-                <button className="link" onClick={() => act(() => bookingService.removeMissingAmenity(id, a._id), 'Đã xoá')}>✕</button></li>)}
-            </ul>
-            <div className="rc-add">
-              <select value={amSel} onChange={(e) => setAmSel(e.target.value)}>
-                <option value="">+ thiết bị</option>
-                {amenities.map((a) => <option key={a._id} value={a._id}>{a.name} ({vnd(a.missingPrice)})</option>)}
-              </select>
-              <input type="number" min={1} value={amQty} onChange={(e) => setAmQty(e.target.value)} style={{ width: 50 }} />
-              <button disabled={!amSel} onClick={() => act(() => bookingService.addMissingAmenity(id, { amenityId: amSel, quantity: Number(amQty) }), 'Đã thêm')}>Thêm</button>
+            <h4>Thiết bị thiếu {b.missingAmenities.length > 0 && `· đã ghi ${b.missingAmenities.length}`}</h4>
+            {b.missingAmenities.length > 0 && (
+              <ul className="rc-lines">
+                {b.missingAmenities.map((a) => <li key={a._id}>{a.name} ×{a.quantity} = {vnd(a.price * a.quantity)}
+                  <button className="link" onClick={() => act(() => bookingService.removeMissingAmenity(id, a._id), 'Đã xoá')}>✕</button></li>)}
+              </ul>
+            )}
+            <div className="rc-picker">
+              {amenities.map((a) => (
+                <button type="button" key={a._id} className="rc-chip"
+                  onClick={() => act(() => bookingService.addMissingAmenity(id, { amenityId: a._id, quantity: 1 }), `Đã ghi thiếu ${a.name}`)}>
+                  <span>+ {a.name}</span><small>{vnd(a.missingPrice)}</small>
+                </button>
+              ))}
             </div>
           </>}
         </section>
