@@ -1,0 +1,119 @@
+.fac-page {
+  font-family: 'Gothic A1', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: #333;
+  background-color: #1a1a1a; /* Dark theme for Night Club / Facilities */
+}
+
+.fac-hero {
+  height: 80vh;
+  min-height: 600px;
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  -webkit-transform: translate3d(0,0,0);
+}
+
+.fac-hero-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.fac-hero-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: #fff;
+  animation: fadeIn 1.5s ease-out;
+}
+
+.fac-hero-content h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 70px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  color: #cca550;
+}
+
+.fac-hero-content p {
+  font-family: 'Jost', sans-serif;
+  font-size: 18px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* Feature Section */
+.fac-feature {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
+.fac-feature:nth-child(even) {
+  background-color: #222;
+}
+
+.fac-feature-img, .fac-feature-content {
+  flex: 1 1 50%;
+  min-width: 300px;
+}
+
+.fac-feature-img {
+  background-size: cover;
+  background-position: center;
+  min-height: 500px;
+}
+
+.fac-feature-content {
+  padding: 100px 10%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.fac-feature-content h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 40px;
+  color: #cca550;
+  margin-bottom: 25px;
+}
+
+.fac-feature-content p {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #ccc;
+  margin-bottom: 30px;
+}
+
+/* Button */
+.fac-btn {
+  background-color: transparent;
+  color: #cca550;
+  border: 2px solid #cca550;
+  border-radius: 25px;
+  padding: 0 30px;
+  height: 45px;
+  font-family: 'Gothic A1', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.fac-btn:hover {
+  background-color: #cca550;
+  color: #1a1a1a;
+}

@@ -1,36 +1,5 @@
 import './Testimonials.css'
 
-const reviews = [
-  {
-    id: 1,
-    title: 'Trải nghiệm đáng nhớ',
-    text: '"Cảnh hồ rất thư giãn, buffet sáng tuyệt vời và nhân viên thì rất chu đáo, sẵn sàng hỗ trợ để đảm bảo chúng tôi có đầy đủ mọi thứ mà chúng tôi cần."',
-    author: 'Michael T',
-    location: 'Singapore'
-  },
-  {
-    id: 2,
-    title: 'Khách sạn tuyệt vời giữa lòng thủ đô',
-    text: '"Đây là khách sạn yêu thích của tôi mỗi lần đến Hà Nội. Phòng nghỉ lúc nào cũng sạch sẽ, dịch vụ tốt và nhân viên chu đáo. Bữa trưa và tối ở đây cũng rất ngon."',
-    author: 'Satoshi K',
-    location: 'Nhật Bản'
-  },
-  {
-    id: 3,
-    title: 'Cảnh đẹp và dịch vụ tốt',
-    text: '"Khách sạn Hà Nội có cảnh hồ đẹp, đội ngũ nhân viên rất thân thiện và luôn hỗ trợ nhiệt tình. Chắc chắn tôi sẽ còn quay lại đây lần nữa!"',
-    author: 'Linh N',
-    location: 'Việt Nam'
-  },
-  {
-    id: 4,
-    title: 'Ẩm thực chuẩn vị Trung Hoa',
-    text: '"Nhà hàng ẩm thực Trung Hoa của khách sạn thật sự rất tuyệt vời. Tôi đặc biệt ấn tượng với những món Dimsum ở đây, một trong những món Dimsum ngon nhất tôi từng thử!"',
-    author: 'Ryan H',
-    location: 'Singapore'
-  }
-]
-
 const LotusWatermark = () => (
   <svg className="testimonial-card__watermark" viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M32 4C34 14 36 24 34 38C32 42 32 42 30 38C28 24 30 14 32 4Z" fill="#A18348" />
@@ -41,7 +10,9 @@ const LotusWatermark = () => (
   </svg>
 )
 
-const Testimonials = () => {
+const Testimonials = ({ reviews = [] }) => {
+  if (!reviews || reviews.length === 0) return null
+
   return (
     <section className="section testimonials">
       <div className="container" style={{ position: 'relative' }}>
@@ -56,20 +27,18 @@ const Testimonials = () => {
           
           <div className="testimonials__grid">
             {reviews.map(review => (
-              <div key={review.id} className="testimonial-card">
+              <div key={review._id} className="testimonial-card">
                 <LotusWatermark />
-                <h4 className="testimonial-card__title">{review.title}</h4>
-                <div className="testimonial-card__stars">★★★★★</div>
-                <p className="testimonial-card__text">{review.text}</p>
+                <h4 className="testimonial-card__title">Đánh giá {review.rating} sao</h4>
+                <div className="testimonial-card__stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                <p className="testimonial-card__text">"{review.comment}"</p>
                 
                 <div className="testimonial-card__footer">
                   <div className="testimonial-card__avatar">
-                    <span className="google-text">Google</span>
-                    <span className="google-stars">★★★★★</span>
+                    <span className="google-text">Customer</span>
                   </div>
                   <div className="testimonial-card__author-info">
-                    <span className="testimonial-card__author">— {review.author}</span>
-                    <span className="testimonial-card__location">{review.location}</span>
+                    <span className="testimonial-card__author">— {review.customer?.fullName || 'Khách hàng'}</span>
                   </div>
                 </div>
               </div>

@@ -1,9 +1,23 @@
 // Sprint 0 — PRE-WIRED. Không sửa khung này; mỗi người thêm route con TRONG trang của mình
 // (dùng nested route bên trong *Dashboard) để tránh đụng file.
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from '../components/ProtectedRoute'
 import HomePage from '../pages/HomePage'
+import RoomDetail from '../pages/RoomDetail'
 import LoginPage from '../pages/auth/LoginPage'
+import BookingPage from '../pages/BookingPage'
+import BookingCheckout from '../pages/BookingCheckout'
+
+// --- STATIC PAGES ---
+import AsianRestaurant from '../pages/dining/AsianRestaurant'
+import WesternRestaurant from '../pages/dining/WesternRestaurant'
+import BarLounge from '../pages/dining/BarLounge'
+import Offers from '../pages/Offers'
+import Facilities from '../pages/Facilities'
+import Events from '../pages/Events'
+import Gallery from '../pages/Gallery'
+import Contact from '../pages/Contact'
+
 import CustomerHome from '../pages/customer/CustomerHome'
 import ReceptionDashboard from '../pages/reception/ReceptionDashboard'
 import HousekeepingDashboard from '../pages/housekeeping/HousekeepingDashboard'
@@ -20,7 +34,23 @@ const AppRoutes = () => (
     <Routes>
       {/* Public / Guest — Khánh */}
       <Route path="/" element={<HomePage />} />
+      <Route path="/rooms" element={<CustomerHome />} />
+      <Route path="/rooms/:id" element={<RoomDetail />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/booking" element={<BookingPage />} />
+      <Route path="/checkout/:id" element={<BookingCheckout />} />
+
+      {/* Static Pages Routes */}
+      <Route path="/dining" element={<Navigate to="/dining/asian" replace />} />
+      <Route path="/dining/asian" element={<AsianRestaurant />} />
+      <Route path="/dining/western" element={<WesternRestaurant />} />
+      <Route path="/dining/bar" element={<BarLounge />} />
+      
+      <Route path="/offers" element={<Offers />} />
+      <Route path="/amenities" element={<Facilities />} />
+      <Route path="/events" element={<Events />} />
+      <Route path="/gallery" element={<Gallery />} />
+      <Route path="/contact" element={<Contact />} />
 
       {/* Customer — Khánh */}
       <Route path="/customer/*" element={

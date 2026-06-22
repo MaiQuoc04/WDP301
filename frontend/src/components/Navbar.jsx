@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { logout as logoutAction } from '../redux/slices/authSlice'
+import { customerService } from '../services'
 import './Navbar.css'
 
 /* ---------- Lotus SVG Icon ---------- */
@@ -20,17 +24,12 @@ const LotusIcon = () => (
 )
 
 /* ---------- Navigation Data ---------- */
-const navItems = [
+const defaultNavItems = [
   { label: 'TRANG CHỦ', href: '/', active: true },
   {
     label: 'HẠNG PHÒNG',
-    href: '/rooms',
-    dropdown: [
-      { label: 'Phòng Deluxe', href: '/rooms/deluxe' },
-      { label: 'Phòng Executive Suite', href: '/rooms/executive' },
-      { label: 'Phòng Presidential Suite', href: '/rooms/presidential' },
-      { label: 'Phòng Gia Đình', href: '/rooms/family' },
-    ],
+    href: '/rooms', // Trỏ đến trang danh sách phòng
+    dropdown: [], // Sẽ được điền từ DB
   },
   {
     label: 'ẨM THỰC',
@@ -44,12 +43,7 @@ const navItems = [
   { label: 'ƯU ĐÃI', href: '/offers' },
   {
     label: 'TIỆN NGHI',
-    href: '/amenities',
-    dropdown: [
-      { label: 'Hồ Bơi Vô Cực', href: '/amenities/pool' },
-      { label: 'Spa & Wellness', href: '/amenities/spa' },
-      { label: 'Phòng Gym', href: '/amenities/gym' },
-    ],
+    href: '/amenities'
   },
   { label: 'HỌP & SỰ KIỆN', href: '/events' },
   { label: 'THƯ VIỆN', href: '/gallery' },
@@ -57,13 +51,67 @@ const navItems = [
 ]
 
 const Navbar = () => {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const currentPath = location.pathname
+  const { user } = useSelector((state) => state.auth)
+
+  const isActive = (item) => {
+    if (item.href === '/') return currentPath === '/';
+    if (item.label === 'HẠNG PHÒNG') {
+      return currentPath.startsWith('/customer') || currentPath.startsWith('/rooms');
+    }
+    if (item.href === '/dining') {
+      return currentPath.startsWith('/dining');
+    }
+    return currentPath.startsWith(item.href);
+  };
+
+  const [navItems, setNavItems] = useState(defaultNavItems)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeDropdown, setActiveDropdown] = useState(null)
   const [mobileExpanded, setMobileExpanded] = useState(null)
 
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const res = await customerService.getPublicRooms()
+        if (res.success && res.data) {
+          const roomsData = Array.isArray(res.data) ? res.data : (res.data.rooms || [])
+          const roomDropdown = roomsData.map(room => ({
+            label: room.name,
+            href: `/rooms/${room._id}`
+          }))
+          setNavItems(prev => prev.map(item => 
+            item.label === 'HẠNG PHÒNG' ? { ...item, dropdown: roomDropdown } : item
+          ))
+        }
+      } catch (err) {
+        console.error('Navbar fetch rooms error:', err)
+      }
+    }
+    fetchRooms()
+  }, [])
+
   const toggleMobile = () => {
     setMobileOpen((prev) => !prev)
-    if (mobileOpen) setMobileExpanded(null)
+    if (!mobileOpen) setMobileExpanded(null) // fixed bug logic
+  }
+
+  const handleBookingClick = (e) => {
+    e.preventDefault()
+    if (!user) {
+      navigate('/login?redirect=/booking')
+    } else {
+      navigate('/booking')
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    dispatch(logoutAction())
+    navigate('/')
   }
 
   return (
@@ -86,7 +134,7 @@ const Navbar = () => {
             >
               <a
                 href={item.href}
-                className={`navbar__link ${item.active ? 'navbar__link--active' : ''}`}
+                className={`navbar__link ${isActive(item) ? 'navbar__link--active' : ''}`}
               >
                 {item.label}
                 {item.dropdown && <span className="navbar__arrow">▾</span>}
@@ -107,10 +155,52 @@ const Navbar = () => {
           ))}
         </ul>
 
-        {/* Desktop CTA */}
-        <a href="/booking" className="navbar__cta">
-          ĐẶT PHÒNG
-        </a>
+        {/* Desktop CTA & Actions */}
+        <div className="navbar__actions">
+          {!user ? (
+            <a href="/booking" onClick={handleBookingClick} className="navbar__cta">
+              ĐẶT PHÒNG
+            </a>
+          ) : (
+            <div 
+              className="navbar__profile"
+              onMouseEnter={() => setActiveDropdown('profile')}
+              onMouseLeave={() => setActiveDropdown(null)}
+            >
+              <button className="navbar__avatar-btn" aria-label="User profile">
+                <div className="navbar__avatar">
+                  {user.fullName ? user.fullName.split(' ').pop().substring(0, 2).toUpperCase() : user.email.substring(0, 2).toUpperCase()}
+                </div>
+                <span className="navbar__avatar-arrow">▾</span>
+              </button>
+
+              {activeDropdown === 'profile' && (
+                <div className="navbar__profile-dropdown">
+                  <div className="navbar__profile-header">
+                    <span className="navbar__profile-name">{user.fullName || 'Người dùng'}</span>
+                    <span className="navbar__profile-email">{user.email}</span>
+                    {/* <span className="navbar__profile-role">{user.role === 'customer' ? 'Khách hàng' : 'Nhân viên'}</span> */}
+                  </div>
+                  <div className="navbar__profile-divider"></div>
+                  <ul className="navbar__profile-links">
+                    <li>
+                      <a href="/customer" className="navbar__profile-link-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 7a4 4 0 100-8 4 4 0 000 8z"/></svg>
+                        Tài khoản của tôi
+                      </a>
+                    </li>
+                    <li>
+                      <button onClick={handleLogout} className="navbar__profile-link-item navbar__profile-logout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                        Đăng xuất
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Mobile Hamburger */}
         <button
@@ -127,12 +217,27 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       <div className={`navbar__mobile-menu ${mobileOpen ? 'navbar__mobile-menu--open' : ''}`}>
-        <ul className="navbar__mobile-list">
+        {user && (
+          <div className="navbar__mobile-user">
+            <div className="navbar__mobile-avatar">
+              {user.fullName ? user.fullName.split(' ').pop().substring(0, 2).toUpperCase() : user.email.substring(0, 2).toUpperCase()}
+            </div>
+            <div className="navbar__mobile-user-info">
+              <span className="navbar__mobile-user-name">{user.fullName || 'Người dùng'}</span>
+              <span className="navbar__mobile-user-email">{user.email}</span>
+            </div>
+            <button onClick={handleLogout} className="navbar__mobile-logout-btn">
+              Đăng xuất
+            </button>
+          </div>
+        )}
+
+        <ul className="navbar__mobile-list" style={{ marginTop: '16px' }}>
           {navItems.map((item, index) => (
             <li key={index} className="navbar__mobile-item">
               <a
                 href={item.dropdown ? undefined : item.href}
-                className={`navbar__mobile-link ${item.active ? 'navbar__mobile-link--active' : ''}`}
+                className={`navbar__mobile-link ${isActive(item) ? 'navbar__mobile-link--active' : ''}`}
                 onClick={(e) => {
                   if (item.dropdown) {
                     e.preventDefault()
@@ -163,9 +268,11 @@ const Navbar = () => {
           ))}
         </ul>
 
-        <a href="/booking" className="navbar__mobile-cta">
-          ĐẶT PHÒNG
-        </a>
+        {!user && (
+          <a href="/booking" onClick={handleBookingClick} className="navbar__mobile-cta">
+            ĐẶT PHÒNG
+          </a>
+        )}
       </div>
     </nav>
   )

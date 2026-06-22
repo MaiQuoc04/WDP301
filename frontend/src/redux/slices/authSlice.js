@@ -1,12 +1,20 @@
 import { createSlice } from '@reduxjs/toolkit'
 
-// Khởi tạo từ localStorage để giữ đăng nhập sau khi refresh (axiosInstance đọc 'token')
-const token = localStorage.getItem('token') || null
-const user = JSON.parse(localStorage.getItem('user') || 'null')
+const getStoredUser = () => {
+  try {
+    const user = localStorage.getItem('user')
+    return user ? JSON.parse(user) : null
+  } catch {
+    return null
+  }
+}
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState: { user, token },
+  initialState: {
+    user: getStoredUser(),
+    token: localStorage.getItem('token') || null,
+  },
   reducers: {
     setCredentials: (state, { payload }) => {
       state.user = payload.user

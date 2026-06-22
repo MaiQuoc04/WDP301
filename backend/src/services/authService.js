@@ -67,10 +67,8 @@ exports.register = async ({ email, password, fullName, phone }) => {
     email, password: await bcrypt.hash(password, 10), role: 'customer', isVerified: false,
   })
   await Customer.create({ account: account._id, fullName, phone })
-  const otp = await issueOtp(account, 'verify')
-  const res = { email: account.email, message: 'Đăng ký thành công, vui lòng kiểm tra OTP trong email' }
-  if (isDev()) res.devOtp = otp
-  return res
+  await issueOtp(account, 'verify')
+  return { email: account.email, message: 'Đăng ký thành công, vui lòng kiểm tra OTP trong email' }
 }
 
 // UC-02: xác thực OTP, kích hoạt tài khoản (tự đăng nhập luôn)
@@ -96,10 +94,8 @@ exports.resendOtp = async ({ email }) => {
     if (elapsed < otpUtil.RESEND_COOLDOWN_SEC)
       throw new Error(`Vui lòng đợi ${Math.ceil(otpUtil.RESEND_COOLDOWN_SEC - elapsed)}s để gửi lại OTP`)
   }
-  const otp = await issueOtp(account, 'verify')
-  const res = { message: 'Đã gửi lại OTP' }
-  if (isDev()) res.devOtp = otp
-  return res
+  await issueOtp(account, 'verify')
+  return { message: 'Đã gửi lại OTP' }
 }
 
 // UC-03: đăng nhập, phát JWT kèm role
@@ -115,12 +111,10 @@ exports.login = async ({ email, password }) => {
 // UC-05: quên mật khẩu -> gửi OTP đặt lại (không tiết lộ email có tồn tại hay không)
 exports.forgotPassword = async ({ email }) => {
   const account = await Account.findOne({ email })
-  const res = { message: 'Nếu email tồn tại, OTP đặt lại mật khẩu đã được gửi' }
   if (account && account.isActive) {
-    const otp = await issueOtp(account, 'reset')
-    if (isDev()) res.devOtp = otp
+    await issueOtp(account, 'reset')
   }
-  return res
+  return { message: 'Nếu email tồn tại, OTP đặt lại mật khẩu đã được gửi' }
 }
 
 exports.resetPassword = async ({ email, otp, password }) => {

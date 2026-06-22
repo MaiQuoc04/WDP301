@@ -404,7 +404,8 @@ exports.getServiceById = async (id, branchId) => {
 
 // Lấy danh sách rút gọn dịch vụ đang hoạt động phục vụ dropdown (sắp xếp theo tên)
 exports.getServiceOptions = async (branchId) => {
-  return Service.find({ branch: branchId, status: 'active' }, '_id name price').sort({ name: 1 })
+  const services = await Service.find({ branch: branchId, status: 'active' }, '_id name price')
+  return services.sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 }
 
 // Tạo mới dịch vụ
@@ -881,6 +882,20 @@ exports.markHousekeepingTaskUrgent = async (id, branchId) => {
   task.isUrgent = !task.isUrgent
   return task.save()
 }
+
+// Lấy danh sách housekeeper thuộc chi nhánh
+exports.getHousekeepers = async (branchId) => {
+  const assignments = await RoleAssignment.find({
+    branch: branchId,
+    role: 'housekeeper',
+    isActive: true
+  }).populate('account', '_id email fullName isActive')
+
+  return assignments
+    .map(a => a.account)
+    .filter(acc => acc && acc.isActive)
+}
+
 
 
 
