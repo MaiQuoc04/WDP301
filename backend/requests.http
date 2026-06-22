@@ -453,3 +453,108 @@ Content-Type: application/json
 {
   "cancellationReason": "Báo cáo nhầm, đã kiểm tra lại dàn lạnh hoạt động bình thường"
 }
+
+### =========================================================================
+### SUPER ADMIN APIs (UC-71→82) - Owner: Sáng
+### =========================================================================
+
+### 1) Đăng nhập Super Admin
+# @name adminLogin
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@hbms.com",
+  "password": "Admin@123"
+}
+
+###
+@aToken = {{adminLogin.response.body.$.data.token}}
+
+### 2) Lấy danh sách chi nhánh
+GET {{base}}/admin/branches
+Authorization: Bearer {{aToken}}
+
+### 3) Tạo mới chi nhánh
+# @name createBranch
+POST {{base}}/admin/branches
+Authorization: Bearer {{aToken}}
+Content-Type: application/json
+
+{
+  "code": "SG01",
+  "name": "Chi nhánh Sài Gòn",
+  "location": "Quận 1, TP.HCM",
+  "hotline": "0909123456"
+}
+
+###
+@newBranchId = {{createBranch.response.body.$.data._id}}
+
+### 4) Cập nhật chi nhánh
+PUT {{base}}/admin/branches/{{newBranchId}}
+Authorization: Bearer {{aToken}}
+Content-Type: application/json
+
+{
+  "name": "Chi nhánh Sài Gòn - Quận 1",
+  "hotline": "0909999888"
+}
+
+### 5) Khóa / Mở khóa chi nhánh
+PATCH {{base}}/admin/branches/{{newBranchId}}/deactivate
+Authorization: Bearer {{aToken}}
+
+### 6) Tạo tài khoản nhân viên mới (Staff)
+# @name createStaffAcc
+POST {{base}}/admin/staff
+Authorization: Bearer {{aToken}}
+Content-Type: application/json
+
+{
+  "email": "letan.test@hbms.com",
+  "password": "Password@123",
+  "fullName": "Nguyễn Văn Lễ Tân",
+  "phone": "0987654321",
+  "gender": "male",
+  "role": "receptionist",
+  "branchId": "{{newBranchId}}"
+}
+
+###
+@newStaffAccId = {{createStaffAcc.response.body.$.data.account._id}}
+
+### 7) Lấy danh sách nhân viên
+GET {{base}}/admin/staff
+Authorization: Bearer {{aToken}}
+
+### 8) Gán thêm chi nhánh cho nhân viên
+POST {{base}}/admin/staff/{{newStaffAccId}}/assignments
+Authorization: Bearer {{aToken}}
+Content-Type: application/json
+
+{
+  "branchId": "660c1c875d5e5e23c015b001"
+}
+
+### 9) Thay đổi vai trò nhân viên
+PUT {{base}}/admin/staff/{{newStaffAccId}}/role
+Authorization: Bearer {{aToken}}
+Content-Type: application/json
+
+{
+  "role": "branch_manager"
+}
+
+### 10) Lấy danh sách tài khoản khách hàng
+GET {{base}}/admin/users?role=customer
+Authorization: Bearer {{aToken}}
+
+### 11) Khóa / Mở khóa tài khoản (Staff / Customer)
+PATCH {{base}}/admin/accounts/{{newStaffAccId}}/deactivate
+Authorization: Bearer {{aToken}}
+
+### 12) Lấy dữ liệu thống kê Dashboard (Aggregate)
+GET {{base}}/admin/dashboard/stats
+Authorization: Bearer {{aToken}}
+
