@@ -7,3 +7,6 @@ dist/
 WDP_Report_Final.docx
 *.docx
 _docx_extract/
+
+# stray root lock (không có package.json gốc)
+package-lock.json
