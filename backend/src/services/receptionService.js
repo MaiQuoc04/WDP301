@@ -174,7 +174,7 @@ exports.getSchedule = async (accountId, { from, to } = {}) => {
   const bookings = await Booking.find({
     branch: { $in: branches },
     room: { $ne: null },
-    status: { $in: ['checked_in', 'checked_out', 'completed'] },
+    status: { $in: ['pending', 'confirmed', 'checked_in', 'checked_out', 'completed'] },
     checkIn: { $lt: end }, checkOut: { $gt: start },
   }).select('code guestName checkIn checkOut status room').lean()
   const byRoom = {}

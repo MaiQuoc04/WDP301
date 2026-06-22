@@ -285,3 +285,40 @@
   .rc-main { padding: 20px 16px; }
   .rc-cols section { min-width: 100%; }
 }
+
+/* ---------- Gantt timeline (Lịch phòng) ---------- */
+.gantt-wrap { overflow-x: auto; background: #fff; border-radius: 12px; box-shadow: var(--shadow-raised, 0 4px 12px rgba(0,0,0,.08)); }
+.gantt-row { display: flex; align-items: stretch; border-bottom: 1px solid #f0f0f0; }
+.gantt-row:last-child { border-bottom: none; }
+.gantt-head { position: sticky; top: 0; z-index: 3; }
+.gantt-room {
+  width: 150px; flex: 0 0 150px; padding: 8px 12px;
+  display: flex; flex-direction: column; justify-content: center;
+  border-right: 1px solid #eee; background: #fff;
+  position: sticky; left: 0; z-index: 2;
+}
+.gantt-head .gantt-room { background: #faf7f0; z-index: 4; }
+.gantt-room b { font-family: var(--font-display, serif); font-size: 17px; line-height: 1.2; }
+.gantt-room small { color: var(--color-pale-gray, #999); }
+.gantt-days { display: flex; background: #faf7f0; }
+.gantt-dh { flex: 0 0 auto; text-align: center; padding: 10px 0; font-size: 12px; color: var(--color-light-gray, #777); font-weight: 700; border-right: 1px solid #eee; }
+.gantt-dh.wknd { color: var(--color-gold, #A18348); }
+.gantt-track {
+  position: relative; height: 46px; flex: 0 0 auto;
+  background-image: linear-gradient(to right, #f0f0f0 1px, transparent 1px);
+  background-size: 64px 100%;
+}
+.gantt-bar {
+  position: absolute; top: 9px; height: 28px; border-radius: 6px; padding: 0 8px;
+  display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: var(--shadow-subtle, 0 2px 4px rgba(0,0,0,.12)); cursor: default;
+}
+.gantt-bar.s-pending { background: #E0A800; }
+.gantt-bar.s-confirmed { background: var(--color-luxury-blue, #248ACC); }
+.gantt-bar.s-checked_in { background: #2e7d32; }
+.gantt-bar.s-checked_out { background: #8a8a8a; }
+.gantt-bar.s-completed { background: #5a5a5a; }
+.gantt-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 13px; flex-wrap: wrap; color: var(--color-medium-gray, #3E3E3F); }
+.gantt-legend span { display: inline-flex; align-items: center; }
+.gantt-legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; margin-right: 6px; }
