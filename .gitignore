@@ -8,5 +8,5 @@ WDP_Report_Final.docx
 *.docx
 _docx_extract/
 
-# stray root lock (không có package.json gốc)
-package-lock.json
+# stray root lock (chỉ root — không có package.json gốc; backend/frontend lock vẫn track)
+/package-lock.json
