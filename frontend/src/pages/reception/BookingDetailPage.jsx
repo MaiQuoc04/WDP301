@@ -75,9 +75,15 @@ export default function BookingDetailPage() {
           {bill && (
             <table className="rc-bill"><tbody>
               <tr><td>Tiền phòng</td><td>{vnd(bill.roomCharge)}</td></tr>
-              <tr><td>Giường phụ {bill.bedSurchargeApplied ? '(đã áp)' : `(ước tính ${vnd(bill.bedSurchargeEstimate)}, chưa áp)`}</td><td>{vnd(bill.bedSurcharge)}</td></tr>
-              <tr><td>Dịch vụ</td><td>{vnd(bill.extraServicesTotal)}</td></tr>
-              <tr><td>Thiết bị thiếu</td><td>{vnd(bill.missingAmenitiesTotal)}</td></tr>
+              {bill.services.map((s) => (
+                <tr key={s._id}><td>(Dịch vụ) {s.name} ×{s.quantity}</td><td>{vnd(s.price * s.quantity)}</td></tr>
+              ))}
+              {bill.missingAmenities.map((a) => (
+                <tr key={a._id}><td>(Thiết bị) {a.name} ×{a.quantity}</td><td>{vnd(a.price * a.quantity)}</td></tr>
+              ))}
+              {bill.bedSurchargeApplied && bill.bedSurcharge > 0 && (
+                <tr><td>(Phụ phí) Giường phụ</td><td>{vnd(bill.bedSurcharge)}</td></tr>
+              )}
               <tr className="tot"><td>Tổng</td><td>{vnd(bill.totalAmount)}</td></tr>
               <tr><td>Đã trả</td><td>{vnd(bill.paidAmount)}</td></tr>
               <tr className="tot"><td>Còn lại</td><td>{vnd(bill.remainingAmount)}</td></tr>
