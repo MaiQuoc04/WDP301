@@ -11,6 +11,7 @@ export const bookingService = {
   listServices: () => get(`${base}/services`),
   listAmenities: () => get(`${base}/amenities`),
   listRooms: (params) => get(`${base}/rooms`, params),
+  searchRooms: (params) => get(`${base}/rooms/available`, params),
   listBookings: (params) => get(`${base}/bookings`, params),
   getBooking: (id) => get(`${base}/bookings/${id}`),
   getBill: (id) => get(`${base}/bookings/${id}/bill`),

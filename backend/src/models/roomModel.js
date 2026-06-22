@@ -12,6 +12,7 @@ const roomSchema = new mongoose.Schema({
   // Soft delete — không xóa vật lý để giữ nguyên reference với Booking (BR-UC60)
   isDeleted:  { type: Boolean, default: false, index: true },
   notes:      { type: String, trim: true },
+  bookingSeq: { type: Number, default: 0 }, // Quốc — token serialize chống đặt trùng theo PHÒNG (nội bộ)
 }, { timestamps: true })
 
 roomSchema.index(

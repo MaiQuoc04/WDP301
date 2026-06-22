@@ -8,6 +8,7 @@ const handle = (fn, code = 200) => async (req, res) => {
 exports.listServices = handle((req) => svc.listServices(req.user.id))               // danh mục dịch vụ
 exports.listAmenities = handle((req) => svc.listAmenities(req.user.id))             // danh mục thiết bị
 exports.listRooms = handle((req) => svc.listRooms(req.user.id, req.query))         // UC-26
+exports.searchRooms = handle((req) => svc.searchRooms(req.user.id, req.query))     // tìm phòng cho walk-in
 exports.listBookings = handle((req) => svc.listBookings(req.user.id, req.query))   // UC-27/43
 exports.getBookingDetail = handle((req) => svc.getBookingDetail(req.user.id, req.params.id)) // UC-28
 

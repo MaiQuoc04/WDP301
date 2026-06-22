@@ -39,3 +39,9 @@ button.link { background: none; border: none; color: #b3261e; cursor: pointer; }
 .rc-room.st-cleaning { border-left: 4px solid #f9a825; }
 .rc-room.st-maintenance, .rc-room.st-locked { border-left: 4px solid #555; }
 .rc-err { color: #b3261e; } .rc-ok { color: #2e7d32; }
+.rc-steps { margin: 10px 0 16px; color: #999; font-size: 14px; }
+.rc-steps .on { color: #0f3d6e; font-weight: 700; }
+.rc-fit { padding: 2px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
+.fit-exact { background: #d1e7dd; }
+.fit-surplus { background: #fff3cd; }
+.fit-short { background: #f8d7da; }

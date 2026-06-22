@@ -79,14 +79,27 @@ async function assertInBranch(accountId, bookingId) {
 
 // ---------- GĐ2: thao tác vòng đời (scope branch + ủy quyền cho bookingService) ----------
 // UC-29: tạo booking tại quầy (walk-in)
+// Tìm phòng cụ thể còn trống + hợp party (cho form walk-in bước 2)
+exports.searchRooms = async (accountId, q = {}) => {
+  const branches = await myBranchIds(accountId)
+  if (!q.checkIn || !q.checkOut) throw new Error('Thiếu ngày nhận/trả')
+  return bookingService.searchAvailableRooms(
+    branches[0], q.checkIn, q.checkOut,
+    Number(q.adults) || 1, Number(q.children) || 0,
+    { roomTypeId: q.roomTypeId || undefined }
+  )
+}
+
+// UC-29: walk-in — lễ tân chọn PHÒNG cụ thể + dịch vụ kèm
 exports.walkIn = async (accountId, body) => {
   const branches = await myBranchIds(accountId)
   return bookingService.create({
     branchId: branches[0],
-    roomTypeId: body.roomTypeId,
+    roomId: body.roomId,
     guestName: body.guestName, guestPhone: body.guestPhone,
     checkIn: body.checkIn, checkOut: body.checkOut,
     adults: body.adults, children: body.children,
+    services: body.services,
     source: 'walk_in', createdBy: accountId,
   })
 }
@@ -94,9 +107,9 @@ exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, by: accountId })
 }
-exports.checkIn = async (accountId, bookingId, body = {}) => {
+exports.checkIn = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
-  return bookingService.checkIn(bookingId, { roomId: body.roomId, by: accountId })
+  return bookingService.checkIn(bookingId, { by: accountId })
 }
 exports.checkOut = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)

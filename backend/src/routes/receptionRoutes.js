@@ -12,6 +12,7 @@ router.get('/amenities', c.listAmenities)
 
 // Giai đoạn 1 — đọc dữ liệu
 router.get('/rooms', c.listRooms)                 // UC-26 danh sách phòng + trạng thái
+router.get('/rooms/available', c.searchRooms)     // tìm phòng trống + hợp party (walk-in bước 2)
 router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
 router.get('/bookings/:id', validateObjectId('id'), c.getBookingDetail) // UC-28 chi tiết booking
 
