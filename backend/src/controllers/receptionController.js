@@ -24,6 +24,8 @@ exports.setBedSurcharge = handle((req) => svc.setBedSurcharge(req.user.id, req.p
 exports.getBill = handle((req) => svc.getBill(req.user.id, req.params.id))                      // UC-34
 exports.addService = handle((req) => svc.addService(req.user.id, req.params.id, req.body), 201)  // UC-32
 exports.removeService = handle((req) => svc.removeService(req.user.id, req.params.id, req.params.lineId))
+exports.serviceBoard = handle((req) => svc.getServiceBoard(req.user.id))  // bảng triển khai dịch vụ theo phòng
+exports.setServiceDelivered = handle((req) => svc.setServiceDelivered(req.user.id, req.params.id, req.params.lineId, req.body.delivered))
 exports.addMissingAmenity = handle((req) => svc.addMissingAmenity(req.user.id, req.params.id, req.body), 201) // UC-33
 exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user.id, req.params.id, req.params.lineId))
 

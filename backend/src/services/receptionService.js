@@ -146,6 +146,38 @@ exports.getBill = async (accountId, bookingId) => {
   return bookingService.getBill(bookingId)
 }
 
+// Bảng triển khai dịch vụ theo phòng — chỉ phòng đang có khách (checked_in), gom theo phòng
+exports.getServiceBoard = async (accountId) => {
+  const branches = await myBranchIds(accountId)
+  const bookings = await Booking.find({
+    branch: { $in: branches },
+    status: 'checked_in',
+    'services.0': { $exists: true }, // có ít nhất 1 dịch vụ
+  }).populate('room', 'roomNumber floor').select('code guestName customer room services').lean()
+  const rows = bookings
+    .filter((b) => b.room) // bỏ booking chưa gán phòng (an toàn)
+    .map((b) => {
+      const services = b.services.map((s) => ({
+        _id: s._id, name: s.name, quantity: s.quantity, price: s.price,
+        addedAt: s.addedAt, status: s.status || 'pending', deliveredAt: s.deliveredAt,
+      }))
+      return {
+        bookingId: b._id, code: b.code, guestName: b.guestName,
+        room: b.room, // { _id, roomNumber, floor }
+        services,
+        pendingCount: services.filter((s) => s.status !== 'delivered').length,
+      }
+    })
+    .sort((a, b) => String(a.room.roomNumber).localeCompare(String(b.room.roomNumber), 'vi', { numeric: true }))
+  return rows
+}
+
+// Toggle trạng thái triển khai 1 dòng dịch vụ (đã giao ⇄ chưa giao)
+exports.setServiceDelivered = async (accountId, bookingId, lineId, delivered) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.setServiceDelivered(bookingId, lineId, !!delivered, accountId)
+}
+
 // ---------- GĐ4: huỷ / no-show ----------
 exports.cancel = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)

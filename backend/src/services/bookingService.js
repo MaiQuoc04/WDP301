@@ -437,6 +437,20 @@ exports.removeExtraService = async (bookingId, lineId, by) => {
   return booking
 }
 
+// Đánh dấu dịch vụ đã/chưa triển khai tại phòng (toggle 2 chiều). Thuần vận hành, KHÔNG đổi bill.
+exports.setServiceDelivered = async (bookingId, lineId, delivered, by) => {
+  const booking = await loadBooking(bookingId)
+  const line = booking.services.id(lineId)
+  if (!line) throw new Error('Không tìm thấy dòng dịch vụ')
+  if (delivered) {
+    line.status = 'delivered'; line.deliveredAt = new Date(); line.deliveredBy = by
+  } else {
+    line.status = 'pending'; line.deliveredAt = undefined; line.deliveredBy = undefined
+  }
+  await booking.save()
+  return booking
+}
+
 // UC-33: ghi thiết bị thiếu vào bill (lễ tân; Tú cũng ghi vào mảng này từ UC-50)
 exports.addMissingAmenity = async (bookingId, amenityId, quantity = 1, by) => {
   const booking = await loadBooking(bookingId)
