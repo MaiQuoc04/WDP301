@@ -20,6 +20,8 @@ const statusLabel = {
   missed: 'Missed',
 }
 
+const formatDateTime = (date) => date ? new Date(date).toLocaleString('vi-VN') : '-'
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
@@ -94,7 +96,7 @@ export default function TasksPage() {
     {
       title: 'Cập nhật',
       dataIndex: 'updatedAt',
-      render: (date) => date ? new Date(date).toLocaleString('vi-VN') : '-',
+      render: (date) => formatDateTime(date),
     },
     {
       title: 'Thao tác',
@@ -112,6 +114,12 @@ export default function TasksPage() {
       ),
     },
   ]
+
+  columns.splice(2, 0, {
+    title: 'Ngày trả phòng',
+    key: 'checkOut',
+    render: (_, task) => formatDateTime(task.booking?.checkOut),
+  })
 
   return (
     <div>
@@ -148,7 +156,7 @@ export default function TasksPage() {
       </div>
 
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} />
+      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} scroll={{ x: true }} />
     </div>
   )
 }
