@@ -545,3 +545,66 @@
 .rc-svcboard .svc-card button.svc-toggle.undo { background: #F1F5F9; color: var(--rc-text-muted); box-shadow: none; }
 .rc-svcboard .svc-card button.svc-toggle.undo:hover { background: #E2E8F0; color: var(--rc-text-main); transform: none; box-shadow: none; }
 .rc-svcboard .svc-card button.svc-toggle:disabled { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
+
+/* ---------- Dọn dẹp & kiểm tra phòng (booking detail) ---------- */
+.rc-hk {
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-lg);
+  box-shadow: var(--rc-shadow-soft);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.rc-hk > h3 { margin: 0 0 14px; }
+.rc-hk-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+/* nút "Dọn phòng" kiểu phụ (outline) để phân biệt với nút chính gold */
+.rc-main .rc-hk button.hk-clean {
+  background: #fff; color: var(--rc-gold);
+  border: 1.5px solid var(--rc-gold); box-shadow: none;
+}
+.rc-main .rc-hk button.hk-clean:hover { background: #FAF8F3; box-shadow: var(--rc-shadow-soft); }
+.hk-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
+}
+.hk-state.wait { background: #FEF3C7; color: #B45309; }
+.hk-state.doing { background: #DBEAFE; color: #1D4ED8; }
+.hk-state.done { background: #DCFCE7; color: #15803D; }
+.rc-hk-hist { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.rc-hk-hist h4 { margin: 0 0 8px; font-size: 14px; color: var(--rc-text-muted); }
+.rc-hk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rc-hk-list li { font-size: 13px; color: var(--rc-text-main); }
+.rc-muted { color: var(--rc-text-muted); font-size: 13px; margin: 0; }
+.hk-tag {
+  display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-right: 6px;
+  background: #EEF2F7; color: #475569;
+}
+.hk-tag.s-pending { background: #FEF3C7; color: #B45309; }
+.hk-tag.s-in_progress { background: #DBEAFE; color: #1D4ED8; }
+.hk-tag.s-urgent { background: #FFE4E6; color: #BE123C; }
+.hk-tag.s-completed { background: #DCFCE7; color: #15803D; }
+.hk-tag.s-missed { background: #F1F5F9; color: #94A3B8; }
+@media (max-width: 640px) { .rc-hk-hist { grid-template-columns: 1fr; } }
+
+/* ---------- Modal cảnh báo check-out ---------- */
+.rc-modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+.rc-modal {
+  background: #fff; border-radius: var(--rc-radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  max-width: 460px; width: 100%; padding: 28px;
+}
+.rc-modal h3 { margin: 0 0 12px; color: #B91C1C; }
+.rc-modal p { margin: 0 0 10px; line-height: 1.5; color: var(--rc-text-main); }
+.rc-modal-hint { font-size: 13px; color: var(--rc-text-muted); }
+.rc-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; align-items: center; }
+.rc-main .rc-modal button.rc-modal-danger {
+  background: linear-gradient(135deg, #e11d48, #fb7185); color: #fff; border: none;
+  padding: 10px 20px; border-radius: var(--rc-radius-md); font-weight: 600; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
+}
+.rc-main .rc-modal button.rc-modal-danger:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }

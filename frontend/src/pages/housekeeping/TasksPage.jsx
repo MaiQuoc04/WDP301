@@ -20,6 +20,9 @@ const statusLabel = {
   missed: 'Missed',
 }
 
+const typeLabel = { inspection: 'Kiểm tra', turnover: 'Dọn (trả phòng)', mid_stay: 'Dọn (yêu cầu)' }
+const typeColor = { inspection: 'purple', turnover: 'volcano', mid_stay: 'cyan' }
+
 const formatDateTime = (date) => date ? new Date(date).toLocaleString('vi-VN') : '-'
 
 export default function TasksPage() {
@@ -82,7 +85,8 @@ export default function TasksPage() {
       title: 'Trạng thái',
       dataIndex: 'status',
       render: (status, task) => (
-        <Space>
+        <Space wrap>
+          <Tag color={typeColor[task.type] || 'default'}>{typeLabel[task.type] || 'Việc phòng'}</Tag>
           <Tag color={statusColor[status]}>{statusLabel[status] || status}</Tag>
           {task.isUrgent && status !== 'urgent' && <Tag color="red">Ưu tiên</Tag>}
         </Space>

@@ -19,6 +19,14 @@ const statusLabel = {
   missed: 'Missed',
 }
 
+// Loại việc — quyết định có cần kiểm kê thiết bị hay không
+const typeLabel = {
+  inspection: 'Kiểm tra thiết bị',
+  turnover: 'Dọn sau trả phòng',
+  mid_stay: 'Dọn theo yêu cầu',
+}
+const typeColor = { inspection: 'purple', turnover: 'volcano', mid_stay: 'cyan' }
+
 export default function TaskDetailPage() {
   const { id } = useParams()
   const [task, setTask] = useState(null)
@@ -100,6 +108,8 @@ export default function TaskDetailPage() {
   const assigned = !!task.assignedTo
   const canStart = assigned && ['pending', 'urgent'].includes(task.status)
   const canEdit = assigned && !done
+  // Chỉ task kiểm tra thiết bị mới cần kiểm kê; dọn (turnover/mid_stay) hoàn tất thẳng.
+  const needsInventory = !['turnover', 'mid_stay'].includes(task.type)
 
   const columns = [
     { title: 'Thiết bị', dataIndex: 'name' },
@@ -160,7 +170,10 @@ export default function TaskDetailPage() {
           <h1>Task phòng {task.room?.roomNumber}</h1>
           <p>{task.booking?.code || 'Không có booking'} · {task.booking?.guestName || 'Khách lưu trú'}</p>
         </div>
-        <Tag color={statusColor[task.status]}>{statusLabel[task.status] || task.status}</Tag>
+        <Space>
+          <Tag color={typeColor[task.type] || 'default'}>{typeLabel[task.type] || 'Việc phòng'}</Tag>
+          <Tag color={statusColor[task.status]}>{statusLabel[task.status] || task.status}</Tag>
+        </Space>
       </div>
 
       <div className="hk-detail-grid">
@@ -170,7 +183,7 @@ export default function TaskDetailPage() {
           <p><b>Booking:</b> {task.booking?.code || '-'}</p>
           <p><b>Khách:</b> {task.booking?.guestName || '-'} {task.booking?.guestPhone ? `· ${task.booking.guestPhone}` : ''}</p>
           <p><b>Người nhận:</b> {task.assignedTo?.email || 'Chưa ai nhận'}</p>
-          <p><b>Đã kiểm kê:</b> {task.amenityChecked ? 'Có' : 'Chưa'}</p>
+          {needsInventory && <p><b>Đã kiểm kê:</b> {task.amenityChecked ? 'Có' : 'Chưa'}</p>}
           {task.issueNote && <p><b>Ghi chú sự cố:</b><br />{task.issueNote}</p>}
 
           <Space wrap>
@@ -186,7 +199,7 @@ export default function TaskDetailPage() {
                 <Button danger onClick={() => act(() => taskService.markMaintenance(id, { note: 'Housekeeper chuyển phòng sang bảo trì' }), 'Đã chuyển phòng sang bảo trì')}>
                   Mark maintenance
                 </Button>
-                <Button type="primary" disabled={!task.amenityChecked} loading={saving} onClick={() => act(() => taskService.completeTask(id), 'Đã hoàn tất task')}>
+                <Button type="primary" disabled={needsInventory && !task.amenityChecked} loading={saving} onClick={() => act(() => taskService.completeTask(id), 'Đã hoàn tất task')}>
                   Hoàn tất
                 </Button>
               </>
@@ -196,24 +209,36 @@ export default function TaskDetailPage() {
 
         <section className="hk-panel">
           <h3>Hướng dẫn thao tác</h3>
-          <p className="hk-muted">Nhập số lượng thực tế sau khi kiểm tra phòng. Nếu thiếu, hệ thống sẽ cộng phí vào bill khi booking còn ở trạng thái có thể chỉnh bill.</p>
-          <p className="hk-muted">Sau khi lưu báo cáo kiểm kê, bạn có thể hoàn tất task. Nếu có hỏng hóc cần quản lý xử lý, dùng “Báo sự cố”.</p>
+          {needsInventory ? (
+            <>
+              <p className="hk-muted">Nhập số lượng thực tế sau khi kiểm tra phòng. Nếu thiếu, hệ thống sẽ cộng phí vào bill khi booking còn ở trạng thái có thể chỉnh bill.</p>
+              <p className="hk-muted">Sau khi lưu báo cáo kiểm kê, bạn có thể hoàn tất task. Nếu có hỏng hóc cần quản lý xử lý, dùng “Báo sự cố”.</p>
+            </>
+          ) : (
+            <p className="hk-muted">
+              {task.type === 'mid_stay'
+                ? 'Dọn phòng theo yêu cầu của khách (miễn phí). Dọn xong bấm “Hoàn tất” — không cần kiểm kê thiết bị, phòng giữ nguyên trạng thái đang ở.'
+                : 'Dọn phòng sau khi khách trả. Dọn xong bấm “Hoàn tất” để đưa phòng về trạng thái sẵn sàng.'}
+            </p>
+          )}
         </section>
       </div>
 
-      <section className="hk-panel">
-        <div className="hk-panel-head">
-          <h3>Kiểm kê thiết bị</h3>
-          <Button type="primary" disabled={done} loading={saving} onClick={saveReport}>Lưu báo cáo</Button>
-        </div>
-        <Table
-          rowKey={(row) => row._id || row.amenity}
-          dataSource={report}
-          columns={columns}
-          pagination={false}
-          locale={{ emptyText: 'Phòng này chưa có template thiết bị. Bạn vẫn có thể lưu báo cáo rỗng để hoàn tất task.' }}
-        />
-      </section>
+      {needsInventory && (
+        <section className="hk-panel">
+          <div className="hk-panel-head">
+            <h3>Kiểm kê thiết bị</h3>
+            <Button type="primary" disabled={done} loading={saving} onClick={saveReport}>Lưu báo cáo</Button>
+          </div>
+          <Table
+            rowKey={(row) => row._id || row.amenity}
+            dataSource={report}
+            columns={columns}
+            pagination={false}
+            locale={{ emptyText: 'Phòng này chưa có template thiết bị. Bạn vẫn có thể lưu báo cáo rỗng để hoàn tất task.' }}
+          />
+        </section>
+      )}
 
       <Modal
         title="Báo sự cố phòng"

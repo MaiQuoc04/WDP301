@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDate, fmtDateTime } from '../../services'
+import { socket, connectSocket } from '../../services/socketService'
+
+const HK_STATUS = { pending: 'Chờ nhận', in_progress: 'Đang làm', urgent: 'Khẩn', completed: 'Xong', missed: 'Bỏ lỡ' }
 
 export default function BookingDetailPage() {
   const { id } = useParams()
@@ -8,6 +11,9 @@ export default function BookingDetailPage() {
   const [bill, setBill] = useState(null)
   const [services, setServices] = useState([])
   const [amenities, setAmenities] = useState([])
+  const [hk, setHk] = useState(null)      // { activeInspection, lastInspectionDone, inspections, cleanings }
+  const [coWarn, setCoWarn] = useState(false)
+  const [cd, setCd] = useState(5)
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
 
@@ -15,6 +21,7 @@ export default function BookingDetailPage() {
     setErr('')
     try { setD(await bookingService.getBooking(id)); setBill(await bookingService.getBill(id)) }
     catch (e) { setErr(e.response?.data?.message || 'Lỗi tải') }
+    try { setHk(await bookingService.getBookingHousekeeping(id)) } catch { /* ignore */ }
   }, [id])
 
   useEffect(() => { reload() }, [reload])
@@ -22,6 +29,20 @@ export default function BookingDetailPage() {
     bookingService.listServices().then(setServices).catch(() => {})
     bookingService.listAmenities().then(setAmenities).catch(() => {})
   }, [])
+  // Realtime: housekeeper nhận/kiểm tra xong -> tự refresh trạng thái nút
+  useEffect(() => {
+    connectSocket()
+    const onNoti = () => reload()
+    socket.on('notification', onNoti)
+    return () => socket.off('notification', onNoti)
+  }, [reload])
+  // Đếm ngược 5s cho nút xác nhận check-out khi chưa kiểm tra phòng
+  useEffect(() => {
+    if (!coWarn) return
+    setCd(5)
+    const t = setInterval(() => setCd((c) => (c <= 1 ? 0 : c - 1)), 1000)
+    return () => clearInterval(t)
+  }, [coWarn])
 
   const act = async (fn, okMsg) => {
     setErr(''); setMsg('')
@@ -33,6 +54,23 @@ export default function BookingDetailPage() {
   const b = d.booking
   const st = b.status
   const editable = ['confirmed', 'checked_in'].includes(st)
+
+  const doCheckout = async () => { setCoWarn(false); await act(() => bookingService.checkOut(id), 'Đã check-out') }
+  const tryCheckout = () => { hk?.lastInspectionDone ? doCheckout() : setCoWarn(true) }
+  const inspectionCtrl = () => {
+    const a = hk?.activeInspection
+    if (a) return <span className={'hk-state ' + (a.status === 'pending' ? 'wait' : 'doing')}>
+      {a.status === 'pending' ? '⏳ Đang chờ housekeeper nhận' : '🧹 Housekeeper đang kiểm tra'}
+    </span>
+    if (hk?.lastInspectionDone) return <span className="hk-state done">✓ Đã check xong phòng</span>
+    return <button onClick={() => act(() => bookingService.requestInspection(id), 'Đã gửi yêu cầu kiểm tra phòng')}>Yêu cầu kiểm tra phòng</button>
+  }
+  const hkList = (arr) => arr?.length ? (
+    <ul className="rc-hk-list">
+      {arr.map((t) => <li key={t._id}><span className={'hk-tag s-' + t.status}>{HK_STATUS[t.status] || t.status}</span> {fmtDateTime(t.requestedAt || t.createdAt)}{t.assignedTo?.email && ` · ${t.assignedTo.email}`}</li>)}
+    </ul>
+  ) : <p className="rc-muted">Chưa có</p>
+  const showHk = st === 'checked_in' || hk?.inspections?.length || hk?.cleanings?.length
 
   return (
     <div className="rc-detail">
@@ -46,12 +84,28 @@ export default function BookingDetailPage() {
       <div className="rc-actions">
         {st === 'pending' && <button onClick={() => act(() => bookingService.confirmDeposit(id), 'Đã thu cọc')}>Thu cọc → Confirm</button>}
         {st === 'confirmed' && <button onClick={() => act(() => bookingService.checkIn(id), 'Đã check-in')}>Check-in</button>}
-        {st === 'checked_in' && <button onClick={() => act(() => bookingService.checkOut(id), 'Đã check-out')}>Check-out</button>}
+        {st === 'checked_in' && <button onClick={tryCheckout}>Check-out</button>}
         {st === 'checked_out' && <button onClick={() => act(() => bookingService.complete(id), 'Đã hoàn tất')}>Complete</button>}
         {st === 'confirmed' && <button onClick={() => act(() => bookingService.noShow(id), 'Đã đánh no-show')}>No-show</button>}
         {['pending', 'confirmed'].includes(st) &&
           <button className="danger" onClick={() => window.confirm('Huỷ booking này?') && act(() => bookingService.cancel(id, { reason: 'Huỷ tại quầy' }), 'Đã huỷ')}>Huỷ</button>}
       </div>
+
+      {showHk && (
+        <section className="rc-hk">
+          <h3>Dọn dẹp & kiểm tra phòng</h3>
+          {st === 'checked_in' && (
+            <div className="rc-hk-actions">
+              {inspectionCtrl()}
+              <button className="hk-clean" onClick={() => act(() => bookingService.requestCleaning(id), 'Đã gửi yêu cầu dọn phòng')}>Dọn phòng (khách yêu cầu)</button>
+            </div>
+          )}
+          <div className="rc-hk-hist">
+            <div><h4>Lịch sử kiểm tra</h4>{hkList(hk?.inspections)}</div>
+            <div><h4>Lịch sử dọn theo yêu cầu</h4>{hkList(hk?.cleanings)}</div>
+          </div>
+        </section>
+      )}
 
       <div className="rc-cols">
         <section>
@@ -130,6 +184,22 @@ export default function BookingDetailPage() {
           </>}
         </section>
       </div>
+
+      {coWarn && (
+        <div className="rc-modal-overlay" onClick={() => setCoWarn(false)}>
+          <div className="rc-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>⚠️ Chưa kiểm tra phòng</h3>
+            <p>Phòng này <b>chưa được kiểm tra thiết bị</b>. Sau khi check-out, bạn <b>không thể cộng thêm phụ phí thiếu thiết bị</b> vào bill nữa.</p>
+            <p className="rc-modal-hint">Nên bấm “Yêu cầu kiểm tra phòng”, đợi housekeeper báo cáo rồi hãy check-out.</p>
+            <div className="rc-modal-actions">
+              <button className="link" onClick={() => setCoWarn(false)}>← Quay lại</button>
+              <button className="rc-modal-danger" disabled={cd > 0} onClick={doCheckout}>
+                {cd > 0 ? `Vẫn check-out (${cd}s)` : 'Vẫn check-out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

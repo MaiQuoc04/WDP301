@@ -4,6 +4,8 @@ import { logout } from '../../redux/slices/authSlice'
 import TasksPage from './TasksPage'
 import TaskDetailPage from './TaskDetailPage'
 import HistoryPage from './HistoryPage'
+import NotificationBell from '../../components/NotificationBell'
+import NotificationsPage from '../../components/NotificationsPage'
 import '../manager/manager.css'
 import './housekeeping.css'
 import {
@@ -73,6 +75,7 @@ export default function HousekeepingDashboard() {
             <span className="manager-branch-badge">HOUSEKEEPING</span>
           </div>
           <div className="hk-header-user">
+            <NotificationBell basePath="/housekeeping" />
             <AuditOutlined />
             <span>
               Xin chào, <strong>{user?.fullName || user?.email}</strong>
@@ -85,6 +88,7 @@ export default function HousekeepingDashboard() {
             <Route index element={<TasksPage />} />
             <Route path="tasks/:id" element={<TaskDetailPage />} />
             <Route path="history" element={<HistoryPage />} />
+            <Route path="notifications" element={<NotificationsPage basePath="/housekeeping" />} />
           </Routes>
         </main>
       </div>

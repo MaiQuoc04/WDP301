@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { bookingService, vnd } from '../../services'
 
 const fitLabel = (r) => {
-  if (r.fit === 'exact') return { text: 'Vừa khít', cls: 'fit-exact' }
-  if (r.fit === 'surplus') return { text: `Dư ${r.surplusBeds} giường`, cls: 'fit-surplus' }
-  return { text: `Thiếu ${r.extraBeds} giường (phụ phí ${vnd(r.surcharge)})`, cls: 'fit-short' }
+  if (r.fit === 'short') return { text: `Cần ${r.extraBeds} giường phụ (+${vnd(r.surcharge)})`, cls: 'fit-short' }
+  if (r.fit === 'surplus') return { text: 'Còn trống', cls: 'fit-surplus' }
+  return { text: 'Vừa khít', cls: 'fit-exact' }
 }
 
 export default function WalkInPage() {
@@ -107,7 +107,7 @@ export default function WalkInPage() {
                 return (
                   <tr key={r.roomId}>
                     <td><b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
-                    <td>{r.roomType.name} ({r.roomType.totalBeds} giường)</td>
+                    <td>{r.roomType.name} <small>· sức chứa {r.roomType.capacity}</small></td>
                     <td><span className={'rc-fit ' + f.cls}>{f.text}</span></td>
                     <td>{vnd(r.total)}{r.surcharge > 0 && <small> (gồm phụ phí)</small>}</td>
                     <td><button onClick={() => { setPicked(r); setStep(3) }}>Chọn</button></td>

@@ -18,6 +18,8 @@ import RoomsPage from './RoomsPage'
 import SchedulePage from './SchedulePage'
 import ServiceBoardPage from './ServiceBoardPage'
 import TransactionsPage from './TransactionsPage'
+import NotificationBell from '../../components/NotificationBell'
+import NotificationsPage from '../../components/NotificationsPage'
 import './reception.css'
 
 export default function ReceptionDashboard() {
@@ -36,7 +38,9 @@ export default function ReceptionDashboard() {
           <NavLink to="/reception/services"><CoffeeOutlined /> Dịch vụ</NavLink>
           <NavLink to="/reception/transactions"><TransactionOutlined /> Giao dịch</NavLink>
         </nav>
-        <span className="rc-user">{user?.fullName || user?.email}
+        <span className="rc-user">
+          <NotificationBell basePath="/reception" />
+          {user?.fullName || user?.email}
           <button onClick={() => { dispatch(logout()); nav('/login') }}><LogoutOutlined /> Đăng xuất</button>
         </span>
       </header>
@@ -49,6 +53,7 @@ export default function ReceptionDashboard() {
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="services" element={<ServiceBoardPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="notifications" element={<NotificationsPage basePath="/reception" />} />
         </Routes>
       </main>
     </div>
