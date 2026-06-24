@@ -14,6 +14,12 @@ const roomTypeSchema = new mongoose.Schema({
   images:      [{ type: String }],
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
   amenities:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Amenity' }], // Hoàng — gán amenity theo loại phòng
+  // Số lượng CHUẨN từng thiết bị theo loại phòng (baseline kiểm kê — manager set, housekeeper không sửa).
+  // Tách khỏi `amenities` (vốn dùng để hiển thị cho khách) để không phá code module khác.
+  amenityStandards: [{
+    amenity:  { type: mongoose.Schema.Types.ObjectId, ref: 'Amenity' },
+    quantity: { type: Number, default: 1, min: 0 },
+  }],
 }, { timestamps: true })
 
 roomTypeSchema.index({ branch: 1, name: 1 }, { unique: true })

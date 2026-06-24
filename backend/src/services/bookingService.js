@@ -349,13 +349,14 @@ exports.checkIn = async (bookingId, { by } = {}) => {
   const booking = await loadBooking(bookingId)
   if (booking.status !== 'confirmed') throw new Error('Chỉ booking đã xác nhận mới check-in được')
   if (!booking.room) throw new Error('Booking chưa được gán phòng')
-  // Set phòng occupied (compare-and-set); {new:false} -> trả trạng thái TRƯỚC để revert nếu lỗi
+  // Chỉ phòng 'available' mới check-in được (phòng đang dọn/chờ bổ sung -> chưa nhận). docs §7
   const room = await Room.findOneAndUpdate(
-    { _id: booking.room, status: { $in: ['available', 'cleaning'] } },
+    { _id: booking.room, status: 'available' },
     { $set: { status: 'occupied' } }, { new: false })
   if (!room) {
     const r = await Room.findById(booking.room)
-    throw new Error(`Phòng ${r ? r.roomNumber : ''} đang ${r ? r.status : '?'}, chưa thể nhận`)
+    const reason = r && r.awaitingRestock ? 'chờ bổ sung thiết bị' : (r ? r.status : '?')
+    throw new Error(`Phòng ${r ? r.roomNumber : ''} đang ${reason}, chưa thể nhận`)
   }
   try {
     await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)

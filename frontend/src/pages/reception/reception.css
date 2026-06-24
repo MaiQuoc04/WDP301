@@ -546,6 +546,21 @@
 .rc-svcboard .svc-card button.svc-toggle.undo:hover { background: #E2E8F0; color: var(--rc-text-main); transform: none; box-shadow: none; }
 .rc-svcboard .svc-card button.svc-toggle:disabled { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
 
+/* ---------- Tóm tắt thông tin tìm phòng (walk-in bước 2) ---------- */
+.rc-search-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 12px 18px;
+  margin-bottom: 14px;
+  background: #FAF8F3;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  font-size: 14px;
+  color: var(--rc-text-main);
+}
+.rc-search-summary b { color: var(--rc-gold); }
+
 /* ---------- Dọn dẹp & kiểm tra phòng (booking detail) ---------- */
 .rc-hk {
   background: var(--rc-surface);

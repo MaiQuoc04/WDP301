@@ -82,7 +82,7 @@ export default function BookingDetailPage() {
       {msg && <p className="rc-ok">{msg}</p>}
 
       <div className="rc-actions">
-        {st === 'pending' && <button onClick={() => act(() => bookingService.confirmDeposit(id), 'Đã thu cọc')}>Thu cọc → Confirm</button>}
+        {st === 'pending' && <button onClick={() => window.confirm(`Xác nhận thu tiền cọc ${vnd(b.depositAmount)}?`) && act(() => bookingService.confirmDeposit(id), 'Đã thu cọc')}>Thu cọc {vnd(b.depositAmount)} → Confirm</button>}
         {st === 'confirmed' && <button onClick={() => act(() => bookingService.checkIn(id), 'Đã check-in')}>Check-in</button>}
         {st === 'checked_in' && <button onClick={tryCheckout}>Check-out</button>}
         {st === 'checked_out' && <button onClick={() => act(() => bookingService.complete(id), 'Đã hoàn tất')}>Complete</button>}
@@ -115,6 +115,7 @@ export default function BookingDetailPage() {
           <p>Nhận {fmtDateTime(b.checkIn)} → Trả {fmtDateTime(b.checkOut)}</p>
           <p>Số khách: {b.adults} người lớn + {b.children} trẻ em</p>
           <p>Thanh toán: <b>{b.paymentStatus}</b></p>
+          {b.depositAmount > 0 && <p>Tiền cọc cần thu: <b style={{ color: 'var(--rc-gold)' }}>{vnd(b.depositAmount)}</b></p>}
 
           <h3>Lịch sử</h3>
           <ul className="rc-hist">

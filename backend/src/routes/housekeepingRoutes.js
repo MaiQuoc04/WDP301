@@ -6,6 +6,7 @@ const c = require('../controllers/housekeepingController')
 
 router.use(protect, authorize('housekeeper'))
 
+router.get('/dashboard', c.getDashboard)
 router.get('/tasks', c.listTasks)
 router.get('/history', c.getHistory)
 router.get('/tasks/:id', validateObjectId('id'), c.getTaskDetail)

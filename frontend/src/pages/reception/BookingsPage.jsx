@@ -33,13 +33,14 @@ export default function BookingsPage() {
       </div>
       {err && <p className="rc-err">{err}</p>}
       <table className="rc-table">
-        <thead><tr><th>Mã</th><th>Khách</th><th>Loại phòng</th><th>Nhận</th><th>Trả</th><th>Trạng thái</th><th>Tổng</th><th></th></tr></thead>
+        <thead><tr><th>Mã</th><th>Khách</th><th>Loại phòng</th><th>Phòng</th><th>Nhận</th><th>Trả</th><th>Trạng thái</th><th>Tổng</th><th></th></tr></thead>
         <tbody>
           {list.map((b) => (
             <tr key={b._id}>
               <td>{b.code}</td>
               <td>{b.customer?.fullName || b.guestName}</td>
               <td>{b.roomType?.name}</td>
+              <td>{b.room?.roomNumber ? <strong>{b.room.roomNumber}</strong> : <span style={{ color: '#aaa' }}>—</span>}</td>
               <td>{fmtDateTime(b.checkIn)}</td>
               <td>{fmtDateTime(b.checkOut)}</td>
               <td><span className={'rc-badge s-' + b.status}>{b.status}</span></td>
@@ -47,7 +48,7 @@ export default function BookingsPage() {
               <td><Link to={`/reception/bookings/${b._id}`}>Chi tiết</Link></td>
             </tr>
           ))}
-          {!list.length && <tr><td colSpan={8} style={{ textAlign: 'center', color: '#888' }}>Không có booking</td></tr>}
+          {!list.length && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#888' }}>Không có booking</td></tr>}
         </tbody>
       </table>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { bookingService, vnd } from '../../services'
+import { bookingService, vnd, fmtDateTime } from '../../services'
 
 const fitLabel = (r) => {
   if (r.fit === 'short') return { text: `Cần ${r.extraBeds} giường phụ (+${vnd(r.surcharge)})`, cls: 'fit-short' }
@@ -98,6 +98,11 @@ export default function WalkInPage() {
               <option value="">Tất cả loại phòng</option>
               {types.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
             </select>
+          </div>
+          <div className="rc-search-summary">
+            <span>👤 <b>{form.guestName || '(chưa nhập tên)'}</b>{form.guestPhone && ` · ${form.guestPhone}`}</span>
+            <span>📅 {fmtDateTime(form.checkIn)} → {fmtDateTime(form.checkOut)}</span>
+            <span>👥 {form.adults} người lớn + {form.children} trẻ em</span>
           </div>
           <table className="rc-table">
             <thead><tr><th>Phòng</th><th>Loại</th><th>Sức chứa</th><th>Giá ({rooms[0]?.nights || 0} đêm)</th><th></th></tr></thead>

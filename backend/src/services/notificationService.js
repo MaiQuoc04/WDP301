@@ -34,6 +34,17 @@ exports.notifyHousekeepers = async (branch, payload = {}) => {
   return exports.notifyUsers(ids, { ...payload, branch })
 }
 
+// Tất cả branch_manager đang active của 1 chi nhánh.
+exports.managerIds = async (branch) => {
+  const ras = await RoleAssignment.find({ branch, role: 'branch_manager', isActive: true }).select('account -_id').lean()
+  return ras.map((r) => r.account)
+}
+
+exports.notifyManagers = async (branch, payload = {}) => {
+  const ids = await exports.managerIds(branch)
+  return exports.notifyUsers(ids, { ...payload, branch })
+}
+
 // ----- đọc / đánh dấu -----
 exports.list = async (accountId, { unreadOnly, limit = 50 } = {}) => {
   const q = { recipient: accountId }

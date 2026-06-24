@@ -13,6 +13,8 @@ const roomSchema = new mongoose.Schema({
   isDeleted:  { type: Boolean, default: false, index: true },
   notes:      { type: String, trim: true },
   bookingSeq: { type: Number, default: 0 }, // Quốc — token serialize chống đặt trùng theo PHÒNG (nội bộ)
+  // Quốc — phòng đã dọn xong nhưng thiếu đồ, chờ manager bổ sung đủ chuẩn mới available (Đợt 4)
+  awaitingRestock: { type: Boolean, default: false },
 }, { timestamps: true })
 
 roomSchema.index(

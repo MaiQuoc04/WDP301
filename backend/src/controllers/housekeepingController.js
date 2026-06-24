@@ -17,3 +17,4 @@ exports.reportIssue = handle((req) => svc.reportIssue(req.user.id, req.params.id
 exports.markMaintenance = handle((req) => svc.markMaintenance(req.user.id, req.params.id, req.body))
 exports.completeTask = handle((req) => svc.completeTask(req.user.id, req.params.id))
 exports.getHistory = handle((req) => svc.getHistory(req.user.id, req.query))
+exports.getDashboard = handle((req) => svc.getDashboard(req.user.id))

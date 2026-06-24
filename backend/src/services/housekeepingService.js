@@ -13,6 +13,10 @@ const notificationService = require('./notificationService')
 
 const ACTIVE_TASK_STATUSES = ['pending', 'in_progress', 'urgent']
 const DONE_TASK_STATUSES = ['completed', 'missed']
+// Escalation tự nhận: 2p chưa ai nhận -> nhắc HK; 5p -> báo manager + khoá tự nhận
+const REMIND_AFTER_MS = 2 * 60 * 1000
+const ESCALATE_AFTER_MS = 5 * 60 * 1000
+exports.ESCALATE_AFTER_MS = ESCALATE_AFTER_MS
 
 function fail(message, status = 400) {
   const err = new Error(message)
@@ -67,35 +71,37 @@ async function loadVisibleTask(accountId, taskId) {
   return task
 }
 
+// "Cần có" (expected) = SỐ CHUẨN theo loại phòng (RoomType.amenityStandards) — không lấy từ RoomAmenity nữa.
+// "Thực tế" (actual) = số hiện có của phòng (RoomAmenity); chưa có bản ghi -> coi như đủ chuẩn.
 async function buildAmenityReport(roomId, roomTypeId) {
-  const roomAmenities = await RoomAmenity.find({ room: roomId })
-    .populate('amenity', 'name missingPrice status')
+  const roomType = await RoomType.findById(roomTypeId)
+    .populate('amenities', 'name missingPrice status')
     .lean()
 
-  if (roomAmenities.length) {
-    return roomAmenities
-      .filter((ra) => ra.amenity && ra.amenity.status !== 'inactive')
-      .map((ra) => ({
-        amenity: ra.amenity._id,
-        name: ra.amenity.name,
-        expected: ra.quantity || 1,
-        actual: ra.quantity || 1,
-        missing: 0,
-        condition: ra.condition || 'active',
-      }))
-  }
+  // Số chuẩn theo từng amenity (amenityStandards lưu amenity dạng ObjectId)
+  const stdQty = {}
+  ;(roomType?.amenityStandards || []).forEach((s) => { if (s.amenity) stdQty[String(s.amenity)] = s.quantity })
 
-  const roomType = await RoomType.findById(roomTypeId).populate('amenities', 'name status').lean()
+  // Danh sách kiểm kê = amenity (active) của loại phòng; "Cần có" = số chuẩn (mặc định 1 nếu chưa set)
+  const ras = await RoomAmenity.find({ room: roomId }).lean()
+  const current = {}
+  ras.forEach((ra) => { current[String(ra.amenity)] = ra })
+
   return (roomType?.amenities || [])
-    .filter((amenity) => amenity && amenity.status !== 'inactive')
-    .map((amenity) => ({
-      amenity: amenity._id,
-      name: amenity.name,
-      expected: 1,
-      actual: 1,
-      missing: 0,
-      condition: 'active',
-    }))
+    .filter((a) => a && a.status !== 'inactive')
+    .map((a) => {
+      const expected = stdQty[String(a._id)] ?? 1
+      const cur = current[String(a._id)]
+      const actual = cur ? cur.quantity : expected
+      return {
+        amenity: a._id,
+        name: a.name,
+        expected,
+        actual,
+        missing: Math.max(0, expected - actual),
+        condition: cur?.condition || 'active',
+      }
+    })
 }
 
 exports.listTasks = async (accountId, query = {}) => {
@@ -127,7 +133,8 @@ exports.getTaskDetail = async (accountId, taskId) => {
 exports.claimTask = async (accountId, taskId) => {
   const branches = await myBranchIds(accountId)
   const claimed = await HousekeepingTask.findOneAndUpdate(
-    { _id: taskId, branch: { $in: branches }, assignedTo: null, status: { $in: ACTIVE_TASK_STATUSES } },
+    // escalatedAt: null -> task đã chuyển quản lý (quá 5p) thì housekeeper KHÔNG tự nhận được nữa
+    { _id: taskId, branch: { $in: branches }, assignedTo: null, escalatedAt: null, status: { $in: ACTIVE_TASK_STATUSES } },
     { $set: { assignedTo: accountId, assignedAt: new Date() } },
     { new: true }
   )
@@ -143,12 +150,13 @@ exports.claimTask = async (accountId, taskId) => {
     return populateTask(HousekeepingTask.findById(claimed._id))
   }
   // Không claim được -> phân biệt lý do
-  const existing = await HousekeepingTask.findOne({ _id: taskId, branch: { $in: branches } }).select('assignedTo status')
+  const existing = await HousekeepingTask.findOne({ _id: taskId, branch: { $in: branches } }).select('assignedTo status escalatedAt')
   if (!existing) fail('Khong tim thay task trong pham vi cua ban', 404)
   if (existing.assignedTo && String(existing.assignedTo) === String(accountId)) {
     return populateTask(HousekeepingTask.findById(taskId)) // mình đã nhận trước đó -> idempotent
   }
   if (existing.assignedTo) fail('Task da duoc nhan boi nhan vien khac')
+  if (existing.escalatedAt) fail('Task đã quá hạn nhận, chỉ quản lý mới phân công được')
   fail('Khong the nhan task da ket thuc')
 }
 
@@ -289,23 +297,43 @@ exports.completeTask = async (accountId, taskId) => {
     fail('Ban khong phai nguoi duoc gan task nay', 403)
   }
   if (DONE_TASK_STATUSES.includes(task.status)) fail('Task da ket thuc')
-  // Chỉ task kiểm tra thiết bị mới bắt buộc đã kiểm kê; turnover/mid_stay hoàn thành thẳng.
-  if (!['turnover', 'mid_stay'].includes(task.type) && !task.amenityChecked) {
-    fail('Can luu bao cao kiem tra thiet bi truoc khi hoan thanh')
+  // mid_stay (dọn theo yêu cầu): hoàn tất thẳng. inspection & turnover: phải đã nhập kiểm kê/hiện có.
+  if (task.type !== 'mid_stay' && !task.amenityChecked) {
+    fail('Can luu kiem ke / so hien co truoc khi hoan thanh')
   }
 
   task.status = 'completed'
   task.completedAt = new Date()
   await task.save()
 
-  // Chỉ turnover (phòng đang 'cleaning' sau check-out) mới đưa phòng về sẵn sàng.
-  // inspection/mid_stay diễn ra khi khách còn ở (phòng 'occupied') -> guard này tự bỏ qua.
   const room = await Room.findById(task.room._id || task.room)
+
+  // Turnover: dọn xong + đối chiếu hiện có với chuẩn. Đủ -> available; thiếu -> chờ manager bổ sung.
+  if (task.type === 'turnover') {
+    const short = (task.amenityReport || []).some((r) => (r.missing || 0) > 0)
+    if (room && room.status === 'cleaning') {
+      if (short) {
+        room.awaitingRestock = true
+        await room.save()
+        await safeNotify(() => notificationService.notifyManagers(task.branch, {
+          type: 'general', title: `Phòng ${room.roomNumber} thiếu thiết bị, cần bổ sung`,
+          body: 'Đã dọn xong nhưng chưa đủ đồ theo chuẩn — vui lòng restock để mở bán phòng',
+          refType: 'room', refId: room._id,
+        }))
+      } else {
+        room.status = 'available'
+        room.awaitingRestock = false
+        await room.save()
+      }
+    }
+    return task
+  }
+
+  // inspection / mid_stay: khách còn ở (phòng 'occupied') -> guard cleaning tự bỏ qua.
   if (room && room.status === 'cleaning') {
     room.status = 'available'
     await room.save()
   }
-
   // Inspection xong -> báo lễ tân đã yêu cầu (bill đã cập nhật, có thể check-out)
   if (task.type === 'inspection' && task.requestedBy) {
     await safeNotify(() => notificationService.notifyUser(task.requestedBy, {
@@ -330,6 +358,76 @@ exports.getHistory = async (accountId, query = {}) => {
   return populateTask(HousekeepingTask.find(filter))
     .sort({ completedAt: -1, updatedAt: -1 })
     .lean()
+}
+
+// Job gọi định kỳ: task chưa ai nhận -> 2p nhắc lại housekeeper; 5p báo manager + khoá tự nhận.
+exports.runEscalation = async () => {
+  const now = Date.now()
+  let reminded = 0, escalated = 0
+
+  // Tầng 2 (>5p): báo manager + set escalatedAt (chặn tự nhận)
+  const toEscalate = await HousekeepingTask.find({
+    assignedTo: null, status: { $in: ACTIVE_TASK_STATUSES }, escalatedAt: null,
+    createdAt: { $lte: new Date(now - ESCALATE_AFTER_MS) },
+  }).populate('room', 'roomNumber')
+  for (const t of toEscalate) {
+    t.escalatedAt = new Date()
+    await t.save()
+    await safeNotify(() => notificationService.notifyManagers(t.branch, {
+      type: 'general', title: `Task phòng ${t.room?.roomNumber || ''} chưa ai nhận`,
+      body: 'Quá 5 phút không housekeeper nào nhận — vui lòng phân công.',
+      refType: 'task', refId: t._id,
+    }))
+    escalated++
+  }
+
+  // Tầng 1 (>2p, chưa escalate, chưa nhắc): nhắc lại tất cả housekeeper
+  const toRemind = await HousekeepingTask.find({
+    assignedTo: null, status: { $in: ACTIVE_TASK_STATUSES }, remindedAt: null, escalatedAt: null,
+    createdAt: { $lte: new Date(now - REMIND_AFTER_MS) },
+  }).populate('room', 'roomNumber')
+  for (const t of toRemind) {
+    t.remindedAt = new Date()
+    await t.save()
+    await safeNotify(() => notificationService.notifyHousekeepers(t.branch, {
+      type: 'task_new', title: `Nhắc: phòng ${t.room?.roomNumber || ''} chưa ai nhận`,
+      body: 'Việc vẫn đang chờ — nhận ngay trước khi chuyển quản lý.',
+      refType: 'task', refId: t._id,
+    }))
+    reminded++
+  }
+  return { reminded, escalated }
+}
+
+// Dashboard đầu ca cho housekeeper: phòng trả hôm nay + việc chờ nhận + số liệu nhanh.
+exports.getDashboard = async (accountId) => {
+  const branches = await myBranchIds(accountId)
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart.getTime() + 86400000)
+
+  const checkouts = await Booking.find({
+    branch: { $in: branches }, room: { $ne: null },
+    status: { $in: ['checked_in', 'checked_out'] },
+    checkOut: { $gte: dayStart, $lt: dayEnd },
+  }).populate('room', 'roomNumber floor').populate('roomType', 'name')
+    .sort('checkOut').select('code guestName checkIn checkOut status room roomType').lean()
+
+  const unclaimed = await populateTask(HousekeepingTask.find({
+    branch: { $in: branches }, assignedTo: null, escalatedAt: null,
+    status: { $in: ACTIVE_TASK_STATUSES },
+  })).sort({ isUrgent: -1, createdAt: 1 }).lean()
+
+  const [myActive, doneToday] = await Promise.all([
+    HousekeepingTask.countDocuments({ branch: { $in: branches }, assignedTo: accountId, status: { $in: ['pending', 'in_progress', 'urgent'] } }),
+    HousekeepingTask.countDocuments({ branch: { $in: branches }, assignedTo: accountId, status: 'completed', completedAt: { $gte: dayStart, $lt: dayEnd } }),
+  ])
+
+  return {
+    counts: { checkoutsToday: checkouts.length, unclaimed: unclaimed.length, myActive, doneToday },
+    checkouts,
+    unclaimed,
+    escalateAfterMs: ESCALATE_AFTER_MS, // FE tính cooldown
+  }
 }
 
 /**
@@ -392,9 +490,10 @@ exports.createTurnover = async (bookingId, roomId) => {
     booking: bookingId, room: roomId, type: 'turnover', status: { $in: ACTIVE_TASK_STATUSES },
   })
   if (open) return open
+  const amenityReport = await buildAmenityReport(roomId, booking.roomType)
   const task = await HousekeepingTask.create({
     branch: booking.branch, room: roomId, booking: bookingId,
-    type: 'turnover', status: 'urgent', isUrgent: true,
+    type: 'turnover', status: 'urgent', isUrgent: true, amenityReport,
   })
   const rn = await roomLabel(roomId)
   await safeNotify(() => notificationService.notifyHousekeepers(booking.branch, {

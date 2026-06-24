@@ -20,6 +20,9 @@ const housekeepingTaskSchema = new mongoose.Schema({
   requestedAt: { type: Date },
   status:     { type: String, enum: TASK_STATUS, default: 'pending' },
   isUrgent:   { type: Boolean, default: false },
+  // Escalation tự nhận (Quốc): 2p chưa ai nhận -> nhắc HK (remindedAt); 5p -> báo manager + khoá tự nhận (escalatedAt)
+  remindedAt:   { type: Date },
+  escalatedAt:  { type: Date },
 
 
   // Báo cáo kiểm kê amenity (UC-49→51, BR-41/42)

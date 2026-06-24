@@ -108,21 +108,21 @@ export default function TaskDetailPage() {
   const assigned = !!task.assignedTo
   const canStart = assigned && ['pending', 'urgent'].includes(task.status)
   const canEdit = assigned && !done
-  // Chỉ task kiểm tra thiết bị mới cần kiểm kê; dọn (turnover/mid_stay) hoàn tất thẳng.
-  const needsInventory = !['turnover', 'mid_stay'].includes(task.type)
+  // mid_stay (dọn theo yêu cầu) không kiểm kê; inspection + turnover đều có bảng số lượng.
+  const needsInventory = task.type !== 'mid_stay'
+  const isTurnover = task.type === 'turnover'
 
   const columns = [
     { title: 'Thiết bị', dataIndex: 'name' },
     {
-      title: 'Cần có',
+      // "Cần có" = SỐ CHUẨN do manager đặt — housekeeper KHÔNG sửa được
+      title: 'Cần có (chuẩn)',
       width: 110,
-      render: (_, row, index) => (
-        <InputNumber min={0} value={row.expected} disabled={done} onChange={(value) => updateReport(index, { expected: value || 0 })} />
-      ),
+      render: (_, row) => <strong>{row.expected ?? 0}</strong>,
     },
     {
-      title: 'Thực tế',
-      width: 110,
+      title: isTurnover ? 'Hiện có (sau bổ sung)' : 'Thực tế',
+      width: 150,
       render: (_, row, index) => (
         <InputNumber min={0} value={row.actual} disabled={done} onChange={(value) => updateReport(index, { actual: value || 0 })} />
       ),
@@ -155,11 +155,12 @@ export default function TaskDetailPage() {
         <Input value={row.note} disabled={done} onChange={(e) => updateReport(index, { note: e.target.value })} />
       ),
     },
-    {
+    // Cột Bill chỉ có nghĩa với inspection (cộng phụ phí cho khách); turnover không cộng bill
+    ...(isTurnover ? [] : [{
       title: 'Bill',
       width: 110,
       render: (_, row) => row.chargedAt ? <Tag color="gold">Đã cộng</Tag> : <span className="hk-muted">Chưa cộng</span>,
-    },
+    }]),
   ]
 
   return (
@@ -209,17 +210,20 @@ export default function TaskDetailPage() {
 
         <section className="hk-panel">
           <h3>Hướng dẫn thao tác</h3>
-          {needsInventory ? (
+          {task.type === 'inspection' && (
             <>
-              <p className="hk-muted">Nhập số lượng thực tế sau khi kiểm tra phòng. Nếu thiếu, hệ thống sẽ cộng phí vào bill khi booking còn ở trạng thái có thể chỉnh bill.</p>
-              <p className="hk-muted">Sau khi lưu báo cáo kiểm kê, bạn có thể hoàn tất task. Nếu có hỏng hóc cần quản lý xử lý, dùng “Báo sự cố”.</p>
+              <p className="hk-muted">Nhập số <strong>Thực tế</strong> sau khi kiểm tra phòng (“Cần có” là số chuẩn, không sửa được). Nếu thiếu, hệ thống cộng phí vào bill khi booking còn có thể chỉnh.</p>
+              <p className="hk-muted">Lưu báo cáo kiểm kê rồi mới hoàn tất được. Có hỏng hóc cần quản lý xử lý thì dùng “Báo sự cố”.</p>
             </>
-          ) : (
+          )}
+          {task.type === 'turnover' && (
             <p className="hk-muted">
-              {task.type === 'mid_stay'
-                ? 'Dọn phòng theo yêu cầu của khách (miễn phí). Dọn xong bấm “Hoàn tất” — không cần kiểm kê thiết bị, phòng giữ nguyên trạng thái đang ở.'
-                : 'Dọn phòng sau khi khách trả. Dọn xong bấm “Hoàn tất” để đưa phòng về trạng thái sẵn sàng.'}
+              Dọn phòng sau khi khách trả, bổ sung đồ rồi nhập số <strong>Hiện có</strong>. Lưu rồi bấm “Hoàn tất”:
+              đủ chuẩn → phòng mở bán; còn thiếu → tự động báo quản lý bổ sung (phòng tạm chưa mở bán).
             </p>
+          )}
+          {task.type === 'mid_stay' && (
+            <p className="hk-muted">Dọn theo yêu cầu của khách (miễn phí). Dọn xong bấm “Hoàn tất” — không cần kiểm kê, phòng giữ nguyên trạng thái đang ở.</p>
           )}
         </section>
       </div>
@@ -227,15 +231,15 @@ export default function TaskDetailPage() {
       {needsInventory && (
         <section className="hk-panel">
           <div className="hk-panel-head">
-            <h3>Kiểm kê thiết bị</h3>
-            <Button type="primary" disabled={done} loading={saving} onClick={saveReport}>Lưu báo cáo</Button>
+            <h3>{isTurnover ? 'Bổ sung & số lượng hiện có' : 'Kiểm kê thiết bị'}</h3>
+            <Button type="primary" disabled={done} loading={saving} onClick={saveReport}>{isTurnover ? 'Lưu số hiện có' : 'Lưu báo cáo'}</Button>
           </div>
           <Table
             rowKey={(row) => row._id || row.amenity}
             dataSource={report}
             columns={columns}
             pagination={false}
-            locale={{ emptyText: 'Phòng này chưa có template thiết bị. Bạn vẫn có thể lưu báo cáo rỗng để hoàn tất task.' }}
+            locale={{ emptyText: 'Loại phòng chưa cấu hình thiết bị chuẩn. Bạn vẫn có thể lưu rỗng để hoàn tất task.' }}
           />
         </section>
       )}
