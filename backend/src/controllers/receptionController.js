@@ -26,6 +26,11 @@ exports.addService = handle((req) => svc.addService(req.user.id, req.params.id, 
 exports.removeService = handle((req) => svc.removeService(req.user.id, req.params.id, req.params.lineId))
 exports.serviceBoard = handle((req) => svc.getServiceBoard(req.user.id))  // bảng triển khai dịch vụ theo phòng
 exports.setServiceDelivered = handle((req) => svc.setServiceDelivered(req.user.id, req.params.id, req.params.lineId, req.body.delivered))
+
+// Housekeeping — yêu cầu kiểm tra / dọn phòng + trạng thái
+exports.requestInspection = handle((req) => svc.requestInspection(req.user.id, req.params.id), 201)
+exports.requestCleaning = handle((req) => svc.requestCleaning(req.user.id, req.params.id), 201)
+exports.getBookingHousekeeping = handle((req) => svc.getBookingHousekeeping(req.user.id, req.params.id))
 exports.addMissingAmenity = handle((req) => svc.addMissingAmenity(req.user.id, req.params.id, req.body), 201) // UC-33
 exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user.id, req.params.id, req.params.lineId))
 

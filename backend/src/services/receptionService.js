@@ -7,6 +7,7 @@ const RoleAssignment = require('../models/roleAssignmentModel')
 const Service = require('../models/serviceModel')
 const Amenity = require('../models/amenityModel')
 const bookingService = require('./bookingService')
+const housekeepingService = require('./housekeepingService')
 
 // Các branchId mà lễ tân được gán (BR-30: chỉ quản lý chi nhánh của mình)
 async function myBranchIds(accountId) {
@@ -176,6 +177,29 @@ exports.getServiceBoard = async (accountId) => {
 exports.setServiceDelivered = async (accountId, bookingId, lineId, delivered) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.setServiceDelivered(bookingId, lineId, !!delivered, accountId)
+}
+
+// ---------- Housekeeping: yêu cầu kiểm tra / dọn phòng (giao task cho housekeeper) ----------
+// UC: lễ tân "Yêu cầu kiểm tra phòng" trước khi khách trả -> task inspection (claimable + thông báo).
+exports.requestInspection = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId).select('status room')
+  if (!booking.room) throw new Error('Booking chưa được gán phòng')
+  if (booking.status !== 'checked_in') throw new Error('Chỉ yêu cầu kiểm tra khi khách đang ở (checked_in)')
+  return housekeepingService.createInspection(bookingId, booking.room, accountId)
+}
+// UC: lễ tân "Dọn phòng" theo yêu cầu khách (giữa kỳ) -> task mid_stay (miễn phí).
+exports.requestCleaning = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId).select('status room')
+  if (!booking.room) throw new Error('Booking chưa được gán phòng')
+  if (booking.status !== 'checked_in') throw new Error('Chỉ dọn phòng khi khách đang ở (checked_in)')
+  return housekeepingService.createMidStay(bookingId, booking.room, accountId)
+}
+// Trạng thái + lịch sử housekeeping của booking (cho nút + lịch sử ở màn chi tiết lễ tân).
+exports.getBookingHousekeeping = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  return housekeepingService.bookingView(bookingId)
 }
 
 // ---------- GĐ4: huỷ / no-show ----------

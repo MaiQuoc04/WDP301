@@ -129,7 +129,7 @@ Theo BR-16: `active` (tốt) | `broken` (hỏng) | `missing` (thiếu). Nếu `b
 4. **Credit balance (BR-34)** — Branch Manager áp credit từ booking trước vào `remaining` lúc check-out.
 5. **Log status (BR-29)** — thêm `BookingStatusHistory` { booking, from, to, by, at, note }.
 6. **Timestamps (BR-49)** — mọi bảng có `createdAt`/`updatedAt` (Mongoose `timestamps: true`).
-7. **Sức chứa & giường phụ** — mô hình "đơn vị": người lớn=1, trẻ em=0.5, mỗi giường=2 đơn vị (`RoomType.totalBeds`). Người lớn phải vừa giường (vượt → từ chối, chọn phòng lớn hơn); trẻ vượt sức chứa → **phụ phí giường phụ** = số trẻ vượt × `RoomType.extraChildFee` × số đêm. Phụ phí **chỉ hiện ước tính** khi tìm phòng/booking (`bookingService.quote()`); **lễ tân tick vào bill** thật ở GĐ3. `Booking` lưu `adults` + `children`.
+7. **Sức chứa & giường phụ** — mô hình "đơn vị": người lớn=1, trẻ em=0.5 (2 trẻ = 1 suất). Sức chứa chuẩn = **`RoomType.capacity`** (không suy từ số giường). `partyUnits = adults + 0.5×children`; **giường phụ tính phí = `floor(max(0, partyUnits − capacity))`** → ghép cặp trẻ, **trẻ lẻ (0.5) miễn**, người lớn thừa luôn tính nguyên giường. **Phương án B**: luôn đặt được, vượt sức chứa → **phụ phí giường phụ** = số giường phụ × `RoomType.extraBedFee` × số đêm (áp cho cả lớn lẫn nhỏ, không phân biệt). `RoomType.totalBeds` **không dùng** trong công thức tính tiền (chỉ hiển thị). Phụ phí **chỉ hiện ước tính** khi tìm phòng/booking (`bookingService.quote()` / `searchAvailableRooms()`); **lễ tân tick/áp vào bill** thật ở GĐ3. `Booking` lưu `adults` + `children`.
 
 ---
 

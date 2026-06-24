@@ -88,14 +88,14 @@ exports.searchAvailableRooms = async (branchId, checkIn, checkOut, adults = 1, c
     const surcharge = occ.extraBeds * (room.roomType.extraBedFee || 0) * nights
     out.push({
       roomId: room._id, roomNumber: room.roomNumber, floor: room.floor,
-      roomType: { _id: room.roomType._id, name: room.roomType.name, totalBeds: room.roomType.totalBeds },
-      bedsNeeded: occ.bedsNeeded, extraBeds: occ.extraBeds, surplusBeds: occ.surplusBeds,
-      fit: occ.extraBeds > 0 ? 'short' : (occ.surplusBeds > 0 ? 'surplus' : 'exact'),
+      roomType: { _id: room.roomType._id, name: room.roomType.name, capacity: room.roomType.capacity, totalBeds: room.roomType.totalBeds },
+      capacity: occ.capacity, partyUnits: occ.partyUnits, extraBeds: occ.extraBeds, surplusUnits: occ.surplusUnits,
+      fit: occ.extraBeds > 0 ? 'short' : (occ.surplusUnits > 0 ? 'surplus' : 'exact'),
       nights, roomCharge, surcharge, total: roomCharge + surcharge,
     })
   }
   // Ưu tiên: vừa khít -> dư (ít->nhiều) -> thiếu (cuối); trong nhóm theo giá tăng dần
-  const rank = (r) => (r.fit === 'exact' ? 0 : r.fit === 'surplus' ? 10 + r.surplusBeds : 1000 + r.extraBeds)
+  const rank = (r) => (r.fit === 'exact' ? 0 : r.fit === 'surplus' ? 10 + r.surplusUnits : 1000 + r.extraBeds)
   out.sort((a, b) => rank(a) - rank(b) || a.total - b.total)
   return out
 }
@@ -120,16 +120,17 @@ async function computeRoomCharge(roomType, checkIn, checkOut) {
 }
 exports.computeRoomCharge = computeRoomCharge
 
-// Mô hình sức chứa theo "đơn vị": người lớn=1, trẻ em=0.5, mỗi giường=2 đơn vị.
-// Phương án B: luôn đặt được; thiếu giường -> phụ phí GIƯỜNG PHỤ (áp cho cả lớn lẫn nhỏ).
-const ADULT_UNIT = 1, CHILD_UNIT = 0.5, BED_UNIT = 2
+// Mô hình sức chứa theo "đơn vị": người lớn=1, trẻ em=0.5 (2 trẻ = 1 suất).
+// Sức chứa chuẩn = roomType.capacity (KHÔNG suy từ số giường). docs §9.7
+// Vượt sức chứa -> giường phụ: ghép cặp trẻ, TRẺ LẺ (0.5) MIỄN (floor). Người lớn thừa luôn tính nguyên giường.
+// Phương án B: luôn đặt được; vượt -> phụ phí GIƯỜNG PHỤ (áp cho cả lớn lẫn nhỏ).
+const ADULT_UNIT = 1, CHILD_UNIT = 0.5
 function computeOccupancy(roomType, adults = 1, children = 0) {
-  const totalBeds = roomType.totalBeds || 1
+  const capacity = roomType.capacity || 2
   const partyUnits = adults * ADULT_UNIT + children * CHILD_UNIT
-  const bedsNeeded = Math.max(1, Math.ceil(partyUnits / BED_UNIT))
-  const extraBeds = Math.max(0, bedsNeeded - totalBeds)    // thiếu giường -> phụ phí
-  const surplusBeds = Math.max(0, totalBeds - bedsNeeded)  // dư giường
-  return { totalBeds, bedsNeeded, extraBeds, surplusBeds }
+  const extraBeds = Math.floor(Math.max(0, partyUnits - capacity))   // giường phụ tính phí (trẻ lẻ -> miễn)
+  const surplusUnits = Math.max(0, capacity - partyUnits)            // còn dư chỗ trong sức chứa
+  return { capacity, partyUnits, extraBeds, surplusUnits }
 }
 exports.computeOccupancy = computeOccupancy
 
@@ -139,7 +140,7 @@ exports.quote = async (roomType, checkIn, checkOut, adults = 1, children = 0) =>
   const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
   const occ = computeOccupancy(roomType, adults, children)
   const surcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nights
-  return { nights, roomCharge, extraBeds: occ.extraBeds, surplusBeds: occ.surplusBeds, surcharge, total: roomCharge + surcharge }
+  return { nights, roomCharge, extraBeds: occ.extraBeds, surplusUnits: occ.surplusUnits, surcharge, total: roomCharge + surcharge }
 }
 
 // Tính lại bill: total = phòng + dịch vụ + amenity thiếu + (phụ phí giường phụ nếu đã áp); remaining = total - đã trả - credit
@@ -368,9 +369,10 @@ exports.checkIn = async (bookingId, { by } = {}) => {
     recalcBill(booking)
     await booking.save()
   }
-  // 🔗 Hợp đồng Tú: sinh HousekeepingTask. Gọi defensive — không chặn check-in nếu Tú chưa cài.
-  try { await require('./housekeepingService').createOnCheckIn(booking._id, room._id) }
-  catch (e) { console.warn('[checkIn] createOnCheckIn chưa sẵn sàng:', e.message) }
+  // 🔗 Housekeeping: check-in KHÔNG tạo task (housekeeper biết qua room='occupied').
+  // Chỉ dọn task active còn sót của phòng từ booking khác. Defensive — không chặn check-in.
+  try { await require('./housekeepingService').cleanupOnCheckIn(booking._id, room._id) }
+  catch (e) { console.warn('[checkIn] cleanupOnCheckIn lỗi:', e.message) }
   return booking
 }
 
@@ -389,8 +391,9 @@ exports.checkOut = async (bookingId, { method = 'cash', by } = {}) => {
   booking.paymentStatus = 'paid'
   await exports.transition(booking, 'checked_out', by, 'Khách trả phòng')
   if (booking.room) await Room.findByIdAndUpdate(booking.room, { status: 'cleaning' })
-  try { await require('./housekeepingService').markUrgentOnCheckOut(booking._id, booking.room) }
-  catch (e) { console.warn('[checkOut] markUrgentOnCheckOut chưa sẵn sàng:', e.message) }
+  // 🔗 Housekeeping: tự sinh task dọn turnover (urgent) cho phòng vừa trả. Defensive.
+  try { await require('./housekeepingService').createTurnover(booking._id, booking.room) }
+  catch (e) { console.warn('[checkOut] createTurnover lỗi:', e.message) }
   return booking
 }
 
