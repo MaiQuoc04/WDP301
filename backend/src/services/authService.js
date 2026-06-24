@@ -147,7 +147,52 @@ exports.getMe = async (accountId) => {
   return buildUser(account)
 }
 
-// UC-04: stub — Khánh hoàn thiện khi có GOOGLE_CLIENT_ID (google-auth-library)
-exports.googleLogin = async () => {
-  throw new Error('Google OAuth chưa được cài đặt (stub - UC-04)')
+// UC-04: Google Login
+const { OAuth2Client } = require('google-auth-library')
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
+exports.googleLogin = async ({ credential }) => {
+  if (!credential) throw new Error('Thiếu Google credential token')
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const payload = ticket.getPayload()
+    const { email, name, picture } = payload
+
+    // 1. Kiểm tra tài khoản đã tồn tại chưa
+    let account = await Account.findOne({ email })
+
+    if (!account) {
+      // 2. Nếu chưa, tạo tài khoản mới tự động
+      const randomPassword = Math.random().toString(36).slice(-8) // Mật khẩu ngẫu nhiên để pass validation
+      account = await Account.create({
+        email,
+        password: await bcrypt.hash(randomPassword, 10),
+        role: 'customer',
+        isVerified: true, // Đã xác thực qua Google
+        isActive: true
+      })
+      await Customer.create({ 
+        account: account._id, 
+        fullName: name, 
+        phone: '' // Cho phép cập nhật sau
+      })
+    } else {
+      // Nếu đã có tài khoản nhưng chưa verify (đăng ký bằng email nhưng chưa nhập OTP)
+      if (!account.isVerified) {
+        account.isVerified = true;
+        await account.save();
+      }
+      if (!account.isActive) throw new Error('Tài khoản đã bị khoá')
+    }
+
+    // 3. Cấp token
+    return { token: signAccessToken(account), user: await buildUser(account) }
+  } catch (err) {
+    console.error('Google Auth Error:', err)
+    throw new Error('Đăng nhập Google thất bại: ' + err.message)
+  }
 }

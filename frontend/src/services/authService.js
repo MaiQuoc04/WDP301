@@ -8,4 +8,5 @@ export const authService = {
   verifyOtp: (data) => axiosInstance.post(ENDPOINTS.AUTH.VERIFY_OTP, data),
   forgotPassword: (data) => axiosInstance.post(ENDPOINTS.AUTH.FORGOT_PASSWORD, data),
   resetPassword: (data) => axiosInstance.post(ENDPOINTS.AUTH.RESET_PASSWORD, data),
+  googleLogin: (data) => axiosInstance.post('/auth/google', data),
 }

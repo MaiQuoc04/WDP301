@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { setCredentials } from '../../redux/slices/authSlice'
 import { authService } from '../../services/authService'
+import { GoogleLogin } from '@react-oauth/google'
 import './LoginPage.css'
 
 const LotusLogo = () => (
@@ -61,6 +62,37 @@ const LoginPage = () => {
     setPassword('')
     setConfirmPassword('')
     setOtp('')
+  }
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true)
+    clearMessages()
+    try {
+      const response = await authService.googleLogin({ credential: credentialResponse.credential })
+      const { token, user } = response.data.data
+      
+      localStorage.setItem('token', token)
+      dispatch(setCredentials({ token, user }))
+      
+      setSuccess('Đăng nhập bằng Google thành công!')
+      setTimeout(() => {
+        if (from) navigate(from)
+        else if (user.role === 'customer') navigate('/customer')
+        else if (user.role === 'receptionist') navigate('/reception')
+        else if (user.role === 'housekeeper') navigate('/housekeeping')
+        else if (user.role === 'branch_manager') navigate('/manager')
+        else if (user.role === 'super_admin') navigate('/admin')
+        else navigate('/')
+      }, 1000)
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Đăng nhập Google thất bại')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleError = () => {
+    setError('Đăng nhập Google thất bại.')
   }
 
   const handleLogin = async (e) => {
@@ -286,6 +318,23 @@ const LoginPage = () => {
                 <button type="submit" className="btn btn--primary auth-submit-btn" disabled={loading}>
                   {loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
                 </button>
+                
+                <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', textAlign: 'center', color: '#888' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+                  <span style={{ padding: '0 10px', fontSize: '14px' }}>HOẶC</span>
+                  <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_black"
+                    text="signin_with"
+                    shape="rectangular"
+                  />
+                </div>
+
                 <div className="auth-switch">
                   Chưa có tài khoản?{' '}
                   <button type="button" className="auth-btn-link-highlight" onClick={() => switchMode('register')}>
@@ -352,6 +401,23 @@ const LoginPage = () => {
                 <button type="submit" className="btn btn--primary auth-submit-btn" disabled={loading}>
                   {loading ? 'ĐANG ĐĂNG KÝ...' : 'ĐĂNG KÝ'}
                 </button>
+
+                <div style={{ margin: '20px 0', display: 'flex', alignItems: 'center', textAlign: 'center', color: '#888' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+                  <span style={{ padding: '0 10px', fontSize: '14px' }}>HOẶC</span>
+                  <div style={{ flex: 1, height: '1px', background: '#eee' }}></div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="filled_black"
+                    text="signup_with"
+                    shape="rectangular"
+                  />
+                </div>
+
                 <div className="auth-switch">
                   Đã có tài khoản?{' '}
                   <button type="button" className="auth-btn-link-highlight" onClick={() => switchMode('login')}>

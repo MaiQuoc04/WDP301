@@ -19,6 +19,7 @@ import Gallery from '../pages/Gallery'
 import Contact from '../pages/Contact'
 
 import CustomerHome from '../pages/customer/CustomerHome'
+import BookingHistoryPage from '../pages/customer/BookingHistoryPage'
 import ReceptionDashboard from '../pages/reception/ReceptionDashboard'
 import HousekeepingDashboard from '../pages/housekeeping/HousekeepingDashboard'
 import ManagerDashboard from '../pages/manager/ManagerDashboard'
@@ -49,7 +50,12 @@ const AppRoutes = () => (
 
       {/* Customer — Khánh */}
       <Route path="/customer/*" element={
-        <ProtectedRoute allow={['customer']}><CustomerHome /></ProtectedRoute>
+        <ProtectedRoute allow={['customer']}>
+          <Routes>
+            <Route path="" element={<CustomerHome />} />
+            <Route path="booking-history" element={<BookingHistoryPage />} />
+          </Routes>
+        </ProtectedRoute>
       } />
 
       {/* Reception — Quốc */}

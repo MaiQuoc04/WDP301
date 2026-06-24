@@ -22,5 +22,9 @@ export const customerService = {
     const response = await axiosInstance.post(`/customer/bookings/${id}/payos-link`, { type })
     return response.data
   },
-  // TODO(Khánh): searchRooms, getRoomDetail, getBookingHistory, getBill, review ...
+  getBookingHistory: async () => {
+    const response = await axiosInstance.get('/customer/bookings')
+    return response.data
+  },
+  // TODO(Khánh): searchRooms, getRoomDetail, getBill, review ...
 }
