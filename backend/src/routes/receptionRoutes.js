@@ -12,6 +12,7 @@ router.get('/amenities', c.listAmenities)
 
 // Giai đoạn 1 — đọc dữ liệu
 router.get('/rooms', c.listRooms)                 // UC-26 danh sách phòng + trạng thái
+router.get('/rooms/available', c.searchRooms)     // tìm phòng trống + hợp party (walk-in bước 2)
 router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
 router.get('/bookings/:id', validateObjectId('id'), c.getBookingDetail) // UC-28 chi tiết booking
 
@@ -27,6 +28,13 @@ router.post('/bookings/:id/bed-surcharge', validateObjectId('id'), c.setBedSurch
 router.get('/bookings/:id/bill', validateObjectId('id'), c.getBill)                                          // UC-34
 router.post('/bookings/:id/services', validateObjectId('id'), c.addService)                                  // UC-32
 router.delete('/bookings/:id/services/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeService)
+router.patch('/bookings/:id/services/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.setServiceDelivered) // toggle đã giao
+router.get('/service-board', c.serviceBoard)                                                                 // bảng triển khai dịch vụ theo phòng
+
+// Housekeeping — lễ tân yêu cầu kiểm tra / dọn phòng + xem trạng thái
+router.post('/bookings/:id/request-inspection', validateObjectId('id'), c.requestInspection)   // tạo task kiểm tra thiết bị
+router.post('/bookings/:id/request-cleaning', validateObjectId('id'), c.requestCleaning)       // tạo task dọn phòng (giữa kỳ)
+router.get('/bookings/:id/housekeeping', validateObjectId('id'), c.getBookingHousekeeping)     // trạng thái + lịch sử
 router.post('/bookings/:id/missing-amenities', validateObjectId('id'), c.addMissingAmenity)                  // UC-33
 router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeMissingAmenity)
 

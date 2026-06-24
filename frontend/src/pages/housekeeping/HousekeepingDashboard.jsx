@@ -1,13 +1,17 @@
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
+import DashboardPage from './DashboardPage'
 import TasksPage from './TasksPage'
 import TaskDetailPage from './TaskDetailPage'
 import HistoryPage from './HistoryPage'
+import NotificationBell from '../../components/NotificationBell'
+import NotificationsPage from '../../components/NotificationsPage'
 import '../manager/manager.css'
 import './housekeeping.css'
 import {
   AuditOutlined,
+  ScheduleOutlined,
   CheckSquareOutlined,
   HistoryOutlined,
   LogoutOutlined,
@@ -44,6 +48,10 @@ export default function HousekeepingDashboard() {
 
         <nav className="manager-nav">
           <NavLink to="/housekeeping" end className="manager-nav-item">
+            <ScheduleOutlined />
+            <span>Hôm nay</span>
+          </NavLink>
+          <NavLink to="/housekeeping/tasks" className="manager-nav-item">
             <CheckSquareOutlined />
             <span>Task đang mở</span>
           </NavLink>
@@ -73,6 +81,7 @@ export default function HousekeepingDashboard() {
             <span className="manager-branch-badge">HOUSEKEEPING</span>
           </div>
           <div className="hk-header-user">
+            <NotificationBell basePath="/housekeeping" />
             <AuditOutlined />
             <span>
               Xin chào, <strong>{user?.fullName || user?.email}</strong>
@@ -82,9 +91,11 @@ export default function HousekeepingDashboard() {
 
         <main className="manager-content hk-main">
           <Routes>
-            <Route index element={<TasksPage />} />
+            <Route index element={<DashboardPage />} />
+            <Route path="tasks" element={<TasksPage />} />
             <Route path="tasks/:id" element={<TaskDetailPage />} />
             <Route path="history" element={<HistoryPage />} />
+            <Route path="notifications" element={<NotificationsPage basePath="/housekeeping" />} />
           </Routes>
         </main>
       </div>

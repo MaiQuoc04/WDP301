@@ -42,6 +42,15 @@ exports.deactivateAmenity = handle((req) => svc.deactivateAmenity(req.params.id,
 exports.getRoomTypeAmenities    = handle((req) => svc.getRoomTypeAmenities(req.params.id, req.branchId))
 exports.updateRoomTypeAmenities = handle((req) => svc.updateRoomTypeAmenities(req.params.id, req.body.amenityIds, req.branchId))
 
+// ─── RoomType Amenity Standards (số lượng chuẩn kiểm kê) ────────────────────────
+exports.getRoomTypeStandards    = handle((req) => svc.getRoomTypeStandards(req.params.id, req.branchId))
+exports.updateRoomTypeStandards = handle((req) => svc.updateRoomTypeStandards(req.params.id, req.body.standards, req.branchId))
+
+// ─── Restock (bổ sung thiết bị phòng) ───────────────────────────────────────────
+exports.getRestockRooms     = handle((req) => svc.getRestockRooms(req.branchId))
+exports.getRoomInventory    = handle((req) => svc.getRoomInventory(req.params.id, req.branchId))
+exports.updateRoomInventory = handle((req) => svc.updateRoomInventory(req.params.id, req.body.items, req.branchId))
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 exports.getServices      = handle((req) => svc.getServices(req.branchId))
 exports.getServiceById   = handle((req) => svc.getServiceById(req.params.id, req.branchId))

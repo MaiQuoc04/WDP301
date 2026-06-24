@@ -43,6 +43,15 @@ export const roomService = {
   getRoomTypeAmenities: (id) => get(`${base.ROOM_TYPES}/${id}/amenities`),
   updateRoomTypeAmenities: (id, amenityIds) => put(`${base.ROOM_TYPES}/${id}/amenities`, { amenityIds }),
 
+  // Số lượng CHUẨN thiết bị theo loại phòng (baseline kiểm kê)
+  getRoomTypeStandards: (id) => get(`${base.ROOM_TYPES}/${id}/standards`),
+  updateRoomTypeStandards: (id, standards) => put(`${base.ROOM_TYPES}/${id}/standards`, { standards }),
+
+  // Restock (bổ sung thiết bị phòng)
+  getRestockRooms: () => get(base.RESTOCK_ROOMS),
+  getRoomInventory: (id) => get(`${base.ROOMS}/${id}/inventory`),
+  updateRoomInventory: (id, items) => put(`${base.ROOMS}/${id}/inventory`, { items }),
+
   // Services
   getServices: () => get(base.SERVICES),
   getServiceOptions: () => get(base.SERVICE_OPTIONS),

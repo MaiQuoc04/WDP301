@@ -37,6 +37,15 @@ router.patch('/amenities/:id/deactivate', managerController.deactivateAmenity)
 router.get('/room-types/:id/amenities', managerController.getRoomTypeAmenities)
 router.put('/room-types/:id/amenities', managerController.updateRoomTypeAmenities)
 
+// ─── RoomType Amenity Standards (số lượng chuẩn kiểm kê) ────────────────────────
+router.get('/room-types/:id/standards', managerController.getRoomTypeStandards)
+router.put('/room-types/:id/standards', managerController.updateRoomTypeStandards)
+
+// ─── Restock (bổ sung thiết bị phòng) ───────────────────────────────────────────
+router.get('/restock/rooms', managerController.getRestockRooms)
+router.get('/rooms/:id/inventory', managerController.getRoomInventory)
+router.put('/rooms/:id/inventory', managerController.updateRoomInventory)
+
 // ─── Services ──────────────────────────────────────────────────────────────────
 router.get('/services', managerController.getServices)
 router.get('/services/options', managerController.getServiceOptions)

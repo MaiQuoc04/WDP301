@@ -26,6 +26,7 @@ export const ENDPOINTS = {
     ROOM_ISSUES: '/manager/room-issues',
     HOUSEKEEPING_TASKS: '/manager/housekeeping/tasks',
     HOUSEKEEPERS: '/manager/housekeepers',
+    RESTOCK_ROOMS: '/manager/restock/rooms',
   },
   ADMIN: {},         // Sáng  — Super Admin (UC-71→82)
 }
