@@ -9,17 +9,19 @@ import AmenitiesPage from './AmenitiesPage'
 import ServicesPage from './ServicesPage'
 import HousekeepingPage from './HousekeepingPage'
 import RoomIssuesPage from './RoomIssuesPage'
+import RestockPage from './RestockPage'
 import './manager.css'
 
-import { 
-  DashboardOutlined, 
-  AppstoreOutlined, 
-  DollarOutlined, 
-  HomeOutlined, 
+import {
+  DashboardOutlined,
+  AppstoreOutlined,
+  DollarOutlined,
+  HomeOutlined,
   CoffeeOutlined,
   CustomerServiceOutlined,
   AuditOutlined,
   WarningOutlined,
+  InboxOutlined,
   LogoutOutlined
 } from '@ant-design/icons'
 
@@ -82,6 +84,10 @@ export default function ManagerDashboard() {
             <AuditOutlined />
             <span>Dọn phòng</span>
           </NavLink>
+          <NavLink to="/manager/restock" className="manager-nav-item">
+            <InboxOutlined />
+            <span>Bổ sung thiết bị</span>
+          </NavLink>
           <NavLink to="/manager/issues" className="manager-nav-item">
             <WarningOutlined />
             <span>Báo cáo sự cố</span>
@@ -125,6 +131,7 @@ export default function ManagerDashboard() {
             <Route path="amenities" element={<AmenitiesPage />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="housekeeping" element={<HousekeepingPage />} />
+            <Route path="restock" element={<RestockPage />} />
             <Route path="issues" element={<RoomIssuesPage />} />
           </Routes>
         </main>

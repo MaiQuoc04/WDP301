@@ -24,6 +24,12 @@ import ReceptionDashboard from '../pages/reception/ReceptionDashboard'
 import HousekeepingDashboard from '../pages/housekeeping/HousekeepingDashboard'
 import ManagerDashboard from '../pages/manager/ManagerDashboard'
 import AdminDashboard from '../pages/admin/AdminDashboard'
+import BranchManagement from '../pages/admin/BranchManagement'
+import StaffManagement from '../pages/admin/StaffManagement'
+import DashboardIndex from '../pages/admin/DashboardIndex'
+import BranchDashboard from '../pages/admin/BranchDashboard'
+import BranchStaff from '../pages/admin/BranchStaff'
+
 
 const AppRoutes = () => (
   <BrowserRouter>
@@ -76,7 +82,14 @@ const AppRoutes = () => (
       {/* Admin — Sáng */}
       <Route path="/admin/*" element={
         <ProtectedRoute allow={['super_admin']}><AdminDashboard /></ProtectedRoute>
-      } />
+      }>
+        <Route path="branches" element={<BranchManagement />} />
+        <Route path="branches/:branchId/staff" element={<BranchStaff />} />
+        <Route path="reports" element={<BranchDashboard />} />
+        <Route path="reports/:branchId" element={<BranchDashboard />} />
+        <Route path="staff" element={<StaffManagement />} />
+        <Route index element={<DashboardIndex />} />
+      </Route>
     </Routes>
   </BrowserRouter>
 )

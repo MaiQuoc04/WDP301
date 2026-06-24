@@ -9,5 +9,6 @@ router.use('/reception',    require('./receptionRoutes'))    // Reception — Qu
 router.use('/housekeeping', require('./housekeepingRoutes')) // Housekeep — Tú    (UC-44→55)
 router.use('/manager',      require('./managerRoutes'))      // Manager   — Hoàng (UC-56→70)
 router.use('/admin',        require('./adminRoutes'))        // SuperAdmin— Sáng  (UC-71→82)
+router.use('/notifications', require('./notificationRoutes')) // Thông báo dùng chung — Quốc (Đợt 2)
 
 module.exports = router

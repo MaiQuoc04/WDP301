@@ -5,3 +5,4 @@ export * from './bookingService'   // Quốc
 export * from './taskService'      // Tú
 export * from './roomService'      // Hoàng
 export * from './adminService'     // Sáng
+export * from './notificationService' // Quốc (Đợt 2/3) — thông báo dùng chung

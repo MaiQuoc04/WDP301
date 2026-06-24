@@ -12,6 +12,7 @@ const Service   = require('../models/serviceModel')
 const RoomIssue = require('../models/roomIssueModel')
 const HousekeepingTask = require('../models/housekeepingTaskModel')
 const RoleAssignment = require('../models/roleAssignmentModel')
+const notificationService = require('./notificationService')
 const Account = require('../models/accountModel')
 
 const supportsTransactions = process.env.ENABLE_TRANSACTIONS === 'true'
@@ -386,6 +387,102 @@ exports.updateRoomTypeAmenities = async (roomTypeId, amenityIds, branchId) => {
   // Trả về danh sách đã được populate
   const updatedRt = await RoomType.findById(roomTypeId).populate('amenities', 'name missingPrice unit status')
   return updatedRt.amenities
+}
+
+// ─── Số lượng CHUẨN thiết bị theo loại phòng (baseline kiểm kê) ──────────────────
+// Liệt kê amenity của loại phòng kèm số chuẩn (mặc định 1 nếu chưa set).
+exports.getRoomTypeStandards = async (roomTypeId, branchId) => {
+  const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
+    .populate('amenities', 'name unit missingPrice status')
+    .populate('amenityStandards.amenity', 'name unit missingPrice status')
+  if (!rt) fail('Loại phòng không tồn tại', 404)
+  const qty = {}
+  ;(rt.amenityStandards || []).forEach((s) => { if (s.amenity) qty[String(s.amenity._id)] = s.quantity })
+  return (rt.amenities || [])
+    .filter((a) => a && a.status !== 'inactive')
+    .map((a) => ({ amenity: a, quantity: qty[String(a._id)] ?? 1 }))
+}
+
+// Set số chuẩn: items = [{ amenity, quantity }]
+exports.updateRoomTypeStandards = async (roomTypeId, items, branchId) => {
+  const rt = await findBranchEntity(RoomType, roomTypeId, branchId)
+  if (!rt) fail('Loại phòng không tồn tại', 404)
+  if (!Array.isArray(items)) fail('Danh sách số lượng chuẩn không hợp lệ')
+  const ids = items.map((i) => i.amenity).filter(Boolean)
+  const valid = await Amenity.find({ _id: { $in: ids }, branch: branchId }).select('_id').lean()
+  const ok = new Set(valid.map((a) => String(a._id)))
+  rt.amenityStandards = items
+    .filter((i) => i.amenity && ok.has(String(i.amenity)))
+    .map((i) => ({ amenity: i.amenity, quantity: Math.max(0, Number(i.quantity) || 0) }))
+  await rt.save()
+  return exports.getRoomTypeStandards(roomTypeId, branchId)
+}
+
+// ─── Restock: bổ sung thiết bị cho phòng (đối chiếu chuẩn vs hiện có) ────────────
+// Khớp logic buildAmenityReport: liệt kê tiện nghi (active) của loại phòng;
+// số chuẩn = amenityStandards (nếu đã set) hoặc mặc định 1 — tránh "No data" khi manager chưa set chuẩn.
+async function standardMap(roomTypeId) {
+  const rt = await RoomType.findById(roomTypeId)
+    .populate('amenities', 'name unit status')
+    .lean()
+  const qty = {}
+  ;(rt?.amenityStandards || []).forEach((s) => { if (s.amenity) qty[String(s.amenity)] = s.quantity })
+  const m = {}
+  ;(rt?.amenities || [])
+    .filter((a) => a && a.status !== 'inactive')
+    .forEach((a) => { m[String(a._id)] = { name: a.name, unit: a.unit, quantity: qty[String(a._id)] ?? 1 } })
+  return m
+}
+
+// Phòng đã dọn xong nhưng thiếu đồ, đang chờ bổ sung.
+exports.getRestockRooms = async (branchId) => {
+  return Room.find({ branch: branchId, isDeleted: { $ne: true }, awaitingRestock: true })
+    .populate('roomType', 'name')
+    .sort('roomNumber').lean()
+}
+
+// Chi tiết tồn kho 1 phòng: chuẩn vs hiện có.
+exports.getRoomInventory = async (roomId, branchId) => {
+  const room = await findBranchEntity(Room, roomId, branchId).populate('roomType', 'name')
+  if (!room) fail('Phòng không tồn tại', 404)
+  const std = await standardMap(room.roomType._id)
+  const ras = await RoomAmenity.find({ room: roomId }).lean()
+  const cur = {}
+  ras.forEach((ra) => { cur[String(ra.amenity)] = ra.quantity })
+  const items = Object.entries(std).map(([amenityId, s]) => ({
+    amenity: amenityId, name: s.name, unit: s.unit,
+    standard: s.quantity, current: cur[amenityId] ?? 0,
+  }))
+  return {
+    room: { _id: room._id, roomNumber: room.roomNumber, status: room.status, awaitingRestock: room.awaitingRestock, roomType: room.roomType },
+    items,
+  }
+}
+
+// Cập nhật số hiện có (restock). Đủ chuẩn + phòng đang chờ -> available.
+exports.updateRoomInventory = async (roomId, items, branchId) => {
+  const room = await findBranchEntity(Room, roomId, branchId)
+  if (!room) fail('Phòng không tồn tại', 404)
+  if (!Array.isArray(items)) fail('Danh sách số lượng không hợp lệ')
+  for (const it of items) {
+    if (!it.amenity) continue
+    await RoomAmenity.findOneAndUpdate(
+      { room: roomId, amenity: it.amenity },
+      { room: roomId, amenity: it.amenity, quantity: Math.max(0, Number(it.quantity) || 0) },
+      { upsert: true, setDefaultsOnInsert: true }
+    )
+  }
+  const std = await standardMap(room.roomType)
+  const ras = await RoomAmenity.find({ room: roomId }).lean()
+  const cur = {}
+  ras.forEach((ra) => { cur[String(ra.amenity)] = ra.quantity })
+  const short = Object.entries(std).some(([aid, s]) => (cur[aid] ?? 0) < s.quantity)
+  if (!short && room.awaitingRestock) {
+    room.awaitingRestock = false
+    if (room.status === 'cleaning') room.status = 'available' // đã dọn + đủ chuẩn -> mở bán
+    await room.save()
+  }
+  return exports.getRoomInventory(roomId, branchId)
 }
 
 // ─── Service (CRUD) ────────────────────────────────────────────────────────────
@@ -871,7 +968,20 @@ exports.assignHousekeepingTask = async (id, assignedToAccountId, branchId, manag
     task.assignedAt = null
   }
 
-  return task.save()
+  const saved = await task.save()
+
+  // Báo cho housekeeper được phân công (đặc biệt với task đã escalated, chỉ manager gán được)
+  if (assignedToAccountId) {
+    const room = await Room.findById(task.room).select('roomNumber').lean()
+    try {
+      await notificationService.notifyUser(assignedToAccountId, {
+        type: 'task_new', title: `Bạn được giao việc phòng ${room?.roomNumber || ''}`,
+        body: 'Quản lý vừa phân công việc này cho bạn.', refType: 'task', refId: task._id, branch: branchId,
+      })
+    } catch (e) { /* notify lỗi không chặn nghiệp vụ */ }
+  }
+
+  return saved
 }
 
 // Đánh dấu/bỏ đánh dấu khẩn cấp cho task dọn phòng
