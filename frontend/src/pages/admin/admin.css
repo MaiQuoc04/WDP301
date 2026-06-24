@@ -432,6 +432,8 @@
   transition: all 0.2s ease;
   cursor: pointer;
   height: 38px;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .admin-btn-primary {
@@ -479,6 +481,7 @@
   color: var(--color-light-gray);
   border: 1px solid var(--color-border);
   transition: all 0.2s ease;
+  text-decoration: none;
 }
 
 .admin-btn-icon:hover {
@@ -740,4 +743,78 @@
   .admin-header {
     padding: 0 var(--space-4);
   }
+}
+
+/* ---------- Sidebar Dropdown & Submenu ---------- */
+.admin-menu-dropdown {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-menu-dropdown.open {
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+.admin-menu-submenu {
+  padding-left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.admin-submenu-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 2px solid transparent;
+}
+
+.admin-submenu-item:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--color-white);
+  padding-left: 20px;
+}
+
+.admin-submenu-item.active {
+  color: var(--color-gold);
+  font-weight: 600;
+  border-left-color: var(--color-gold);
+  background: linear-gradient(90deg, rgba(161, 131, 72, 0.12) 0%, rgba(161, 131, 72, 0.01) 100%);
+}
+
+.submenu-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 10px;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: currentColor;
+  opacity: 0.5;
+}
+
+.admin-submenu-item:hover .submenu-icon {
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+.admin-submenu-item.active .submenu-icon {
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 4px rgba(161, 131, 72, 0.6));
+}
+
+.admin-menu-item.dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
 }

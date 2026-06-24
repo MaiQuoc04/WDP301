@@ -175,11 +175,11 @@ const BranchManagement = () => {
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '8px' }}>
                       <Link 
-                        to={`/admin/branches/${b._id}/dashboard`}
+                        to={`/admin/branches/${b._id}/staff`}
                         className="admin-btn admin-btn-secondary"
                         style={{ height: '32px', padding: '0 12px', fontSize: '12.5px' }}
                       >
-                        Dashboard
+                        Chi tiết
                       </Link>
                       <button 
                         className="admin-btn admin-btn-secondary"

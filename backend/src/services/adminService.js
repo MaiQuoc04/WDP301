@@ -136,13 +136,13 @@ exports.assignBranchToStaff = async (accountId, branchId) => {
   const branch = await Branch.findById(branchId)
   if (!branch) throw { status: 400, message: 'Chi nhánh không hợp lệ' }
 
-  // Kiểm tra xem đã gán chưa
+  // Kiểm tra xem đã gán chi nhánh nào chưa (1 người chỉ được làm 1 chi nhánh)
   const existing = await RoleAssignment.findOne({
-    account: accountId,
-    branch: branchId
+    account: accountId
   })
 
   if (existing) {
+    existing.branch = branchId
     if (existing.role !== account.role) {
       existing.role = account.role
     }

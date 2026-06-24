@@ -145,7 +145,7 @@ const DashboardIndex = () => {
                 return (
                   <div key={r._id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '20%' }} title={`${r.name}: ${formatVND(r.total)}`}>
                     <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-charcoal)', marginBottom: '4px', whiteSpace: 'nowrap' }}>
-                      {formatVND(r.total / 1000000)}M
+                      {(r.total / 1000000).toLocaleString('vi-VN')} Tr ₫
                     </div>
                     <div style={{ height: 140, width: '28px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
                       <div className="chart-svg-bar" style={{ width: '100%', height: `${percentHeight}%`, background: 'linear-gradient(to top, var(--color-gold), #d4af37)', borderRadius: '4px', transition: 'height 0.6s ease' }} />
@@ -206,78 +206,6 @@ const DashboardIndex = () => {
               </svg>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Branch Table with drilldown to branch dashboard */}
-      <div className="admin-card" style={{ marginBottom: '24px' }}>
-        <div className="admin-card-header">
-          <h3 className="admin-card-title">Hiệu năng hoạt động các chi nhánh</h3>
-        </div>
-        
-        <div className="admin-table-wrapper" style={{ boxShadow: 'none', margin: 0 }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Chi nhánh</th>
-                <th>Mã</th>
-                <th>Tỷ lệ lấp đầy</th>
-                <th>Tỷ lệ dọn dẹp trễ</th>
-                <th>Trạng thái</th>
-                <th style={{ textAlign: 'right' }}>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {occupancyByBranch.map(branch => {
-                const hk = housekeepingKPI.find(h => h._id === branch._id) || { missedRate: 0, totalTasks: 0 }
-                return (
-                  <tr key={branch._id}>
-                    <td>
-                      <strong style={{ fontSize: '15px' }}>{branch.name}</strong>
-                    </td>
-                    <td><span className="admin-badge admin-badge-role" style={{ fontSize: '11px' }}>{branch.code}</span></td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ minWidth: '40px', fontWeight: 'bold' }}>{branch.occupancyRate}%</span>
-                        <div style={{ height: '6px', width: '80px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${branch.occupancyRate}%`, backgroundColor: '#8cb92b', borderRadius: '4px' }} />
-                        </div>
-                        <small style={{ color: 'var(--color-light-gray)' }}>({branch.occupiedRooms}/{branch.totalRooms} phòng)</small>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ minWidth: '40px', fontWeight: 'bold' }}>{hk.missedRate}%</span>
-                        <div style={{ height: '6px', width: '80px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${hk.missedRate}%`, backgroundColor: hk.missedRate > 30 ? 'var(--color-error)' : 'var(--color-warning)', borderRadius: '4px' }} />
-                        </div>
-                        <small style={{ color: 'var(--color-light-gray)' }}>({hk.missedTasks}/{hk.totalTasks} việc)</small>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="admin-badge admin-badge-active">Đang mở</span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Link 
-                        to={`/admin/branches/${branch._id}/dashboard`} 
-                        className="admin-btn admin-btn-secondary"
-                        style={{ padding: '4px 12px', height: '32px', fontSize: '12.5px' }}
-                      >
-                        Xem chi tiết
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              })}
-              {occupancyByBranch.length === 0 && (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--color-light-gray)' }}>
-                    Chưa có chi nhánh nào hoạt động
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

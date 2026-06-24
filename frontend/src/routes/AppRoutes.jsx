@@ -27,6 +27,7 @@ import BranchManagement from '../pages/admin/BranchManagement'
 import StaffManagement from '../pages/admin/StaffManagement'
 import DashboardIndex from '../pages/admin/DashboardIndex'
 import BranchDashboard from '../pages/admin/BranchDashboard'
+import BranchStaff from '../pages/admin/BranchStaff'
 
 
 const AppRoutes = () => (
@@ -77,7 +78,9 @@ const AppRoutes = () => (
         <ProtectedRoute allow={['super_admin']}><AdminDashboard /></ProtectedRoute>
       }>
         <Route path="branches" element={<BranchManagement />} />
-        <Route path="branches/:branchId/dashboard" element={<BranchDashboard />} />
+        <Route path="branches/:branchId/staff" element={<BranchStaff />} />
+        <Route path="reports" element={<BranchDashboard />} />
+        <Route path="reports/:branchId" element={<BranchDashboard />} />
         <Route path="staff" element={<StaffManagement />} />
         <Route index element={<DashboardIndex />} />
       </Route>

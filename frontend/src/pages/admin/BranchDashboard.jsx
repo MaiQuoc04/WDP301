@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useParams, Link } from 'react-router-dom'
-import { fetchBranchDashboard } from '../../redux/slices/adminSlice'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { fetchBranchDashboard, fetchBranches, fetchDashboardStats } from '../../redux/slices/adminSlice'
 
 const BranchDashboard = () => {
   const { branchId } = useParams()
   const dispatch = useDispatch()
-  const { branchDashboard, loading, error } = useSelector(state => state.admin)
+  const navigate = useNavigate()
+  const { branchDashboard, dashboardStats, branches, loading, error } = useSelector(state => state.admin)
 
   useEffect(() => {
     if (branchId) {
@@ -14,6 +15,131 @@ const BranchDashboard = () => {
     }
   }, [dispatch, branchId])
 
+  // Fetch branches list for dropdown select selector
+  useEffect(() => {
+    if (!branches || branches.length === 0) {
+      dispatch(fetchBranches())
+    }
+  }, [dispatch, branches])
+
+  // Fetch global dashboard stats (for the branch list table) if no branchId is specified
+  useEffect(() => {
+    if (!branchId && !dashboardStats) {
+      dispatch(fetchDashboardStats())
+    }
+  }, [dispatch, branchId, dashboardStats])
+
+  // ----------------------------------------------------
+  // CASE 1: Render All Branches Performance Table (no branchId specified)
+  // ----------------------------------------------------
+  if (!branchId) {
+    if (loading && !dashboardStats) {
+      return (
+        <div className="admin-card text-center" style={{ padding: '80px 0' }}>
+          <p style={{ color: 'var(--color-light-gray)' }}>Đang tải hiệu năng hoạt động các chi nhánh...</p>
+        </div>
+      )
+    }
+
+    if (error && !dashboardStats) {
+      return (
+        <div className="admin-card" style={{ borderLeft: '4px solid var(--color-error)' }}>
+          <h4 style={{ color: 'var(--color-error)', marginBottom: '8px' }}>Lỗi Tải Dữ Liệu</h4>
+          <p style={{ margin: 0 }}>{error}</p>
+        </div>
+      )
+    }
+
+    const occupancyByBranch = dashboardStats?.occupancyByBranch || []
+    const housekeepingKPI = dashboardStats?.housekeepingKPI || []
+
+    return (
+      <div>
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: '0 0 4px 0' }}>
+            Hiệu Năng Hoạt Động Các Chi Nhánh
+          </h2>
+          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>
+            Báo cáo chi tiết và giám sát hiệu suất phòng, công việc dọn dẹp theo từng chi nhánh
+          </p>
+        </div>
+
+        {/* Branch Performance Table */}
+        <div className="admin-card" style={{ marginBottom: '24px' }}>
+          <div className="admin-table-wrapper" style={{ boxShadow: 'none', margin: 0 }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Chi nhánh</th>
+                  <th>Mã</th>
+                  <th>Tỷ lệ lấp đầy</th>
+                  <th>Tỷ lệ dọn dẹp trễ</th>
+                  <th>Trạng thái</th>
+                  <th style={{ textAlign: 'right' }}>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {occupancyByBranch.map(branch => {
+                  const hk = housekeepingKPI.find(h => h._id === branch._id) || { missedRate: 0, totalTasks: 0, missedTasks: 0 }
+                  return (
+                    <tr key={branch._id}>
+                      <td>
+                        <strong style={{ fontSize: '15px' }}>{branch.name}</strong>
+                      </td>
+                      <td>
+                        <span className="admin-badge admin-badge-role" style={{ fontSize: '11px' }}>{branch.code}</span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ minWidth: '40px', fontWeight: 'bold' }}>{branch.occupancyRate}%</span>
+                          <div style={{ height: '6px', width: '80px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${branch.occupancyRate}%`, backgroundColor: '#8cb92b', borderRadius: '4px' }} />
+                          </div>
+                          <small style={{ color: 'var(--color-light-gray)' }}>({branch.occupiedRooms}/{branch.totalRooms} phòng)</small>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ minWidth: '40px', fontWeight: 'bold' }}>{hk.missedRate}%</span>
+                          <div style={{ height: '6px', width: '80px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${hk.missedRate}%`, backgroundColor: hk.missedRate > 30 ? 'var(--color-error)' : 'var(--color-warning)', borderRadius: '4px' }} />
+                          </div>
+                          <small style={{ color: 'var(--color-light-gray)' }}>({hk.missedTasks}/{hk.totalTasks} việc)</small>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="admin-badge admin-badge-active">Đang mở</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <Link 
+                          to={`/admin/reports/${branch._id}`} 
+                          className="admin-btn admin-btn-secondary"
+                          style={{ padding: '4px 12px', height: '32px', fontSize: '12.5px' }}
+                        >
+                          Xem chi tiết
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {occupancyByBranch.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--color-light-gray)' }}>
+                      Chưa có chi nhánh nào hoạt động
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ----------------------------------------------------
+  // CASE 2: Render Single Branch Dashboard (branchId is specified)
+  // ----------------------------------------------------
   if (loading && !branchDashboard) {
     return (
       <div className="admin-card text-center" style={{ padding: '80px 0' }}>
@@ -27,7 +153,7 @@ const BranchDashboard = () => {
       <div className="admin-card" style={{ borderLeft: '4px solid var(--color-error)' }}>
         <h4 style={{ color: 'var(--color-error)', marginBottom: '8px' }}>Lỗi Tải Dữ Liệu</h4>
         <p style={{ marginBottom: '16px' }}>{error}</p>
-        <Link to="/admin" className="admin-btn admin-btn-secondary">Quay lại Tổng Quan</Link>
+        <Link to="/admin/reports" className="admin-btn admin-btn-secondary">Quay lại Danh Sách</Link>
       </div>
     )
   }
@@ -67,28 +193,55 @@ const BranchDashboard = () => {
   return (
     <div>
       {/* Back button and title */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <Link to="/admin" className="admin-btn-icon" style={{ borderRadius: '50%' }} title="Quay lại">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-              </svg>
-            </Link>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: 0 }}>
-              Báo Cáo Chi Nhánh: {branch.name}
-            </h2>
-            <span className="admin-badge admin-badge-role">{branch.code}</span>
-          </div>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>
-            Địa chỉ: {branch.address} | Điện thoại: {branch.phone}
-          </p>
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
+          <Link to="/admin/reports" className="admin-btn-icon" style={{ borderRadius: '50%' }} title="Quay lại danh sách">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+          </Link>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: 'var(--color-black)', margin: 0 }}>
+            Báo Cáo Chi Nhánh:
+          </h2>
+          <select
+            value={branchId || ''}
+            onChange={(e) => navigate(`/admin/reports/${e.target.value}`)}
+            style={{
+              padding: '8px 32px 8px 16px',
+              fontSize: '16px',
+              fontWeight: '600',
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-white)',
+              color: 'var(--color-charcoal)',
+              cursor: 'pointer',
+              fontFamily: 'Inter, sans-serif',
+              minWidth: '240px',
+              outline: 'none',
+              boxShadow: 'var(--shadow-subtle)',
+              backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 8px center',
+              backgroundSize: '16px',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
+              appearance: 'none'
+            }}
+          >
+            {branches.map(b => (
+              <option key={b._id} value={b._id}>
+                {b.name} ({b.code})
+              </option>
+            ))}
+          </select>
+          {branch.code && <span className="admin-badge admin-badge-role" style={{ height: 'fit-content' }}>{branch.code}</span>}
         </div>
-
-        <Link to="/admin" className="admin-btn admin-btn-secondary">
-          Quay lại Báo cáo chung
-        </Link>
+        {branch.address && (
+          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px', paddingLeft: '40px' }}>
+            Địa chỉ: {branch.address} | Điện thoại: {branch.phone || branch.hotline || 'N/A'}
+          </p>
+        )}
       </div>
 
       {/* KPI Cards Grid */}
@@ -143,7 +296,7 @@ const BranchDashboard = () => {
       <div className="admin-charts-grid" style={{ gridTemplateColumns: '1fr' }}>
         <div className="admin-card">
           <div className="admin-card-header">
-            <h3 className="admin-card-title">Xu hướng đặt phòng tại chi nhánh (6 tháng)</h3>
+            <h3 className="admin-card-title">Xu hình đặt phòng tại chi nhánh (6 tháng)</h3>
           </div>
           {monthlyBookingTrend.length === 0 ? (
             <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-light-gray)' }}>
