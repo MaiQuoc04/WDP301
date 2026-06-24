@@ -1,3 +1,20 @@
+.hk-dashboard-layout .manager-brand svg {
+  width: 42px;
+  height: 42px;
+}
+
+.hk-header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--color-light-gray);
+}
+
+.hk-header-user svg {
+  color: var(--color-gold);
+}
+
 .hk-layout {
   min-height: 100vh;
   display: flex;
@@ -141,6 +158,27 @@
 }
 
 @media (max-width: 860px) {
+  .hk-dashboard-layout {
+    flex-direction: column;
+  }
+
+  .hk-dashboard-layout .manager-sidebar {
+    width: auto;
+  }
+
+  .hk-dashboard-layout .manager-container {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .hk-dashboard-layout .manager-header {
+    height: auto;
+    min-height: 72px;
+    padding: 16px 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
   .hk-layout {
     flex-direction: column;
   }

@@ -4,16 +4,25 @@
 const mongoose = require('mongoose')
 
 const TASK_STATUS = ['pending', 'in_progress', 'urgent', 'completed', 'missed']
+// Loại việc: inspection = kiểm tra thiết bị trước trả phòng (cộng bill); turnover = dọn sau check-out
+// (đưa phòng về sẵn sàng); mid_stay = khách đang ở yêu cầu dọn (miễn phí, không kiểm kê, không đổi phòng).
+const TASK_TYPE = ['inspection', 'turnover', 'mid_stay']
 
 const housekeepingTaskSchema = new mongoose.Schema({
   branch:     { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   room:       { type: mongoose.Schema.Types.ObjectId, ref: 'Room', required: true },
   booking:    { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
+  type:       { type: String, enum: TASK_TYPE, default: 'inspection' },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // null = chưa ai claim
   assignedAt: { type: Date },
   assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
+  requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân yêu cầu (inspection/mid_stay)
+  requestedAt: { type: Date },
   status:     { type: String, enum: TASK_STATUS, default: 'pending' },
   isUrgent:   { type: Boolean, default: false },
+  // Escalation tự nhận (Quốc): 2p chưa ai nhận -> nhắc HK (remindedAt); 5p -> báo manager + khoá tự nhận (escalatedAt)
+  remindedAt:   { type: Date },
+  escalatedAt:  { type: Date },
 
 
   // Báo cáo kiểm kê amenity (UC-49→51, BR-41/42)
@@ -35,4 +44,5 @@ const housekeepingTaskSchema = new mongoose.Schema({
 }, { timestamps: true })
 
 housekeepingTaskSchema.statics.TASK_STATUS = TASK_STATUS
+housekeepingTaskSchema.statics.TASK_TYPE = TASK_TYPE
 module.exports = mongoose.model('HousekeepingTask', housekeepingTaskSchema)

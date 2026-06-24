@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Switch, message, Divider, Checkbox, Row, Col } from 'antd'
-import { PlusOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, SettingOutlined, NumberOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
 
@@ -12,6 +12,8 @@ export default function RoomTypesPage() {
   // Modal states
   const [formModalVisible, setFormModalVisible] = useState(false)
   const [amenityModalVisible, setAmenityModalVisible] = useState(false)
+  const [standardModalVisible, setStandardModalVisible] = useState(false)
+  const [standardRows, setStandardRows] = useState([]) // [{ amenity:{_id,name,unit}, quantity }]
   const [editingType, setEditingType] = useState(null)
   const [selectedRoomType, setSelectedRoomType] = useState(null)
   const [selectedAmenityIds, setSelectedAmenityIds] = useState([])
@@ -117,6 +119,35 @@ export default function RoomTypesPage() {
     }
   }
 
+  // Standards (số lượng chuẩn) Modal Trigger
+  const startStandards = async (record) => {
+    setSelectedRoomType(record)
+    setStandardRows([])
+    try {
+      const rows = await roomService.getRoomTypeStandards(record._id)
+      setStandardRows(rows)
+      setStandardModalVisible(true)
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Không thể lấy số lượng chuẩn')
+    }
+  }
+
+  const setStandardQty = (amenityId, qty) => {
+    setStandardRows((prev) => prev.map((r) => String(r.amenity._id) === String(amenityId) ? { ...r, quantity: qty ?? 0 } : r))
+  }
+
+  // Save standards
+  const handleSaveStandards = async () => {
+    try {
+      const payload = standardRows.map((r) => ({ amenity: r.amenity._id, quantity: r.quantity }))
+      await roomService.updateRoomTypeStandards(selectedRoomType._id, payload)
+      message.success('Cập nhật số lượng chuẩn thành công')
+      setStandardModalVisible(false)
+    } catch (err) {
+      message.error(err.response?.data?.message || err.message || 'Lỗi cập nhật số lượng chuẩn')
+    }
+  }
+
   const columns = [
     {
       title: 'Tên loại phòng',
@@ -175,6 +206,7 @@ export default function RoomTypesPage() {
         <Space size="middle">
           <Button type="text" icon={<EditOutlined />} onClick={() => startEdit(record)}>Sửa</Button>
           <Button type="text" icon={<SettingOutlined />} onClick={() => startAmenitiesMapping(record)}>Tiện nghi</Button>
+          <Button type="text" icon={<NumberOutlined />} onClick={() => startStandards(record)}>Số chuẩn</Button>
         </Space>
       )
     }
@@ -310,6 +342,43 @@ export default function RoomTypesPage() {
               ))}
             </Row>
           </Checkbox.Group>
+        )}
+      </Modal>
+
+      {/* AMENITY STANDARDS (số lượng chuẩn kiểm kê) MODAL */}
+      <Modal
+        title={`Số lượng chuẩn — ${selectedRoomType?.name}`}
+        open={standardModalVisible}
+        onCancel={() => setStandardModalVisible(false)}
+        onOk={handleSaveStandards}
+        okText="Lưu số chuẩn"
+        cancelText="Hủy"
+        width={520}
+      >
+        <p style={{ color: 'var(--color-light-gray)' }}>
+          Số lượng mỗi thiết bị phòng loại này <strong>phải có</strong>. Dùng làm mốc kiểm kê — housekeeper không sửa được.
+        </p>
+        <Divider style={{ margin: '12px 0' }} />
+        {standardRows.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>
+            Loại phòng chưa gán tiện nghi nào. Hãy bấm “Tiện nghi” để gán trước, rồi đặt số lượng chuẩn.
+          </p>
+        ) : (
+          <Table
+            rowKey={(r) => r.amenity._id}
+            dataSource={standardRows}
+            pagination={false}
+            size="small"
+            columns={[
+              { title: 'Thiết bị', render: (_, r) => r.amenity.name },
+              {
+                title: 'Số lượng chuẩn', width: 160,
+                render: (_, r) => (
+                  <InputNumber min={0} value={r.quantity} onChange={(v) => setStandardQty(r.amenity._id, v)} style={{ width: 120 }} />
+                ),
+              },
+            ]}
+          />
         )}
       </Modal>
     </div>

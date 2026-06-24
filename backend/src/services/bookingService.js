@@ -57,6 +57,49 @@ exports.countAvailableRooms = countAvailableRooms
 exports.isRoomTypeAvailable = async (roomTypeId, branchId, checkIn, checkOut) =>
   (await countAvailableRooms(roomTypeId, branchId, checkIn, checkOut)) > 0
 
+// PHÒNG CỤ THỂ còn trống cho [checkIn, checkOut)? = không có booking đang chiếm trùng giờ trên phòng đó
+async function isRoomFree(roomId, checkIn, checkOut, session) {
+  const q = Booking.countDocuments({
+    room: roomId, status: { $in: OCCUPYING },
+    checkIn: { $lt: checkOut }, checkOut: { $gt: checkIn },
+  })
+  if (session) q.session(session)
+  return (await q) === 0
+}
+exports.isRoomFree = isRoomFree
+
+// Tìm danh sách PHÒNG CỤ THỂ còn trống + hợp party (dùng chung walk-in & online). docs §9.7 + per-room availability.
+exports.searchAvailableRooms = async (branchId, checkIn, checkOut, adults = 1, children = 0, opts = {}) => {
+  const ci = new Date(checkIn), co = new Date(checkOut)
+  const roomFilter = { branch: branchId, isDeleted: { $ne: true }, status: { $nin: ['maintenance', 'locked'] } }
+  if (opts.roomTypeId) roomFilter.roomType = opts.roomTypeId
+  const rooms = await Room.find(roomFilter).populate('roomType').sort('roomNumber').lean()
+  const busy = await Booking.find({
+    branch: branchId, room: { $ne: null }, status: { $in: OCCUPYING },
+    checkIn: { $lt: co }, checkOut: { $gt: ci },
+  }).distinct('room')
+  const busySet = new Set(busy.map(String))
+  const nights = nightsBetween(ci, co)
+  const out = []
+  for (const room of rooms) {
+    if (!room.roomType || busySet.has(String(room._id))) continue
+    const occ = computeOccupancy(room.roomType, adults, children)
+    const roomCharge = await computeRoomCharge(room.roomType, ci, co)
+    const surcharge = occ.extraBeds * (room.roomType.extraBedFee || 0) * nights
+    out.push({
+      roomId: room._id, roomNumber: room.roomNumber, floor: room.floor,
+      roomType: { _id: room.roomType._id, name: room.roomType.name, capacity: room.roomType.capacity, totalBeds: room.roomType.totalBeds },
+      capacity: occ.capacity, partyUnits: occ.partyUnits, extraBeds: occ.extraBeds, surplusUnits: occ.surplusUnits,
+      fit: occ.extraBeds > 0 ? 'short' : (occ.surplusUnits > 0 ? 'surplus' : 'exact'),
+      nights, roomCharge, surcharge, total: roomCharge + surcharge,
+    })
+  }
+  // Ưu tiên: vừa khít -> dư (ít->nhiều) -> thiếu (cuối); trong nhóm theo giá tăng dần
+  const rank = (r) => (r.fit === 'exact' ? 0 : r.fit === 'surplus' ? 10 + r.surplusUnits : 1000 + r.extraBeds)
+  out.sort((a, b) => rank(a) - rank(b) || a.total - b.total)
+  return out
+}
+
 // Tính tiền phòng theo KHOẢNG giá (RoomPrice); ngày ngoài mọi khoảng -> RoomType.basePrice. docs §9.1
 async function computeRoomCharge(roomType, checkIn, checkOut) {
   const nights = nightsBetween(checkIn, checkOut)
@@ -77,16 +120,17 @@ async function computeRoomCharge(roomType, checkIn, checkOut) {
 }
 exports.computeRoomCharge = computeRoomCharge
 
-// Mô hình sức chứa theo "đơn vị": người lớn=1, trẻ em=0.5, mỗi giường=2 đơn vị.
-// Người lớn phải vừa giường; trẻ vượt sức chứa -> phụ phí từng trẻ (giường phụ).
-const ADULT_UNIT = 1, CHILD_UNIT = 0.5, BED_UNIT = 2
+// Mô hình sức chứa theo "đơn vị": người lớn=1, trẻ em=0.5 (2 trẻ = 1 suất).
+// Sức chứa chuẩn = roomType.capacity (KHÔNG suy từ số giường). docs §9.7
+// Vượt sức chứa -> giường phụ: ghép cặp trẻ, TRẺ LẺ (0.5) MIỄN (floor). Người lớn thừa luôn tính nguyên giường.
+// Phương án B: luôn đặt được; vượt -> phụ phí GIƯỜNG PHỤ (áp cho cả lớn lẫn nhỏ).
+const ADULT_UNIT = 1, CHILD_UNIT = 0.5
 function computeOccupancy(roomType, adults = 1, children = 0) {
-  const unitCapacity = (roomType.totalBeds || 1) * BED_UNIT
-  const adultUnits = adults * ADULT_UNIT
-  const fitsAdults = adultUnits <= unitCapacity
-  const childrenThatFit = fitsAdults ? Math.floor((unitCapacity - adultUnits) / CHILD_UNIT) : 0
-  const extraChildren = Math.max(0, children - childrenThatFit)
-  return { unitCapacity, fitsAdults, childrenThatFit, extraChildren }
+  const capacity = roomType.capacity || 2
+  const partyUnits = adults * ADULT_UNIT + children * CHILD_UNIT
+  const extraBeds = Math.floor(Math.max(0, partyUnits - capacity))   // giường phụ tính phí (trẻ lẻ -> miễn)
+  const surplusUnits = Math.max(0, capacity - partyUnits)            // còn dư chỗ trong sức chứa
+  return { capacity, partyUnits, extraBeds, surplusUnits }
 }
 exports.computeOccupancy = computeOccupancy
 
@@ -95,8 +139,8 @@ exports.quote = async (roomType, checkIn, checkOut, adults = 1, children = 0) =>
   const nights = nightsBetween(checkIn, checkOut)
   const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
   const occ = computeOccupancy(roomType, adults, children)
-  const surcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights
-  return { nights, roomCharge, extraChildren: occ.extraChildren, surcharge, total: roomCharge + surcharge, fitsAdults: occ.fitsAdults }
+  const surcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nights
+  return { nights, roomCharge, extraBeds: occ.extraBeds, surplusUnits: occ.surplusUnits, surcharge, total: roomCharge + surcharge }
 }
 
 // Tính lại bill: total = phòng + dịch vụ + amenity thiếu + (phụ phí giường phụ nếu đã áp); remaining = total - đã trả - credit
@@ -169,72 +213,107 @@ exports.transition = async (booking, toStatus, by, note) => {
  */
 exports.create = async (p) => {
   const source = p.source || 'online'
-  const checkIn = startOfDay(p.checkIn)
-  const checkOut = startOfDay(p.checkOut)
+  // Giữ giờ check-in/out (datetime-local). Nếu chỉ truyền NGÀY (YYYY-MM-DD) -> mặc định giờ khách sạn: nhận 14:00, trả 12:00
+  const parseDT = (v, h, m) => {
+    const d = new Date(v)
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) d.setHours(h, m, 0, 0)
+    return d
+  }
+  const checkIn = parseDT(p.checkIn, 14, 0)
+  const checkOut = parseDT(p.checkOut, 12, 0)
 
   // Validate (BR-26)
-  if (!p.branchId || !p.roomTypeId) throw new Error('Thiếu branch hoặc loại phòng')
   if (!(checkIn instanceof Date) || isNaN(checkIn) || isNaN(checkOut)) throw new Error('Ngày không hợp lệ')
   if (nightsBetween(checkIn, checkOut) < 1) throw new Error('Phải ở tối thiểu 1 đêm (check-out > check-in)')
   if (checkIn < startOfDay(new Date())) throw new Error('Không thể đặt cho ngày trong quá khứ')
   if (source === 'online' && !p.customerId && !p.guestName) throw new Error('Đặt online cần thông tin khách hàng (Tên hoặc đăng nhập)')
   if (source === 'walk_in' && !p.guestName) throw new Error('Walk-in cần tên khách')
 
-  const branch = await Branch.findById(p.branchId)
-  if (!branch || !branch.isActive) throw new Error('Chi nhánh không tồn tại hoặc đã ngừng hoạt động')
-  const roomType = await RoomType.findById(p.roomTypeId)
+  // Xác định PHÒNG cụ thể (roomId — walk-in lễ tân chọn) hoặc LOẠI phòng (roomTypeId — online auto-gán)
+  let roomType, preRoom = null
+  if (p.roomId) {
+    preRoom = await Room.findOne({ _id: p.roomId, isDeleted: { $ne: true } }).populate('roomType')
+    if (!preRoom) throw new Error('Phòng không tồn tại')
+    if (['maintenance', 'locked'].includes(preRoom.status)) throw new Error(`Phòng đang ${preRoom.status}, không thể đặt`)
+    roomType = preRoom.roomType
+  } else if (p.roomTypeId) {
+    roomType = await RoomType.findById(p.roomTypeId)
+  } else {
+    throw new Error('Thiếu phòng hoặc loại phòng')
+  }
   if (!roomType || roomType.status !== 'active') throw new Error('Loại phòng không khả dụng')
+  const branch = await Branch.findById(p.branchId || roomType.branch)
+  if (!branch || !branch.isActive) throw new Error('Chi nhánh không tồn tại hoặc đã ngừng hoạt động')
   if (String(roomType.branch) !== String(branch._id)) throw new Error('Loại phòng không thuộc chi nhánh')
+  if (preRoom && String(preRoom.branch) !== String(branch._id)) throw new Error('Phòng không thuộc chi nhánh')
 
-  // Sức chứa (mô hình đơn vị): người lớn phải vừa giường; trẻ vượt -> phụ phí (lễ tân tick sau)
+  // Sức chứa theo giường (phương án B: luôn đặt được; thiếu giường -> phụ phí giường phụ)
   const adults = p.adults || 1
   const children = p.children || 0
   const occ = computeOccupancy(roomType, adults, children)
-  if (!occ.fitsAdults) throw new Error('Số người lớn vượt sức chứa phòng, vui lòng chọn loại phòng lớn hơn')
+
+  // Dịch vụ kèm theo (tùy chọn — walk-in chọn ngay khi tạo)
+  const services = []
+  let extraServicesTotal = 0
+  for (const s of (Array.isArray(p.services) ? p.services : [])) {
+    const svc = await Service.findOne({ _id: s.serviceId || s.service, branch: branch._id, status: 'active' })
+    if (!svc) continue
+    const qty = Math.max(1, parseInt(s.quantity, 10) || 1)
+    services.push({ service: svc._id, name: svc.name, price: svc.price, quantity: qty, addedAt: new Date() })
+    extraServicesTotal += svc.price * qty
+  }
 
   // Tính tiền (đọc, ngoài transaction)
   const nights = nightsBetween(checkIn, checkOut)
   const roomCharge = await computeRoomCharge(roomType, checkIn, checkOut)
   const depositAmount = Math.round(branch.depositRate * roomCharge)
-  const bedSurcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights // ước tính, chưa áp
-  const totalAmount = roomCharge // phụ phí/dịch vụ cộng sau qua recalcBill
+  const bedSurcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nights // ước tính giường phụ, áp khi check-in
+  const totalAmount = roomCharge + extraServicesTotal
   const remainingAmount = totalAmount // chưa trả gì (paid 0)
-  // Hạn cọc cho đặt online; walk-in không hết hạn (lễ tân tự quản)
   const expiresAt = source === 'online'
     ? new Date(Date.now() + (branch.pendingTimeoutMinutes || 15) * 60 * 1000) : undefined
   const code = await genBookingCode(branch.code)
 
-  // Transaction: re-check availability (BR-23) + tạo, NGUYÊN TỬ để chống đặt trùng (review #2).
-  // $inc RoomType.bookingSeq buộc 2 giao dịch đồng thời cùng loại phòng xung đột -> 1 cái retry rồi thấy hết phòng.
+  // Transaction: chọn/khoá PHÒNG cụ thể + tạo, NGUYÊN TỬ chống đặt trùng theo phòng (review #2).
+  // $inc Room.bookingSeq buộc 2 giao dịch đồng thời cùng 1 phòng xung đột -> 1 cái retry rồi thấy phòng đã đặt.
   const resultBooking = await runInTransaction(async (session) => {
-    const totalRooms = await Room.countDocuments({ roomType: roomType._id, branch: branch._id }).session(session)
-    const overlap = await Booking.countDocuments({
-      roomType: roomType._id, status: { $in: OCCUPYING },
-      checkIn: { $lt: checkOut }, checkOut: { $gt: checkIn },
-    }).session(session)
-    if (totalRooms - overlap <= 0) throw new Error('Hết phòng cho khoảng thời gian đã chọn')
+    let room
+    if (preRoom) {
+      if (!(await isRoomFree(preRoom._id, checkIn, checkOut, session)))
+        throw new Error(`Phòng ${preRoom.roomNumber} đã có booking trùng thời gian`)
+      room = preRoom
+    } else {
+      const candidates = await Room.find({
+        branch: branch._id, roomType: roomType._id,
+        isDeleted: { $ne: true }, status: { $nin: ['maintenance', 'locked'] },
+      }).sort('roomNumber').session(session)
+      for (const cand of candidates) {
+        if (await isRoomFree(cand._id, checkIn, checkOut, session)) { room = cand; break }
+      }
+      if (!room) throw new Error('Hết phòng trống của loại này cho khoảng thời gian đã chọn')
+    }
 
     const [booking] = await Booking.create([{
-      code, branch: branch._id, roomType: roomType._id,
+      code, branch: branch._id, roomType: roomType._id, room: room._id,
       customer: source === 'online' ? p.customerId : undefined,
       guestName: p.guestName, guestPhone: p.guestPhone,
       checkIn, checkOut, guests: adults + children, adults, children,
       source, status: 'pending', paymentStatus: 'unpaid',
-      roomCharge, depositAmount, totalAmount, remainingAmount, paidAmount: 0,
-      bedSurcharge, bedSurchargeApplied: false, expiresAt, createdBy: p.createdBy,
+      roomCharge, depositAmount, extraServicesTotal, totalAmount, remainingAmount, paidAmount: 0,
+      services, bedSurcharge, bedSurchargeApplied: false, expiresAt, createdBy: p.createdBy,
     }], { session })
 
     if (source === 'online') {
-      await HoldRoom.create([{ roomType: roomType._id, customer: p.customerId, booking: booking._id, checkIn, checkOut, expiresAt }], { session })
+      await HoldRoom.create([{ roomType: roomType._id, room: room._id, customer: p.customerId, booking: booking._id, checkIn, checkOut, expiresAt }], { session })
     }
-    await BookingStatusHistory.create([{ booking: booking._id, fromStatus: null, toStatus: 'pending', changedBy: p.createdBy, note: `Tạo booking (${source})` }], { session })
-    await RoomType.updateOne({ _id: roomType._id }, { $inc: { bookingSeq: 1 } }, { session }) // serialize chống đặt trùng
+    await BookingStatusHistory.create([{ booking: booking._id, fromStatus: null, toStatus: 'pending', changedBy: p.createdBy, note: `Tạo booking (${source}) - phòng ${room.roomNumber}` }], { session })
+    await Room.updateOne({ _id: room._id }, { $inc: { bookingSeq: 1 } }, { session }) // serialize theo phòng
     return booking
   })
 
   try {
     const { getIO } = require('../config/socket')
-    getIO().emit('new_booking', { roomTypeId: roomType._id, branchId: branch._id })
+    getIO().emit('new_booking', { roomId: resultBooking.room, branchId: branch._id })
   } catch (err) {
     console.warn('[Socket] Emit new_booking error:', err.message)
   }
@@ -265,34 +344,24 @@ exports.confirmDeposit = async (bookingId, { method = 'online_qr', transactionCo
   return booking
 }
 
-// UC-30: check-in -> gán phòng + occupied + sinh task dọn (Tú)
-exports.checkIn = async (bookingId, { roomId, by } = {}) => {
+// UC-30: check-in -> phòng đã gán lúc tạo, set occupied + sinh task dọn (Tú)
+exports.checkIn = async (bookingId, { by } = {}) => {
   const booking = await loadBooking(bookingId)
   if (booking.status !== 'confirmed') throw new Error('Chỉ booking đã xác nhận mới check-in được')
-  // Nhận phòng NGUYÊN TỬ (compare-and-set status) chống 2 check-in cùng giành 1 phòng (review #2)
-  let room
-  const CLAIM = { $in: ['available', 'cleaning'] }
-  if (roomId) {
-    room = await Room.findOneAndUpdate(
-      { _id: roomId, branch: booking.branch, roomType: booking.roomType, status: CLAIM },
-      { $set: { status: 'occupied' } }, { new: true })
-    if (!room) {
-      const exists = await Room.findOne({ _id: roomId, branch: booking.branch, roomType: booking.roomType })
-      throw new Error(exists ? `Phòng đang ${exists.status}, không nhận được` : 'Phòng không hợp lệ (sai chi nhánh/loại phòng)')
-    }
-  } else {
-    const candidates = await Room.find({ branch: booking.branch, roomType: booking.roomType, status: CLAIM }).sort('roomNumber').select('_id')
-    for (const cand of candidates) {
-      const claimed = await Room.findOneAndUpdate({ _id: cand._id, status: CLAIM }, { $set: { status: 'occupied' } }, { new: true })
-      if (claimed) { room = claimed; break }
-    }
-    if (!room) throw new Error('Không còn phòng trống cùng loại để gán')
+  if (!booking.room) throw new Error('Booking chưa được gán phòng')
+  // Chỉ phòng 'available' mới check-in được (phòng đang dọn/chờ bổ sung -> chưa nhận). docs §7
+  const room = await Room.findOneAndUpdate(
+    { _id: booking.room, status: 'available' },
+    { $set: { status: 'occupied' } }, { new: false })
+  if (!room) {
+    const r = await Room.findById(booking.room)
+    const reason = r && r.awaitingRestock ? 'chờ bổ sung thiết bị' : (r ? r.status : '?')
+    throw new Error(`Phòng ${r ? r.roomNumber : ''} đang ${reason}, chưa thể nhận`)
   }
-  booking.room = room._id
   try {
     await exports.transition(booking, 'checked_in', by, `Nhận phòng ${room.roomNumber}`)
   } catch (e) {
-    await Room.findByIdAndUpdate(room._id, { status: 'available' }) // revert nếu transition lỗi
+    await Room.findByIdAndUpdate(room._id, { status: room.status }) // revert về trạng thái trước
     throw e
   }
   // Tự áp phụ phí giường phụ khi check-in (lễ tân có thể tắt sau qua setBedSurcharge)
@@ -301,9 +370,10 @@ exports.checkIn = async (bookingId, { roomId, by } = {}) => {
     recalcBill(booking)
     await booking.save()
   }
-  // 🔗 Hợp đồng Tú: sinh HousekeepingTask. Gọi defensive — không chặn check-in nếu Tú chưa cài.
-  try { await require('./housekeepingService').createOnCheckIn(booking._id, room._id) }
-  catch (e) { console.warn('[checkIn] createOnCheckIn chưa sẵn sàng:', e.message) }
+  // 🔗 Housekeeping: check-in KHÔNG tạo task (housekeeper biết qua room='occupied').
+  // Chỉ dọn task active còn sót của phòng từ booking khác. Defensive — không chặn check-in.
+  try { await require('./housekeepingService').cleanupOnCheckIn(booking._id, room._id) }
+  catch (e) { console.warn('[checkIn] cleanupOnCheckIn lỗi:', e.message) }
   return booking
 }
 
@@ -322,8 +392,9 @@ exports.checkOut = async (bookingId, { method = 'cash', by } = {}) => {
   booking.paymentStatus = 'paid'
   await exports.transition(booking, 'checked_out', by, 'Khách trả phòng')
   if (booking.room) await Room.findByIdAndUpdate(booking.room, { status: 'cleaning' })
-  try { await require('./housekeepingService').markUrgentOnCheckOut(booking._id, booking.room) }
-  catch (e) { console.warn('[checkOut] markUrgentOnCheckOut chưa sẵn sàng:', e.message) }
+  // 🔗 Housekeeping: tự sinh task dọn turnover (urgent) cho phòng vừa trả. Defensive.
+  try { await require('./housekeepingService').createTurnover(booking._id, booking.room) }
+  catch (e) { console.warn('[checkOut] createTurnover lỗi:', e.message) }
   return booking
 }
 
@@ -367,6 +438,20 @@ exports.removeExtraService = async (bookingId, lineId, by) => {
   if (!booking.services.id(lineId)) throw new Error('Không tìm thấy dòng dịch vụ')
   booking.services.pull(lineId)
   recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+
+// Đánh dấu dịch vụ đã/chưa triển khai tại phòng (toggle 2 chiều). Thuần vận hành, KHÔNG đổi bill.
+exports.setServiceDelivered = async (bookingId, lineId, delivered, by) => {
+  const booking = await loadBooking(bookingId)
+  const line = booking.services.id(lineId)
+  if (!line) throw new Error('Không tìm thấy dòng dịch vụ')
+  if (delivered) {
+    line.status = 'delivered'; line.deliveredAt = new Date(); line.deliveredBy = by
+  } else {
+    line.status = 'pending'; line.deliveredAt = undefined; line.deliveredBy = undefined
+  }
+  await booking.save()
   return booking
 }
 
@@ -467,10 +552,9 @@ exports.updateBooking = async (bookingId, { adults, children, guestName, guestPh
     const newChildren = children !== undefined ? children : booking.children
     const roomType = await RoomType.findById(booking.roomType)
     const occ = computeOccupancy(roomType, newAdults, newChildren)
-    if (!occ.fitsAdults) throw new Error('Số người lớn vượt sức chứa phòng')
     booking.adults = newAdults; booking.children = newChildren; booking.guests = newAdults + newChildren
     const nights = nightsBetween(booking.checkIn, booking.checkOut)
-    booking.bedSurcharge = occ.extraChildren * (roomType.extraChildFee || 0) * nights
+    booking.bedSurcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nights
     recalcBill(booking) // nếu bedSurchargeApplied thì total cập nhật theo
   }
   await booking.save()

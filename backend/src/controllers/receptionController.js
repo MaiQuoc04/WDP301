@@ -8,6 +8,7 @@ const handle = (fn, code = 200) => async (req, res) => {
 exports.listServices = handle((req) => svc.listServices(req.user.id))               // danh mục dịch vụ
 exports.listAmenities = handle((req) => svc.listAmenities(req.user.id))             // danh mục thiết bị
 exports.listRooms = handle((req) => svc.listRooms(req.user.id, req.query))         // UC-26
+exports.searchRooms = handle((req) => svc.searchRooms(req.user.id, req.query))     // tìm phòng cho walk-in
 exports.listBookings = handle((req) => svc.listBookings(req.user.id, req.query))   // UC-27/43
 exports.getBookingDetail = handle((req) => svc.getBookingDetail(req.user.id, req.params.id)) // UC-28
 
@@ -23,6 +24,13 @@ exports.setBedSurcharge = handle((req) => svc.setBedSurcharge(req.user.id, req.p
 exports.getBill = handle((req) => svc.getBill(req.user.id, req.params.id))                      // UC-34
 exports.addService = handle((req) => svc.addService(req.user.id, req.params.id, req.body), 201)  // UC-32
 exports.removeService = handle((req) => svc.removeService(req.user.id, req.params.id, req.params.lineId))
+exports.serviceBoard = handle((req) => svc.getServiceBoard(req.user.id))  // bảng triển khai dịch vụ theo phòng
+exports.setServiceDelivered = handle((req) => svc.setServiceDelivered(req.user.id, req.params.id, req.params.lineId, req.body.delivered))
+
+// Housekeeping — yêu cầu kiểm tra / dọn phòng + trạng thái
+exports.requestInspection = handle((req) => svc.requestInspection(req.user.id, req.params.id), 201)
+exports.requestCleaning = handle((req) => svc.requestCleaning(req.user.id, req.params.id), 201)
+exports.getBookingHousekeeping = handle((req) => svc.getBookingHousekeeping(req.user.id, req.params.id))
 exports.addMissingAmenity = handle((req) => svc.addMissingAmenity(req.user.id, req.params.id, req.body), 201) // UC-33
 exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user.id, req.params.id, req.params.lineId))
 

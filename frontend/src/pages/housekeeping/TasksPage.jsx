@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Alert, Button, Select, Space, Table, Tag, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
+import TaskCooldown from './TaskCooldown'
 
 const statusColor = {
   pending: 'default',
@@ -19,6 +20,11 @@ const statusLabel = {
   completed: 'Hoàn tất',
   missed: 'Missed',
 }
+
+const typeLabel = { inspection: 'Kiểm tra', turnover: 'Dọn (trả phòng)', mid_stay: 'Dọn (yêu cầu)' }
+const typeColor = { inspection: 'purple', turnover: 'volcano', mid_stay: 'cyan' }
+
+const formatDateTime = (date) => date ? new Date(date).toLocaleString('vi-VN') : '-'
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([])
@@ -80,7 +86,8 @@ export default function TasksPage() {
       title: 'Trạng thái',
       dataIndex: 'status',
       render: (status, task) => (
-        <Space>
+        <Space wrap>
+          <Tag color={typeColor[task.type] || 'default'}>{typeLabel[task.type] || 'Việc phòng'}</Tag>
           <Tag color={statusColor[status]}>{statusLabel[status] || status}</Tag>
           {task.isUrgent && status !== 'urgent' && <Tag color="red">Ưu tiên</Tag>}
         </Space>
@@ -94,15 +101,20 @@ export default function TasksPage() {
     {
       title: 'Cập nhật',
       dataIndex: 'updatedAt',
-      render: (date) => date ? new Date(date).toLocaleString('vi-VN') : '-',
+      render: (date) => formatDateTime(date),
     },
     {
       title: 'Thao tác',
       key: 'actions',
       render: (_, task) => (
-        <Space>
+        <Space size={6}>
           {!task.assignedTo && (
-            <Button size="small" onClick={() => quickAction(task, 'claim')}>Nhận</Button>
+            task.escalatedAt
+              ? <Tag color="red">Đã chuyển QL</Tag>
+              : <>
+                  <Button size="small" onClick={() => quickAction(task, 'claim')}>Nhận</Button>
+                  <TaskCooldown createdAt={task.createdAt} escalatedAt={task.escalatedAt} />
+                </>
           )}
           {task.assignedTo && ['pending', 'urgent'].includes(task.status) && (
             <Button size="small" type="primary" onClick={() => quickAction(task, 'start')}>Bắt đầu</Button>
@@ -112,6 +124,12 @@ export default function TasksPage() {
       ),
     },
   ]
+
+  columns.splice(2, 0, {
+    title: 'Ngày trả phòng',
+    key: 'checkOut',
+    render: (_, task) => formatDateTime(task.booking?.checkOut),
+  })
 
   return (
     <div>
@@ -148,7 +166,7 @@ export default function TasksPage() {
       </div>
 
       {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} />
+      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} scroll={{ x: true }} />
     </div>
   )
 }

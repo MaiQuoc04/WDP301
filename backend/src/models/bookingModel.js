@@ -49,6 +49,10 @@ const bookingSchema = new mongoose.Schema({
     price:    Number,
     quantity: { type: Number, default: 1 },
     addedAt:  { type: Date, default: Date.now },
+    // Theo dõi triển khai tại phòng (UI bảng dịch vụ) — KHÔNG ảnh hưởng bill
+    status:      { type: String, enum: ['pending', 'delivered'], default: 'pending' },
+    deliveredAt: { type: Date },
+    deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
   }],
 
   // Amenity thiếu (UC-33/50) — Tú ghi, phản ánh vào bill

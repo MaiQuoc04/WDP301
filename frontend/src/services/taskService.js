@@ -8,6 +8,7 @@ const put = (url, data) => axiosInstance.put(url, data || {}).then((res) => res.
 
 // Owner: Tu - Housekeeper APIs (UC-44 -> UC-55)
 export const taskService = {
+  getDashboard: () => get(`${base}/dashboard`),
   listTasks: (params) => get(`${base}/tasks`, params),
   getTaskDetail: (id) => get(`${base}/tasks/${id}`),
   claimTask: (id) => patch(`${base}/tasks/${id}/claim`),
