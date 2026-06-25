@@ -108,13 +108,44 @@ exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, by: accountId })
 }
+
+// Gen QR PayOS để thu cọc (lễ tân dùng cho booking pending)
+exports.createDepositQR = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId)
+  if (!booking) { const e = new Error('Không tìm thấy booking'); e.status = 404; throw e }
+  if (booking.status !== 'pending') throw new Error('Chỉ tạo QR cọc khi booking đang chờ (pending)')
+  const payosService = require('./payosService')
+  return payosService.createQR(booking, 'deposit', accountId)
+}
 exports.checkIn = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.checkIn(bookingId, { by: accountId })
 }
 exports.checkOut = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
-  return bookingService.checkOut(bookingId, { method: body.method, by: accountId })
+  // Bắt buộc giao housekeeper cho task dọn turnover; validate TRƯỚC khi check-out (tránh trạng thái dở)
+  const booking = await Booking.findById(bookingId).select('branch')
+  await housekeepingService.assertHousekeeperInBranch(body.housekeeperId, booking.branch)
+  return bookingService.checkOut(bookingId, { method: body.method, by: accountId, housekeeperId: body.housekeeperId })
+}
+
+// Gen QR PayOS để thu remaining khi check-out (lễ tân chọn phương thức QR)
+exports.createCheckoutQR = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId)
+  if (!booking) { const e = new Error('Không tìm thấy booking'); e.status = 404; throw e }
+  if (booking.status !== 'checked_in') throw new Error('Chỉ tạo QR checkout khi khách đang ở')
+  const payosService = require('./payosService')
+  return payosService.createQR(booking, 'remaining', accountId)
+}
+
+// Check-out bằng tiền mặt (lễ tân xác nhận trực tiếp, không QR)
+exports.checkOutCash = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId).select('branch')
+  await housekeepingService.assertHousekeeperInBranch(body.housekeeperId, booking.branch)
+  return bookingService.checkOut(bookingId, { method: 'cash', by: accountId, housekeeperId: body.housekeeperId })
 }
 exports.complete = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
@@ -123,6 +154,14 @@ exports.complete = async (accountId, bookingId) => {
 exports.setBedSurcharge = async (accountId, bookingId, apply) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.setBedSurcharge(bookingId, apply, accountId)
+}
+exports.setEarlyCheckin = async (accountId, bookingId, hours) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.setEarlyCheckin(bookingId, hours, accountId)
+}
+exports.setLateCheckout = async (accountId, bookingId, hours) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.setLateCheckout(bookingId, hours, accountId)
 }
 
 // ---------- GĐ3: Bill ----------
@@ -181,25 +220,31 @@ exports.setServiceDelivered = async (accountId, bookingId, lineId, delivered) =>
 
 // ---------- Housekeeping: yêu cầu kiểm tra / dọn phòng (giao task cho housekeeper) ----------
 // UC: lễ tân "Yêu cầu kiểm tra phòng" trước khi khách trả -> task inspection (claimable + thông báo).
-exports.requestInspection = async (accountId, bookingId) => {
+exports.requestInspection = async (accountId, bookingId, housekeeperId) => {
   await assertInBranch(accountId, bookingId)
   const booking = await Booking.findById(bookingId).select('status room')
   if (!booking.room) throw new Error('Booking chưa được gán phòng')
   if (booking.status !== 'checked_in') throw new Error('Chỉ yêu cầu kiểm tra khi khách đang ở (checked_in)')
-  return housekeepingService.createInspection(bookingId, booking.room, accountId)
+  return housekeepingService.createInspection(bookingId, booking.room, accountId, housekeeperId)
 }
 // UC: lễ tân "Dọn phòng" theo yêu cầu khách (giữa kỳ) -> task mid_stay (miễn phí).
-exports.requestCleaning = async (accountId, bookingId) => {
+exports.requestCleaning = async (accountId, bookingId, housekeeperId) => {
   await assertInBranch(accountId, bookingId)
   const booking = await Booking.findById(bookingId).select('status room')
   if (!booking.room) throw new Error('Booking chưa được gán phòng')
   if (booking.status !== 'checked_in') throw new Error('Chỉ dọn phòng khi khách đang ở (checked_in)')
-  return housekeepingService.createMidStay(bookingId, booking.room, accountId)
+  return housekeepingService.createMidStay(bookingId, booking.room, accountId, housekeeperId)
 }
 // Trạng thái + lịch sử housekeeping của booking (cho nút + lịch sử ở màn chi tiết lễ tân).
 exports.getBookingHousekeeping = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return housekeepingService.bookingView(bookingId)
+}
+// Gợi ý housekeeper để giao việc (theo tầng phòng + rảnh/bận).
+exports.getHousekeeperSuggestions = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const booking = await Booking.findById(bookingId).populate('room', 'floor').lean()
+  return housekeepingService.suggestHousekeepers(booking.branch, booking?.room?.floor ?? null)
 }
 
 // ---------- GĐ4: huỷ / no-show ----------
@@ -218,6 +263,47 @@ exports.transfer = async (accountId, bookingId, body = {}) => {
 exports.update = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.updateBooking(bookingId, { ...body, by: accountId })
+}
+
+// ---------- Dashboard: thông số trong ngày của lễ tân ----------
+exports.getDashboard = async (accountId) => {
+  const branches = await myBranchIds(accountId)
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart.getTime() + 86400000)
+  const today = { $gte: dayStart, $lt: dayEnd }
+  const inBranch = { branch: { $in: branches } }
+
+  const pop = (q) => q
+    .populate('roomType', 'name').populate('room', 'roomNumber')
+    .populate({ path: 'customer', select: 'fullName phone' })
+
+  const [arrivals, departures, inHouse, pendingCount, roomsTotal, roomsAvailable, roomsOccupied] = await Promise.all([
+    // Khách dự kiến NHẬN hôm nay (chưa nhận)
+    pop(Booking.find({ ...inBranch, checkIn: today, status: { $in: ['pending', 'confirmed'] } })).sort('checkIn').lean(),
+    // Khách dự kiến TRẢ hôm nay (đang ở)
+    pop(Booking.find({ ...inBranch, checkOut: today, status: 'checked_in' })).sort('checkOut').lean(),
+    Booking.countDocuments({ ...inBranch, status: 'checked_in' }),
+    Booking.countDocuments({ ...inBranch, status: 'pending' }),
+    Room.countDocuments({ ...inBranch, isDeleted: { $ne: true } }),
+    Room.countDocuments({ ...inBranch, isDeleted: { $ne: true }, status: 'available' }),
+    Room.countDocuments({ ...inBranch, isDeleted: { $ne: true }, status: 'occupied' }),
+  ])
+
+  // Doanh thu hôm nay (các payment đã thu trong ngày, thuộc booking của chi nhánh)
+  const bookingIds = await Booking.find(inBranch).distinct('_id')
+  const pays = await Payment.find({ booking: { $in: bookingIds }, status: 'paid', paidAt: today }).select('amount').lean()
+  const revenueToday = pays.reduce((s, p) => s + (p.amount || 0), 0)
+
+  return {
+    counts: {
+      arrivalsToday: arrivals.length,
+      departuresToday: departures.length,
+      inHouse, pending: pendingCount,
+      roomsAvailable, roomsOccupied, roomsTotal,
+      revenueToday,
+    },
+    arrivals, departures,
+  }
 }
 
 // ---------- GĐ5: lịch phòng + giao dịch ----------

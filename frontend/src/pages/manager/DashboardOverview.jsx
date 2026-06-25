@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Card, Row, Col, Progress, Table, Tag, Button, Spin, Empty, Alert } from 'antd'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
@@ -19,22 +20,24 @@ export default function DashboardOverview() {
     amenities: [],
     services: [],
     issues: [],
-    tasks: []
+    tasks: [],
+    hkFloors: []
   })
 
   const loadData = async () => {
     setLoading(true)
     setError('')
     try {
-      const [rooms, roomTypes, amenities, services, issues, tasks] = await Promise.all([
+      const [rooms, roomTypes, amenities, services, issues, tasks, hkFloors] = await Promise.all([
         roomService.getRooms(),
         roomService.getRoomTypes(),
         roomService.getAmenities(),
         roomService.getServices(),
         roomService.getRoomIssues(),
-        roomService.getHousekeepingTasks()
+        roomService.getHousekeepingTasks(),
+        roomService.getHousekeeperFloors().catch(() => [])
       ])
-      setData({ rooms, roomTypes, amenities, services, issues, tasks })
+      setData({ rooms, roomTypes, amenities, services, issues, tasks, hkFloors })
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Lỗi tải dữ liệu thống kê')
     } finally {
@@ -108,6 +111,15 @@ export default function DashboardOverview() {
       </div>
 
       {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 24 }} />}
+
+      {data.hkFloors.filter((h) => !h.floors || h.floors.length === 0).length > 0 && (
+        <Alert
+          type="warning" showIcon style={{ marginBottom: 24 }}
+          message={`Có ${data.hkFloors.filter((h) => !h.floors || h.floors.length === 0).length} nhân viên buồng phòng chưa được phân tầng`}
+          description="Lễ tân giao việc theo tầng phụ trách — hãy phân tầng để hệ thống gợi ý chính xác."
+          action={<Link to="/manager/floors"><Button size="small" type="primary">Phân tầng ngay</Button></Link>}
+        />
+      )}
 
       {/* KPI Cards */}
       <div className="dashboard-grid">

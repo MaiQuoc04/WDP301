@@ -96,7 +96,7 @@ const RoomList = () => {
                 </div>
 
                 <div className="card-actions">
-                  <button className="action-btn" onClick={() => navigate(`/booking?roomType=${room._id}`)}>ĐẶT PHÒNG</button>
+                  <button className="action-btn" onClick={() => navigate('/')}>ĐẶT PHÒNG</button>
                   <button className="action-btn outline" onClick={() => navigate(`/rooms/${room._id}`)}>CHI TIẾT &rarr;</button>
                 </div>
               </div>

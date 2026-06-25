@@ -19,10 +19,15 @@ router.get('/bookings/:id', validateObjectId('id'), c.getBookingDetail) // UC-28
 // Giai đoạn 2 — vòng đời booking
 router.post('/bookings', c.walkIn)                                                      // UC-29 walk-in
 router.post('/bookings/:id/confirm-deposit', validateObjectId('id'), c.confirmDeposit)  // thu cọc -> confirmed
+router.post('/bookings/:id/deposit-qr', validateObjectId('id'), c.createDepositQR)       // Gen QR PayOS thu cọc
 router.post('/bookings/:id/check-in', validateObjectId('id'), c.checkIn)                // UC-30
-router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)              // UC-31
+router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)              // UC-31 (legacy - cash mặc định)
+router.post('/bookings/:id/checkout-qr', validateObjectId('id'), c.createCheckoutQR)   // Gen QR PayOS thu tiền còn lại
+router.post('/bookings/:id/checkout-cash', validateObjectId('id'), c.checkOutCash)      // Tiền mặt — xác nhận trực tiếp
 router.post('/bookings/:id/complete', validateObjectId('id'), c.complete)               // -> completed
 router.post('/bookings/:id/bed-surcharge', validateObjectId('id'), c.setBedSurcharge)   // bật/tắt phụ phí giường phụ
+router.post('/bookings/:id/early-checkin', validateObjectId('id'), c.setEarlyCheckin)   // nhận sớm (giờ)
+router.post('/bookings/:id/late-checkout', validateObjectId('id'), c.setLateCheckout)   // trả muộn (giờ)
 
 // Giai đoạn 3 — Bill
 router.get('/bookings/:id/bill', validateObjectId('id'), c.getBill)                                          // UC-34
@@ -35,6 +40,7 @@ router.get('/service-board', c.serviceBoard)                                    
 router.post('/bookings/:id/request-inspection', validateObjectId('id'), c.requestInspection)   // tạo task kiểm tra thiết bị
 router.post('/bookings/:id/request-cleaning', validateObjectId('id'), c.requestCleaning)       // tạo task dọn phòng (giữa kỳ)
 router.get('/bookings/:id/housekeeping', validateObjectId('id'), c.getBookingHousekeeping)     // trạng thái + lịch sử
+router.get('/bookings/:id/housekeepers', validateObjectId('id'), c.getHousekeeperSuggestions)  // gợi ý housekeeper để giao việc
 router.post('/bookings/:id/missing-amenities', validateObjectId('id'), c.addMissingAmenity)                  // UC-33
 router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeMissingAmenity)
 
@@ -43,6 +49,9 @@ router.post('/bookings/:id/cancel', validateObjectId('id'), c.cancel)       // U
 router.post('/bookings/:id/no-show', validateObjectId('id'), c.markNoShow)  // UC-36 giữ cọc
 router.post('/bookings/:id/transfer', validateObjectId('id'), c.transfer)   // UC-37 đổi phòng in-house
 router.patch('/bookings/:id', validateObjectId('id'), c.update)             // UC-38 cập nhật booking
+
+// Dashboard — thông số trong ngày
+router.get('/dashboard', c.getDashboard)
 
 // Giai đoạn 5 — lịch phòng + giao dịch
 router.get('/schedule', c.getSchedule)                                          // UC-39/40 lịch/timeline phòng

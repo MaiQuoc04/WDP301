@@ -10,6 +10,14 @@ export const customerService = {
     const response = await axiosInstance.get('/public/home-data')
     return response.data
   },
+  getBranches: async () => {
+    const response = await axiosInstance.get('/public/branches')
+    return response.data // { success, data: branches }
+  },
+  searchAvailableRooms: async (params) => {
+    const response = await axiosInstance.get('/public/rooms/available', { params })
+    return response.data // { success, data: rooms }
+  },
   createBooking: async (data) => {
     const response = await axiosInstance.post('/customer/bookings', data)
     return response.data

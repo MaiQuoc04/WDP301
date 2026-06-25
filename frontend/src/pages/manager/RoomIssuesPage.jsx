@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, Tag, message } from 'antd'
-import { PlusOutlined, CheckOutlined, CloseOutlined, SyncOutlined } from '@ant-design/icons'
+import { PlusOutlined, CheckOutlined, CloseOutlined, SyncOutlined, EyeOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+
+const STATUS_LABEL = { open: 'Chờ duyệt', maintaining: 'Đang bảo trì', fix_requested: 'Chờ xác nhận sửa', resolved: 'Đã khắc phục', cancelled: 'Đã hủy' }
+const SEV_LABEL = { high: 'Nghiêm trọng', medium: 'Trung bình', low: 'Thấp' }
+const fmtDT = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '-')
+const NoteBox = ({ children }) => (
+  <div style={{ whiteSpace: 'pre-wrap', background: '#f7f7f9', border: '1px solid #eee', borderRadius: 6, padding: '8px 12px', marginTop: 4 }}>{children}</div>
+)
 
 export default function RoomIssuesPage() {
   const [issues, setIssues] = useState([])
@@ -18,6 +25,8 @@ export default function RoomIssuesPage() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false)
   
   const [selectedIssue, setSelectedIssue] = useState(null)
+  const [detailIssue, setDetailIssue] = useState(null)
+  const [detailVisible, setDetailVisible] = useState(false)
 
   const [createForm] = Form.useForm()
   const [resolveForm] = Form.useForm()
@@ -50,7 +59,7 @@ export default function RoomIssuesPage() {
   const handleCreateIssue = async (values) => {
     try {
       await roomService.createRoomIssue(values)
-      message.success('Báo cáo sự cố mới thành công! Trạng thái phòng được đồng bộ.')
+      message.success('Đã tạo & chuyển phòng sang bảo trì')
       setCreateModalVisible(false)
       loadData()
     } catch (err) {
@@ -58,6 +67,17 @@ export default function RoomIssuesPage() {
         title: 'Thất bại',
         content: err.response?.data?.message || err.message || 'Lỗi gửi báo cáo sự cố'
       })
+    }
+  }
+
+  // Approve maintenance (open -> maintaining)
+  const handleApprove = async (record) => {
+    try {
+      await roomService.approveRoomMaintenance(record._id)
+      message.success('Đã duyệt — phòng chuyển sang bảo trì')
+      loadData()
+    } catch (err) {
+      Modal.error({ title: 'Không thể duyệt', content: err.response?.data?.message || err.message || 'Lỗi duyệt bảo trì' })
     }
   }
 
@@ -101,7 +121,8 @@ export default function RoomIssuesPage() {
     {
       title: 'Mô tả sự cố',
       dataIndex: 'description',
-      key: 'description'
+      key: 'description',
+      render: (t) => <span style={{ display: 'inline-block', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }} title={t}>{t}</span>
     },
     {
       title: 'Mức độ',
@@ -124,61 +145,50 @@ export default function RoomIssuesPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        const colors = { open: 'error', resolved: 'success', cancelled: 'default' }
-        const labels = { open: 'Chưa xử lý', resolved: 'Đã khắc phục', cancelled: 'Đã hủy' }
+        const colors = { open: 'gold', maintaining: 'processing', fix_requested: 'warning', resolved: 'success', cancelled: 'default' }
+        const labels = { open: 'Chờ duyệt', maintaining: 'Đang bảo trì', fix_requested: 'Chờ xác nhận sửa', resolved: 'Đã khắc phục', cancelled: 'Đã hủy' }
         return <Tag color={colors[status]}>{labels[status] || status}</Tag>
       }
     },
     {
-      title: 'Khắc phục bởi',
-      key: 'resolvedInfo',
-      render: (_, record) => {
-        if (record.status === 'resolved') {
-          return (
-            <div>
-              <div style={{ fontSize: 13, fontWeight: '500' }}>{record.resolvedBy?.email}</div>
-              {record.resolutionNote && (
-                <div style={{ fontSize: 11, color: '#666' }}>Note: {record.resolutionNote}</div>
-              )}
-            </div>
-          )
-        }
-        if (record.status === 'cancelled') {
-          return (
-            <div>
-              <div style={{ fontSize: 13, color: '#999' }}>Đã hủy</div>
-              {record.cancellationReason && (
-                <div style={{ fontSize: 11, color: '#666' }}>Lý do: {record.cancellationReason}</div>
-              )}
-            </div>
-          )
-        }
-        return '-'
+      title: 'Người sửa',
+      key: 'fixedBy',
+      render: (_, r) => r.fixRequestedBy?.email || <span style={{ color: '#bbb' }}>—</span>
+    },
+    {
+      title: 'Người xác nhận',
+      key: 'confirmedBy',
+      render: (_, r) => {
+        if (r.status === 'resolved') return r.resolvedBy?.email || '-'
+        if (r.status === 'cancelled') return <span style={{ color: '#999' }}>{r.cancelledBy?.email || 'Đã hủy'}</span>
+        return <span style={{ color: '#bbb' }}>—</span>
       }
     },
     {
       title: 'Thao tác',
       key: 'actions',
       render: (_, record) => {
-        if (record.status !== 'open') return '-'
+        const s = record.status
         return (
           <Space>
-            <Button 
-              type="text" 
-              icon={<CheckOutlined />} 
-              style={{ color: '#2e7d32' }} 
-              onClick={() => { setSelectedIssue(record); resolveForm.resetFields(); setResolveModalVisible(true); }}
-            >
-              Giải quyết
-            </Button>
-            <Button 
-              type="text" 
-              icon={<CloseOutlined />} 
-              danger 
-              onClick={() => { setSelectedIssue(record); cancelForm.resetFields(); setCancelModalVisible(true); }}
-            >
-              Hủy
-            </Button>
+            <Button type="text" icon={<EyeOutlined />} onClick={() => { setDetailIssue(record); setDetailVisible(true) }}>Chi tiết</Button>
+            {s === 'open' && (
+              <Button type="text" icon={<CheckOutlined />} style={{ color: '#1677ff' }} onClick={() => handleApprove(record)}>
+                Duyệt bảo trì
+              </Button>
+            )}
+            {['maintaining', 'fix_requested'].includes(s) && (
+              <Button type="text" icon={<CheckOutlined />} style={{ color: '#2e7d32' }}
+                onClick={() => { setSelectedIssue(record); resolveForm.resetFields(); setResolveModalVisible(true) }}>
+                Xác nhận đã sửa
+              </Button>
+            )}
+            {!['resolved', 'cancelled'].includes(s) && (
+              <Button type="text" icon={<CloseOutlined />} danger
+                onClick={() => { setSelectedIssue(record); cancelForm.resetFields(); setCancelModalVisible(true) }}>
+                {s === 'open' ? 'Từ chối' : 'Hủy'}
+              </Button>
+            )}
           </Space>
         )
       }
@@ -202,9 +212,11 @@ export default function RoomIssuesPage() {
             <span style={{ marginRight: 8, fontWeight: 500 }}>Trạng thái sự cố:</span>
             <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 160 }} placeholder="Tất cả trạng thái">
               <Select.Option value="">Tất cả trạng thái</Select.Option>
-              <Select.Option value="open">Chưa xử lý (Open)</Select.Option>
-              <Select.Option value="resolved">Đã khắc phục (Resolved)</Select.Option>
-              <Select.Option value="cancelled">Đã hủy bỏ (Cancelled)</Select.Option>
+              <Select.Option value="open">Chờ duyệt</Select.Option>
+              <Select.Option value="maintaining">Đang bảo trì</Select.Option>
+              <Select.Option value="fix_requested">Chờ xác nhận sửa</Select.Option>
+              <Select.Option value="resolved">Đã khắc phục</Select.Option>
+              <Select.Option value="cancelled">Đã hủy bỏ</Select.Option>
             </Select>
           </div>
 
@@ -326,6 +338,37 @@ export default function RoomIssuesPage() {
             <Input.TextArea rows={3} placeholder="Ví dụ: Báo nhầm phòng, sự cố khách tự bấm nhầm nút khóa..." />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* DETAIL MODAL — xem đầy đủ note (mô tả dài / ghi chú xác nhận / lý do hủy) */}
+      <Modal
+        title={`Chi tiết sự cố — Phòng ${detailIssue?.room?.roomNumber || ''}`}
+        open={detailVisible}
+        onCancel={() => setDetailVisible(false)}
+        footer={[<Button key="close" onClick={() => setDetailVisible(false)}>Đóng</Button>]}
+        width={560}
+      >
+        {detailIssue && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ margin: 0 }}><b>Trạng thái:</b> {STATUS_LABEL[detailIssue.status] || detailIssue.status} · <b>Mức độ:</b> {SEV_LABEL[detailIssue.severity] || detailIssue.severity}</p>
+            <p style={{ margin: 0 }}><b>HK báo cần bảo trì:</b> {detailIssue.reporter?.email || '-'} · {fmtDT(detailIssue.createdAt)}</p>
+            <div><b>Mô tả sự cố:</b><NoteBox>{detailIssue.description}</NoteBox></div>
+            {detailIssue.approvedAt && <p style={{ margin: 0 }}><b>QL duyệt bảo trì:</b> {fmtDT(detailIssue.approvedAt)}</p>}
+            {detailIssue.fixRequestedBy && <p style={{ margin: 0 }}><b>Người sửa (HK báo đã sửa):</b> {detailIssue.fixRequestedBy.email} · {fmtDT(detailIssue.fixRequestedAt)}</p>}
+            {detailIssue.status === 'resolved' && (
+              <>
+                <p style={{ margin: 0 }}><b>Người xác nhận:</b> {detailIssue.resolvedBy?.email || '-'} · {fmtDT(detailIssue.resolvedAt)}</p>
+                {detailIssue.resolutionNote && <div><b>Ghi chú xác nhận:</b><NoteBox>{detailIssue.resolutionNote}</NoteBox></div>}
+              </>
+            )}
+            {detailIssue.status === 'cancelled' && (
+              <>
+                <p style={{ margin: 0 }}><b>Người từ chối:</b> {detailIssue.cancelledBy?.email || '-'}</p>
+                {detailIssue.cancellationReason && <div><b>Lý do từ chối:</b><NoteBox>{detailIssue.cancellationReason}</NoteBox></div>}
+              </>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { bookingService, vnd, fmtDateTime } from '../../services'
+import { bookingService, vnd, fmtDateTime, bookingStatusLabel } from '../../services'
 
 const STATUSES = ['', 'pending', 'confirmed', 'checked_in', 'checked_out', 'completed', 'cancelled', 'no_show']
 
@@ -25,7 +25,7 @@ export default function BookingsPage() {
       </div>
       <div className="rc-filters">
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          {STATUSES.map((s) => <option key={s} value={s}>{s || 'Tất cả trạng thái'}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s}>{s ? bookingStatusLabel(s) : 'Tất cả trạng thái'}</option>)}
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã/tên/sđt"
           onKeyDown={(e) => e.key === 'Enter' && load()} />
@@ -43,7 +43,7 @@ export default function BookingsPage() {
               <td>{b.room?.roomNumber ? <strong>{b.room.roomNumber}</strong> : <span style={{ color: '#aaa' }}>—</span>}</td>
               <td>{fmtDateTime(b.checkIn)}</td>
               <td>{fmtDateTime(b.checkOut)}</td>
-              <td><span className={'rc-badge s-' + b.status}>{b.status}</span></td>
+              <td><span className={'rc-badge s-' + b.status}>{bookingStatusLabel(b.status)}</span></td>
               <td>{vnd(b.totalAmount)}</td>
               <td><Link to={`/reception/bookings/${b._id}`}>Chi tiết</Link></td>
             </tr>

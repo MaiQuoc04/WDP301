@@ -11,11 +11,11 @@ export const taskService = {
   getDashboard: () => get(`${base}/dashboard`),
   listTasks: (params) => get(`${base}/tasks`, params),
   getTaskDetail: (id) => get(`${base}/tasks/${id}`),
-  claimTask: (id) => patch(`${base}/tasks/${id}/claim`),
   startTask: (id) => patch(`${base}/tasks/${id}/start`),
   saveAmenityReport: (id, report) => put(`${base}/tasks/${id}/amenity-report`, { report }),
   reportIssue: (id, data) => post(`${base}/tasks/${id}/issues`, data),
-  markMaintenance: (id, data) => patch(`${base}/tasks/${id}/maintenance`, data),
   completeTask: (id) => patch(`${base}/tasks/${id}/complete`),
   getHistory: (params) => get(`${base}/history`, params),
+  listMaintenance: () => get(`${base}/maintenance`),
+  requestFix: (issueId, data) => patch(`${base}/maintenance/${issueId}/fixed`, data),
 }

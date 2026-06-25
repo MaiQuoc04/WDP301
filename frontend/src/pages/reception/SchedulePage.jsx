@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { bookingService, fmtDate } from '../../services'
+import { bookingService, fmtDate, bookingStatusLabel } from '../../services'
 
 const DAY = 86400000
 const COL = 64 // px mỗi ngày (khớp background-size trong reception.css)
@@ -64,7 +64,7 @@ export default function SchedulePage() {
                     const pos = bar(b); if (!pos) return null
                     return (
                       <div key={b.code} className={'gantt-bar s-' + b.status} style={{ left: pos.left, width: pos.width }}
-                        title={`${b.code} · ${b.guestName || ''} · ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)} · ${b.status}`}>
+                        title={`${b.code} · ${b.guestName || ''} · ${fmtDate(b.checkIn)} → ${fmtDate(b.checkOut)} · ${bookingStatusLabel(b.status)}`}>
                         {b.code}
                       </div>
                     )

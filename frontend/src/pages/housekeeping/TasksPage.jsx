@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Alert, Button, Select, Space, Table, Tag, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
-import TaskCooldown from './TaskCooldown'
 
 const statusColor = {
   pending: 'default',
@@ -52,7 +51,6 @@ export default function TasksPage() {
 
   const quickAction = async (task, action) => {
     try {
-      if (action === 'claim') await taskService.claimTask(task._id)
       if (action === 'start') await taskService.startTask(task._id)
       message.success('Cập nhật task thành công')
       loadTasks()
@@ -108,14 +106,6 @@ export default function TasksPage() {
       key: 'actions',
       render: (_, task) => (
         <Space size={6}>
-          {!task.assignedTo && (
-            task.escalatedAt
-              ? <Tag color="red">Đã chuyển QL</Tag>
-              : <>
-                  <Button size="small" onClick={() => quickAction(task, 'claim')}>Nhận</Button>
-                  <TaskCooldown createdAt={task.createdAt} escalatedAt={task.escalatedAt} />
-                </>
-          )}
           {task.assignedTo && ['pending', 'urgent'].includes(task.status) && (
             <Button size="small" type="primary" onClick={() => quickAction(task, 'start')}>Bắt đầu</Button>
           )}

@@ -67,6 +67,7 @@ export default function RoomTypesPage() {
       capacity: record.capacity,
       area: record.area,
       basePrice: record.basePrice,
+      extraBedFee: record.extraBedFee || 0,
       description: record.description
     })
     setFormModalVisible(true)
@@ -183,6 +184,12 @@ export default function RoomTypesPage() {
       render: (price) => <span style={{ color: 'var(--color-gold)', fontWeight: 'bold' }}>{vnd(price)}</span>
     },
     {
+      title: 'Phụ phí giường phụ',
+      dataIndex: 'extraBedFee',
+      key: 'extraBedFee',
+      render: (fee) => fee ? <span style={{ color: 'var(--color-gold)', fontWeight: 'bold' }}>{vnd(fee)}/đêm</span> : '-'
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
@@ -244,7 +251,7 @@ export default function RoomTypesPage() {
           form={form}
           layout="vertical"
           onFinish={handleFormSubmit}
-          initialValues={{ capacity: 2, bedType: 'double' }}
+          initialValues={{ capacity: 2, bedType: 'double', extraBedFee: 0 }}
         >
           <Form.Item
             name="name"
@@ -304,6 +311,20 @@ export default function RoomTypesPage() {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="extraBedFee"
+            label="Phụ phí giường phụ / đêm (VNĐ)"
+            rules={[{ type: 'number', min: 0, message: 'Phụ phí không được âm' }]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              min={0}
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+              placeholder="Ví dụ: 300,000"
+            />
+          </Form.Item>
 
           <Form.Item
             name="description"

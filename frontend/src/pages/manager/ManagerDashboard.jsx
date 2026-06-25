@@ -10,6 +10,9 @@ import ServicesPage from './ServicesPage'
 import HousekeepingPage from './HousekeepingPage'
 import RoomIssuesPage from './RoomIssuesPage'
 import RestockPage from './RestockPage'
+import HousekeeperFloorsPage from './HousekeeperFloorsPage'
+import NotificationBell from '../../components/NotificationBell'
+import NotificationsPage from '../../components/NotificationsPage'
 import './manager.css'
 
 import {
@@ -20,6 +23,7 @@ import {
   CoffeeOutlined,
   CustomerServiceOutlined,
   AuditOutlined,
+  ApartmentOutlined,
   WarningOutlined,
   InboxOutlined,
   LogoutOutlined
@@ -88,6 +92,10 @@ export default function ManagerDashboard() {
             <InboxOutlined />
             <span>Bổ sung thiết bị</span>
           </NavLink>
+          <NavLink to="/manager/floors" className="manager-nav-item">
+            <ApartmentOutlined />
+            <span>Phân tầng</span>
+          </NavLink>
           <NavLink to="/manager/issues" className="manager-nav-item">
             <WarningOutlined />
             <span>Báo cáo sự cố</span>
@@ -116,6 +124,7 @@ export default function ManagerDashboard() {
             <span className="manager-branch-badge">HANOI HOTEL HN01</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <NotificationBell basePath="/manager" />
             <span style={{ fontSize: 14, color: 'var(--color-light-gray)' }}>
               Xin chào, <strong>{user?.fullName || user?.email}</strong>
             </span>
@@ -132,6 +141,8 @@ export default function ManagerDashboard() {
             <Route path="services" element={<ServicesPage />} />
             <Route path="housekeeping" element={<HousekeepingPage />} />
             <Route path="restock" element={<RestockPage />} />
+            <Route path="floors" element={<HousekeeperFloorsPage />} />
+            <Route path="notifications" element={<NotificationsPage basePath="/manager" />} />
             <Route path="issues" element={<RoomIssuesPage />} />
           </Routes>
         </main>
