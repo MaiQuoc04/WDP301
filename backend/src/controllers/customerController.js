@@ -26,6 +26,19 @@ exports.createBooking = async (req, res) => {
 
 const Booking = require('../models/bookingModel');
 
+exports.getBookingHistory = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ customer: req.user._id })
+      .populate('roomType', 'name images')
+      .populate('branch', 'name')
+      .sort({ createdAt: -1 });
+    
+    res.json({ success: true, data: bookings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getBookingDetail = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
