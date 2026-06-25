@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
 import './admin.css'
 
@@ -8,6 +8,7 @@ const AdminDashboard = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const location = useLocation()
+  const user = useSelector((state) => state.auth.user)
 
   // Auto open the reports menu if on any reports path
   const isReportPath = location.pathname === '/admin' || location.pathname.startsWith('/admin/reports')
@@ -121,25 +122,34 @@ const AdminDashboard = () => {
             <span>Quản lý khách hàng</span>
           </NavLink>
         </nav>
+
+        {/* Sidebar Footer - User Info & Logout */}
+        <div className="admin-sidebar-footer">
+          <div className="admin-user-info">
+            <span className="admin-user-name" title={user?.fullName || user?.email}>
+              {user?.fullName || 'System Admin'}
+            </span>
+            <span className="admin-user-role-text">{user?.email || 'admin@hbms.vn'}</span>
+          </div>
+          <button className="admin-sidebar-logout-btn" onClick={handleLogout}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16, marginRight: 8 }}>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+            Đăng xuất
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="admin-main">
         <header className="admin-header">
           <div className="admin-header-title">
-            <h1>Tổng Quản Trị Hệ Thống</h1>
+            <span className="admin-branch-badge">SYSTEM ADMIN</span>
           </div>
-          <div className="admin-header-profile">
-            <div className="admin-profile-info">
-              <div className="admin-avatar">SA</div>
-              <div className="admin-profile-text">
-                <div className="admin-profile-name">Super Admin</div>
-                <div className="admin-profile-role">Hệ thống HBMS</div>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="admin-logout-btn">
-              Đăng xuất
-            </button>
+          <div className="admin-header-greeting">
+            <span>Xin chào, <strong>{user?.fullName || user?.email || 'Admin'}</strong></span>
           </div>
         </header>
 
