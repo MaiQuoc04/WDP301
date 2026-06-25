@@ -10,11 +10,11 @@ const handle = (fn, code = 200) => async (req, res) => {
 
 exports.listTasks = handle((req) => svc.listTasks(req.user.id, req.query))
 exports.getTaskDetail = handle((req) => svc.getTaskDetail(req.user.id, req.params.id))
-exports.claimTask = handle((req) => svc.claimTask(req.user.id, req.params.id))
 exports.startTask = handle((req) => svc.startTask(req.user.id, req.params.id))
 exports.saveAmenityReport = handle((req) => svc.saveAmenityReport(req.user.id, req.params.id, req.body.report))
 exports.reportIssue = handle((req) => svc.reportIssue(req.user.id, req.params.id, req.body), 201)
-exports.markMaintenance = handle((req) => svc.markMaintenance(req.user.id, req.params.id, req.body))
+exports.listMaintenance = handle((req) => svc.listMaintenance(req.user.id))
+exports.requestFix = handle((req) => svc.requestFix(req.user.id, req.params.id, req.body))
 exports.completeTask = handle((req) => svc.completeTask(req.user.id, req.params.id))
 exports.getHistory = handle((req) => svc.getHistory(req.user.id, req.query))
 exports.getDashboard = handle((req) => svc.getDashboard(req.user.id))

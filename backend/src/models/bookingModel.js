@@ -38,6 +38,11 @@ const bookingSchema = new mongoose.Schema({
   missingAmenitiesTotal: { type: Number, default: 0 },
   bedSurcharge:          { type: Number, default: 0 },      // phụ phí giường phụ (ước tính, theo §9.7)
   bedSurchargeApplied:   { type: Boolean, default: false }, // đã cộng vào bill chưa (tự áp khi check-in)
+  // Phí giờ: nhận sớm / trả muộn — 10% giá đêm/giờ; trả muộn quá 18:00 -> tính 1 đêm (lateFullNight)
+  earlyHours:            { type: Number, default: 0 },
+  lateHours:             { type: Number, default: 0 },
+  lateFullNight:         { type: Boolean, default: false },
+  extraHourFee:          { type: Number, default: 0 },
   totalAmount:           { type: Number, default: 0 },
   paidAmount:            { type: Number, default: 0 },
   remainingAmount:       { type: Number, default: 0 },

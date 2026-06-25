@@ -6,6 +6,7 @@ const roleAssignmentSchema = new mongoose.Schema({
   branch:   { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   role:     { type: String, required: true }, // receptionist | housekeeper | branch_manager
   isActive: { type: Boolean, default: true },
+  floors:   [{ type: Number }], // CHỈ housekeeper: các tầng phụ trách (branch manager set)
 }, { timestamps: true })
 
 roleAssignmentSchema.index({ account: 1, branch: 1, role: 1 }, { unique: true })

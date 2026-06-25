@@ -1,0 +1,331 @@
+/* ═══════════════════════════════════════════════
+   BookingCheckout.css — Customer PayOS QR page
+   ═══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.bkco-page {
+  font-family: 'Inter', sans-serif;
+  background: #f5f4f0;
+  min-height: 100vh;
+}
+
+/* ── Loading ─────────────────────────────────── */
+.bkco-loading {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #6b7280;
+}
+.bkco-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #b8933f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Container & Header ──────────────────────── */
+.bkco-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px 60px;
+}
+.bkco-header {
+  margin-bottom: 28px;
+}
+.bkco-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 6px;
+}
+.bkco-sub {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── Grid ────────────────────────────────────── */
+.bkco-grid {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.bkco-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+  padding: 28px;
+}
+.bkco-info-card { flex: 1 1 380px; }
+.bkco-pay-card  { flex: 1 1 320px; }
+
+/* ── Card title ──────────────────────────────── */
+.bkco-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bkco-card-icon { font-size: 20px; }
+
+/* ── Info rows ───────────────────────────────── */
+.bkco-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #4b5563;
+}
+.bkco-info-row span:first-child { color: #9ca3af; }
+.bkco-info-row strong { color: #111827; font-weight: 600; text-align: right; max-width: 60%; }
+.bkco-divider {
+  border: none;
+  border-top: 1px dashed #e5e7eb;
+  margin: 12px 0;
+}
+
+/* ── Status badge ────────────────────────────── */
+.bkco-status-badge {
+  margin-top: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  background: #fef9ec;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+.bkco-status-badge[data-status="confirmed"],
+.bkco-status-badge[data-status="checked_in"] {
+  background: #ecfdf5; color: #065f46; border-color: #a7f3d0;
+}
+.bkco-status-badge[data-status="completed"] {
+  background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe;
+}
+.bkco-status-badge[data-status="cancelled"] {
+  background: #fef2f2; color: #991b1b; border-color: #fecaca;
+}
+
+/* ── Cost rows ───────────────────────────────── */
+.bkco-cost-rows { margin-bottom: 24px; }
+.bkco-cost-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #4b5563;
+  border-bottom: 1px solid #f3f4f6;
+}
+.bkco-cost-row.total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  border-top: 2px solid #e5e7eb;
+  border-bottom: none;
+  margin-top: 8px;
+  padding-top: 12px;
+}
+.bkco-cost-row.total span:last-child { color: #b8933f; }
+.bkco-cost-row.deposit span:last-child { color: #d97706; font-weight: 600; }
+.bkco-cost-row.paid span:last-child { color: #059669; font-weight: 600; }
+
+/* ── Done banner ─────────────────────────────── */
+.bkco-done-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #6ee7b7;
+  border-radius: 12px;
+}
+.bkco-done-icon { font-size: 28px; }
+.bkco-done-banner strong { display: block; color: #065f46; font-size: 15px; margin-bottom: 4px; }
+.bkco-done-banner p { color: #047857; font-size: 13px; margin: 0; }
+
+/* ── Pay section ─────────────────────────────── */
+.bkco-pay-section { margin-top: 4px; }
+.bkco-pay-hint { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+
+/* ── Buttons ─────────────────────────────────── */
+.bkco-btn-group { display: flex; flex-direction: column; gap: 12px; }
+
+.bkco-btn-qr,
+.bkco-btn-full {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.2s;
+  width: 100%;
+}
+.bkco-btn-qr {
+  background: #fefce8;
+  border-color: #fbbf24;
+  color: #92400e;
+}
+.bkco-btn-qr:hover:not(:disabled) {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(251,191,36,0.25);
+}
+.bkco-btn-full {
+  background: linear-gradient(135deg, #b8933f, #d4a853);
+  border-color: #b8933f;
+  color: #fff;
+}
+.bkco-btn-full:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(184,147,63,0.35);
+}
+.bkco-btn-qr:disabled,
+.bkco-btn-full:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.bkco-btn-icon { font-size: 24px; flex-shrink: 0; }
+.bkco-btn-qr span:last-child,
+.bkco-btn-full span:last-child {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bkco-btn-qr strong,
+.bkco-btn-full strong { font-size: 14px; font-weight: 600; }
+.bkco-btn-qr small,
+.bkco-btn-full small { font-size: 12px; opacity: 0.75; }
+
+.bkco-btn-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 6px;
+}
+
+.bkco-or-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+.bkco-or-divider::before,
+.bkco-or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ── QR Box ──────────────────────────────────── */
+.bkco-qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border: 2px dashed #fbbf24;
+  border-radius: 16px;
+  background: #fffbeb;
+}
+.bkco-qr-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.bkco-qr-amount {
+  font-size: 24px;
+  font-weight: 800;
+  color: #b8933f;
+}
+.bkco-expire {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+.bkco-expire.urgent { color: #dc2626; background: #fef2f2; animation: pulse 1s infinite; }
+.bkco-expire.expired { color: #dc2626; background: #fef2f2; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+.bkco-qr-frame {
+  padding: 12px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+.bkco-qr-img { width: 220px; height: 220px; display: block; border-radius: 4px; }
+.bkco-qr-noimg {
+  width: 220px; height: 220px;
+  display: flex; align-items: center; justify-content: center;
+  color: #9ca3af; font-size: 13px; background: #f9fafb; border-radius: 4px;
+}
+
+.bkco-qr-guide {
+  font-size: 13px;
+  color: #4b5563;
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+}
+.bkco-link-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b8933f;
+  text-decoration: none;
+  border-bottom: 1px solid #b8933f;
+  padding-bottom: 1px;
+  transition: opacity 0.15s;
+}
+.bkco-link-btn:hover { opacity: 0.75; }
+
+.bkco-qr-polling {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.bkco-polling-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: blink 1.4s ease-in-out infinite;
+}
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+.bkco-cancel-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+  padding: 0;
+  margin-top: 4px;
+}
+.bkco-cancel-btn:hover { color: #374151; }

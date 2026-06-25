@@ -34,6 +34,7 @@ export default function NotificationsPage({ basePath }) {
     }
     if (n.refType === 'booking' && n.refId) nav(`${basePath}/bookings/${n.refId}`)
     else if (n.refType === 'task' && n.refId && basePath === '/housekeeping') nav(`${basePath}/tasks/${n.refId}`)
+    else if (n.refType === 'room' && basePath === '/manager') nav(`${basePath}/restock`)
   }
 
   const markAll = async () => {

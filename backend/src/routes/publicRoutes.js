@@ -4,8 +4,10 @@ const publicController = require('../controllers/publicController')
 
 // Public routes (không cần protect)
 router.get('/rooms', publicController.getRooms)
+router.get('/rooms/available', publicController.searchRooms)   // tìm phòng trống theo chi nhánh + ngày
+router.get('/branches', publicController.getBranches)          // danh sách chi nhánh (ô chọn)
 router.get('/home-data', publicController.getHomeData)
 
-// TODO(Khánh): GET /branches, /branches/:id, /rooms/:id, /rooms/search, /reviews ...
+// TODO(Khánh): GET /branches/:id, /rooms/:id, /reviews ...
 
 module.exports = router

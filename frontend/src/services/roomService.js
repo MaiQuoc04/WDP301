@@ -64,6 +64,7 @@ export const roomService = {
   getRoomIssues: (params) => get(base.ROOM_ISSUES, params),
   getRoomIssueById: (id) => get(`${base.ROOM_ISSUES}/${id}`),
   createRoomIssue: (data) => post(base.ROOM_ISSUES, data),
+  approveRoomMaintenance: (id) => patch(`${base.ROOM_ISSUES}/${id}/approve-maintenance`),
   resolveRoomIssue: (id, data) => patch(`${base.ROOM_ISSUES}/${id}/resolve`, data),
   cancelRoomIssue: (id, data) => patch(`${base.ROOM_ISSUES}/${id}/cancel`, data),
 
@@ -76,6 +77,10 @@ export const roomService = {
 
   // Housekeepers staff list
   getHousekeepers: () => get(base.HOUSEKEEPERS),
+
+  // Phân tầng housekeeper
+  getHousekeeperFloors: () => get(base.HOUSEKEEPER_FLOORS),
+  setHousekeeperFloors: (accountId, floors) => put(`${base.HOUSEKEEPERS}/${accountId}/floors`, { floors }),
 }
 
 

@@ -17,8 +17,13 @@ export const bookingService = {
   getBill: (id) => get(`${base}/bookings/${id}/bill`),
   walkIn: (data) => post(`${base}/bookings`, data),
   confirmDeposit: (id, data) => post(`${base}/bookings/${id}/confirm-deposit`, data || {}),
+  createDepositQR: (id) => post(`${base}/bookings/${id}/deposit-qr`, {}),
   checkIn: (id, data) => post(`${base}/bookings/${id}/check-in`, data || {}),
   checkOut: (id, data) => post(`${base}/bookings/${id}/check-out`, data || {}),
+  // PayOS QR checkout — lễ tân gen QR, khách quét QR để trả số dư
+  createCheckoutQR: (id) => post(`${base}/bookings/${id}/checkout-qr`, {}),
+  // Tiền mặt checkout — không cần QR, lễ tân xác nhận trực tiếp
+  checkOutCash: (id, data) => post(`${base}/bookings/${id}/checkout-cash`, data || {}),
   complete: (id) => post(`${base}/bookings/${id}/complete`, {}),
   cancel: (id, data) => post(`${base}/bookings/${id}/cancel`, data || {}),
   noShow: (id) => post(`${base}/bookings/${id}/no-show`, {}),
@@ -28,16 +33,40 @@ export const bookingService = {
   removeService: (id, lineId) => del(`${base}/bookings/${id}/services/${lineId}`),
   serviceBoard: () => get(`${base}/service-board`),
   setServiceDelivered: (id, lineId, delivered) => patch(`${base}/bookings/${id}/services/${lineId}`, { delivered }),
-  requestInspection: (id) => post(`${base}/bookings/${id}/request-inspection`, {}),
-  requestCleaning: (id) => post(`${base}/bookings/${id}/request-cleaning`, {}),
+  requestInspection: (id, housekeeperId) => post(`${base}/bookings/${id}/request-inspection`, { housekeeperId }),
+  requestCleaning: (id, housekeeperId) => post(`${base}/bookings/${id}/request-cleaning`, { housekeeperId }),
   getBookingHousekeeping: (id) => get(`${base}/bookings/${id}/housekeeping`),
+  getHousekeepers: (id) => get(`${base}/bookings/${id}/housekeepers`),
   addMissingAmenity: (id, data) => post(`${base}/bookings/${id}/missing-amenities`, data),
   removeMissingAmenity: (id, lineId) => del(`${base}/bookings/${id}/missing-amenities/${lineId}`),
   setBedSurcharge: (id, apply) => post(`${base}/bookings/${id}/bed-surcharge`, { apply }),
+  setEarlyCheckin: (id, hours) => post(`${base}/bookings/${id}/early-checkin`, { hours }),
+  setLateCheckout: (id, hours) => post(`${base}/bookings/${id}/late-checkout`, { hours }),
   schedule: (params) => get(`${base}/schedule`, params),
   transactions: (params) => get(`${base}/transactions`, params),
+  dashboard: () => get(`${base}/dashboard`),
 }
 
 export const vnd = (n) => (n || 0).toLocaleString('vi-VN') + 'đ'
 export const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('vi-VN') : '')
 export const fmtDateTime = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '')
+
+// Nhãn trạng thái booking (DB enum -> tiếng Việt dễ hiểu cho lễ tân)
+export const BOOKING_STATUS_LABEL = {
+  pending: 'Chờ cọc',
+  confirmed: 'Đã cọc',
+  checked_in: 'Đã nhận phòng',
+  checked_out: 'Đã trả phòng',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã huỷ',
+  no_show: 'Vắng (no-show)',
+}
+export const bookingStatusLabel = (s) => BOOKING_STATUS_LABEL[s] || s
+
+// Nhãn trạng thái thanh toán
+export const PAYMENT_STATUS_LABEL = {
+  unpaid: 'Chưa thanh toán',
+  partial: 'Thanh toán một phần',
+  paid: 'Đã thanh toán',
+}
+export const paymentStatusLabel = (s) => PAYMENT_STATUS_LABEL[s] || s

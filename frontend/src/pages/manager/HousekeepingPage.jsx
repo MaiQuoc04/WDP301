@@ -82,12 +82,7 @@ export default function HousekeepingPage() {
       title: 'Phòng',
       dataIndex: ['room', 'roomNumber'],
       key: 'roomNumber',
-      render: (text, record) => (
-        <Space>
-          <strong>{text}</strong>
-          {record.escalatedAt && !record.assignedTo && <Tag color="red">Quá hạn nhận</Tag>}
-        </Space>
-      )
+      render: (text) => <strong>{text}</strong>
     },
     {
       title: 'Độ khẩn cấp',

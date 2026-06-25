@@ -5,6 +5,7 @@ import DashboardPage from './DashboardPage'
 import TasksPage from './TasksPage'
 import TaskDetailPage from './TaskDetailPage'
 import HistoryPage from './HistoryPage'
+import MaintenancePage from './MaintenancePage'
 import NotificationBell from '../../components/NotificationBell'
 import NotificationsPage from '../../components/NotificationsPage'
 import '../manager/manager.css'
@@ -13,6 +14,7 @@ import {
   AuditOutlined,
   ScheduleOutlined,
   CheckSquareOutlined,
+  ToolOutlined,
   HistoryOutlined,
   LogoutOutlined,
 } from '@ant-design/icons'
@@ -55,6 +57,10 @@ export default function HousekeepingDashboard() {
             <CheckSquareOutlined />
             <span>Task đang mở</span>
           </NavLink>
+          <NavLink to="/housekeeping/maintenance" className="manager-nav-item">
+            <ToolOutlined />
+            <span>Phòng bảo trì</span>
+          </NavLink>
           <NavLink to="/housekeeping/history" className="manager-nav-item">
             <HistoryOutlined />
             <span>Lịch sử</span>
@@ -94,6 +100,7 @@ export default function HousekeepingDashboard() {
             <Route index element={<DashboardPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="tasks/:id" element={<TaskDetailPage />} />
+            <Route path="maintenance" element={<MaintenancePage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="notifications" element={<NotificationsPage basePath="/housekeeping" />} />
           </Routes>

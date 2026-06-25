@@ -90,10 +90,17 @@ export default function RoomPricesPage() {
       title: 'Áp dụng cho',
       key: 'applyTarget',
       render: (_, record) => {
-        if (record.date) {
-          return <Tag color="gold">Ngày cụ thể: {fmtDate(record.date)}</Tag>
+        if (record.startDate) {
+          const isOneDay = !record.endDate || dayjs(record.startDate).isSame(record.endDate, 'day')
+          return (
+            <Tag color="gold">
+              {isOneDay
+                ? `Ngày cụ thể: ${fmtDate(record.startDate)}`
+                : `Khoảng ngày: ${fmtDate(record.startDate)} - ${fmtDate(record.endDate)}`}
+            </Tag>
+          )
         }
-        const dayTypes = { weekday: 'Ngày thường (T2-T6)', weekend: 'Cuối tuần (T7-CN)', holiday: 'Ngày lễ' }
+        const dayTypes = { weekday: 'Ngày thường (T2-T5)', weekend: 'Cuối tuần (T6-CN)', holiday: 'Ngày lễ' }
         return <Tag color="blue">{dayTypes[record.dayType] || record.dayType}</Tag>
       }
     },
@@ -195,7 +202,6 @@ export default function RoomPricesPage() {
               <Select>
                 <Select.Option value="weekday">Ngày thường trong tuần (T2 - T5)</Select.Option>
                 <Select.Option value="weekend">Cuối tuần (T6 - CN)</Select.Option>
-                <Select.Option value="holiday">Ngày lễ lớn</Select.Option>
               </Select>
             </Form.Item>
           )}

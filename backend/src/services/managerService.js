@@ -34,6 +34,13 @@ function fail(msg, code = 400) {
   throw e
 }
 
+function parseLocalDate(value) {
+  if (value instanceof Date) return new Date(value)
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return new Date(value)
+}
+
 // Các trạng thái booking đang "chiếm" phòng (nguồn sự thật: bookingModel.BOOKING_STATUS)
 const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed', 'checked_in']
 
@@ -46,7 +53,7 @@ exports.getRoomTypes = async (branchId) => {
 
 // Dropdown options — chỉ loại phòng đang active (cho các select box của UI)
 exports.getRoomTypeOptions = async (branchId) => {
-  return RoomType.find({ branch: branchId, status: 'active' }, '_id name bedType capacity basePrice').sort({ name: 1 })
+  return RoomType.find({ branch: branchId, status: 'active' }, '_id name bedType capacity basePrice extraBedFee').sort({ name: 1 })
 }
 
 // Chi tiết 1 RoomType (chặn xem chéo chi nhánh)
@@ -58,17 +65,18 @@ exports.getRoomTypeById = async (id, branchId) => {
 
 // UC-57: Tạo mới RoomType
 exports.createRoomType = async (data, branchId) => {
-  const { name, bedType, capacity, area, basePrice, description, images } = data
+  const { name, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
 
   if (!name?.trim()) fail('Tên loại phòng không được để trống')
   if (!basePrice || basePrice <= 0) fail('Giá cơ bản phải lớn hơn 0')
   if (capacity != null && capacity <= 0) fail('Sức chứa phải lớn hơn 0')
+  if (extraBedFee != null && extraBedFee < 0) fail('Phụ phí giường phụ không được âm')
 
   // Kiểm tra trùng tên trong chi nhánh
   const exists = await RoomType.findOne({ branch: branchId, name: name.trim() })
   if (exists) fail(`Loại phòng "${name.trim()}" đã tồn tại trong chi nhánh`)
 
-  return RoomType.create({ branch: branchId, name: name.trim(), bedType, capacity, area, basePrice, description, images })
+  return RoomType.create({ branch: branchId, name: name.trim(), bedType, capacity, area, basePrice, extraBedFee: extraBedFee || 0, description, images })
 }
 
 // UC-58: Cập nhật RoomType
@@ -76,7 +84,7 @@ exports.updateRoomType = async (id, data, branchId) => {
   const rt = await findBranchEntity(RoomType, id, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
 
-  const { name, bedType, capacity, area, basePrice, description, images } = data
+  const { name, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
 
   if (name != null) {
     const trimmed = name.trim()
@@ -93,6 +101,10 @@ exports.updateRoomType = async (id, data, branchId) => {
   if (capacity != null) {
     if (capacity <= 0) fail('Sức chứa phải lớn hơn 0')
     rt.capacity = capacity
+  }
+  if (extraBedFee != null) {
+    if (extraBedFee < 0) fail('Phụ phí giường phụ không được âm')
+    rt.extraBedFee = extraBedFee
   }
   if (bedType != null) rt.bedType = bedType
   if (area != null) rt.area = area
@@ -222,15 +234,18 @@ exports.getRoomPrices = async (branchId) => {
   const roomTypeIds = await RoomType.distinct('_id', { branch: branchId })
   return RoomPrice.find({ roomType: { $in: roomTypeIds } })
     .populate('roomType', 'name basePrice')
-    .sort({ roomType: 1, date: 1 })
+    .sort({ roomType: 1, startDate: 1, dayType: 1 })
 }
 
 // Tạo hoặc cập nhật cấu hình giá động (upsert)
 exports.createOrUpdateRoomPrice = async (data, branchId) => {
   const { roomType: roomTypeId, date, dayType, price, discount } = data
+  const nextPrice = Number(price)
+  const nextDiscount = Number(discount || 0)
 
   if (!roomTypeId) fail('Loại phòng không được để trống')
-  if (!price || price <= 0) fail('Giá phải lớn hơn 0')
+  if (!Number.isFinite(nextPrice) || nextPrice <= 0) fail('Giá phải lớn hơn 0')
+  if (!Number.isFinite(nextDiscount) || nextDiscount < 0 || nextDiscount > 99) fail('Giảm giá phải từ 0 đến 99%')
   if (!date && !dayType) fail('Phải chỉ định ngày cụ thể (date) hoặc loại ngày (dayType)')
   if (date && dayType) fail('Chỉ được chỉ định 1 trong 2: ngày cụ thể (date) hoặc loại ngày (dayType)')
 
@@ -239,24 +254,30 @@ exports.createOrUpdateRoomPrice = async (data, branchId) => {
   if (!rt) fail('Loại phòng không tồn tại hoặc không thuộc chi nhánh này', 404)
 
   if (date) {
-    const targetDate = new Date(date)
+    const targetDate = parseLocalDate(date)
     if (isNaN(targetDate)) fail('Ngày không hợp lệ')
     // Cấu hình theo ngày cụ thể → upsert theo roomType + date
     const startOfDay = new Date(targetDate); startOfDay.setHours(0, 0, 0, 0)
     const endOfDay   = new Date(targetDate); endOfDay.setHours(23, 59, 59, 999)
     return RoomPrice.findOneAndUpdate(
-      { roomType: roomTypeId, date: { $gte: startOfDay, $lte: endOfDay } },
-      { roomType: roomTypeId, date: startOfDay, price, discount: discount || 0, dayType: undefined },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { roomType: roomTypeId, startDate: startOfDay, endDate: endOfDay },
+      {
+        $set: { roomType: roomTypeId, startDate: startOfDay, endDate: endOfDay, price: nextPrice, discount: nextDiscount },
+        $unset: { dayType: '' },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
     )
   } else {
-    const validDayTypes = ['weekday', 'weekend', 'holiday']
-    if (!validDayTypes.includes(dayType)) fail(`dayType không hợp lệ. Cho phép: ${validDayTypes.join(', ')}`)
+    const validDayTypes = ['weekday', 'weekend']
+    if (!validDayTypes.includes(dayType)) fail('Loại ngày định kỳ chỉ hỗ trợ weekday/weekend. Ngày lễ hãy cấu hình theo ngày cụ thể.')
     // Cấu hình theo loại ngày → upsert theo roomType + dayType
     return RoomPrice.findOneAndUpdate(
-      { roomType: roomTypeId, dayType, date: null },
-      { roomType: roomTypeId, dayType, price, discount: discount || 0, date: undefined },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { roomType: roomTypeId, dayType, startDate: { $exists: false }, endDate: { $exists: false } },
+      {
+        $set: { roomType: roomTypeId, dayType, price: nextPrice, discount: nextDiscount },
+        $unset: { startDate: '', endDate: '' },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
     )
   }
 }
@@ -582,7 +603,7 @@ exports.getRoomIssues = async (branchId, query = {}) => {
   const filter = { branch: branchId }
 
   if (query.status) {
-    if (['open', 'resolved'].includes(query.status)) {
+    if (['open', 'maintaining', 'fix_requested', 'resolved', 'cancelled'].includes(query.status)) {
       filter.status = query.status
     }
   }
@@ -597,8 +618,10 @@ exports.getRoomIssues = async (branchId, query = {}) => {
 
   return RoomIssue.find(filter)
     .populate('room', 'roomNumber status')
-    .populate('reporter', 'email')
-    .populate('resolvedBy', 'email')
+    .populate('reporter', 'email')          // HK báo cần bảo trì
+    .populate('fixRequestedBy', 'email')    // HK báo đã sửa (người sửa)
+    .populate('resolvedBy', 'email')        // QL xác nhận
+    .populate('cancelledBy', 'email')       // QL từ chối
     .sort({ createdAt: -1 })
 }
 
@@ -624,173 +647,81 @@ exports.createRoomIssue = async (data, branchId, reporterId) => {
   const room = await Room.findOne({ _id: roomId, branch: branchId, isDeleted: { $ne: true } })
   if (!room) fail('Phòng không tồn tại', 404)
 
+  // Manager TỰ tạo -> vào thẳng 'maintaining' + phòng maintenance (manager là người duyệt)
   const issue = await RoomIssue.create({
-    branch: branchId,
-    room: roomId,
-    reporter: reporterId,
-    description: description.trim(),
-    severity: severity || 'medium',
-    status: 'open'
+    branch: branchId, room: roomId, reporter: reporterId,
+    description: description.trim(), severity: severity || 'medium',
+    status: 'maintaining', approvedBy: reporterId, approvedAt: new Date(),
   })
-
-  // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
-  // Không ghi đè nếu phòng đang 'occupied' (khách đang ở)
-  if (['available', 'cleaning'].includes(room.status)) {
-    room.status = 'maintenance'
-    await room.save()
-  }
-
+  if (room.status !== 'occupied') { room.status = 'maintenance'; await room.save() }
   return issue
 }
 
-// Giải quyết sự cố phòng
-exports.resolveRoomIssue = async (id, data, branchId, managerId) => {
-  const { resolutionNote } = data
+// QL DUYỆT yêu cầu bảo trì của HK: open -> maintaining + phòng maintenance + báo HK.
+exports.approveMaintenance = async (id, branchId, managerId) => {
+  const issue = await findBranchEntity(RoomIssue, id, branchId)
+  if (!issue) fail('Yêu cầu bảo trì không tồn tại', 404)
+  if (issue.status !== 'open') fail('Chỉ duyệt yêu cầu đang chờ duyệt')
+  issue.status = 'maintaining'; issue.approvedBy = managerId; issue.approvedAt = new Date()
+  await issue.save()
+  const room = await findBranchEntity(Room, issue.room, branchId)
+  if (room && room.status !== 'occupied') { room.status = 'maintenance'; await room.save() }
+  try {
+    await notificationService.notifyUser(issue.reporter, {
+      type: 'general', title: `Đã duyệt bảo trì phòng ${room?.roomNumber || ''}`,
+      body: 'Quản lý đã duyệt — phòng chuyển sang bảo trì.', refType: 'room', refId: issue.room, branch: branchId,
+    })
+  } catch { /* ignore */ }
+  return issue
+}
 
-  if (supportsTransactions) {
-    let session
-    try {
-      session = await mongoose.startSession()
-      session.startTransaction()
-      const issue = await RoomIssue.findOne({ _id: id, branch: branchId }).session(session)
-      if (!issue) fail('Sự cố không tồn tại', 404)
-
-      if (issue.status !== 'open') {
-        fail('Chỉ có thể giải quyết sự cố đang mở')
-      }
-
-      issue.status = 'resolved'
-      issue.resolvedBy = managerId
-      issue.resolvedAt = new Date()
-      issue.resolutionNote = resolutionNote?.trim() || ''
-      await issue.save({ session })
-
-      // Kiểm tra xem phòng còn sự cố nào khác đang mở không
-      const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' }).session(session)
-      if (openCount === 0) {
-        const room = await Room.findOne({ _id: issue.room, branch: branchId }).session(session)
-        if (room && room.status === 'maintenance') {
-          room.status = 'available'
-          await room.save({ session })
-        }
-      }
-
-      await session.commitTransaction()
-      session.endSession()
-      return issue
-    } catch (error) {
-      if (session) {
-        if (session.inTransaction()) {
-          await session.abortTransaction()
-        }
-        session.endSession()
-      }
-      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
-        throw new Error('Transactions are enabled but MongoDB does not support them')
-      }
-      throw error
-    }
-  } else {
-    const issue = await findBranchEntity(RoomIssue, id, branchId)
-    if (!issue) fail('Sự cố không tồn tại', 404)
-
-    if (issue.status !== 'open') {
-      fail('Chỉ có thể giải quyết sự cố đang mở')
-    }
-
-    issue.status = 'resolved'
-    issue.resolvedBy = managerId
-    issue.resolvedAt = new Date()
-    issue.resolutionNote = resolutionNote?.trim() || ''
-    await issue.save()
-
-    // Kiểm tra xem phòng còn sự cố nào khác đang mở không
-    const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' })
-    if (openCount === 0) {
-      const room = await findBranchEntity(Room, issue.room, branchId)
-      if (room && room.status === 'maintenance') {
-        room.status = 'available'
-        await room.save()
-      }
-    }
-
-    return issue
+// Còn yêu cầu bảo trì nào đang hoạt động không -> nếu hết thì mở lại phòng.
+async function reopenRoomIfClear(roomId, branchId) {
+  const active = await RoomIssue.countDocuments({ room: roomId, status: { $in: ['open', 'maintaining', 'fix_requested'] } })
+  if (active === 0) {
+    const room = await findBranchEntity(Room, roomId, branchId)
+    if (room && room.status === 'maintenance') { room.status = 'available'; await room.save() }
   }
 }
 
-// Hủy bỏ sự cố phòng (Cancelled status)
+// QL XÁC NHẬN đã sửa: maintaining/fix_requested -> resolved + mở lại phòng + báo HK.
+exports.resolveRoomIssue = async (id, data, branchId, managerId) => {
+  const issue = await findBranchEntity(RoomIssue, id, branchId)
+  if (!issue) fail('Sự cố không tồn tại', 404)
+  if (!['maintaining', 'fix_requested'].includes(issue.status)) fail('Chỉ xác nhận đã sửa cho phòng đang bảo trì')
+  issue.status = 'resolved'
+  issue.resolvedBy = managerId
+  issue.resolvedAt = new Date()
+  issue.resolutionNote = data?.resolutionNote?.trim() || issue.resolutionNote || ''
+  await issue.save()
+  await reopenRoomIfClear(issue.room, branchId)
+  try {
+    await notificationService.notifyUser(issue.reporter, {
+      type: 'general', title: 'Phòng đã được xác nhận sửa xong',
+      body: 'Quản lý đã xác nhận — phòng được mở lại.', refType: 'room', refId: issue.room, branch: branchId,
+    })
+  } catch { /* ignore */ }
+  return issue
+}
+
+// QL TỪ CHỐI / huỷ yêu cầu: open/maintaining/fix_requested -> cancelled (mở lại phòng nếu đang bảo trì) + báo HK.
 exports.cancelRoomIssue = async (id, data, branchId, managerId) => {
-  const { cancellationReason } = data
-
-  if (supportsTransactions) {
-    let session
-    try {
-      session = await mongoose.startSession()
-      session.startTransaction()
-      const issue = await RoomIssue.findOne({ _id: id, branch: branchId }).session(session)
-      if (!issue) fail('Sự cố không tồn tại', 404)
-
-      if (issue.status !== 'open') {
-        fail('Chỉ có thể hủy sự cố đang mở')
-      }
-
-      issue.status = 'cancelled'
-      issue.cancelledBy = managerId
-      issue.cancelledAt = new Date()
-      issue.cancellationReason = cancellationReason?.trim() || ''
-      await issue.save({ session })
-
-      // Kiểm tra xem phòng còn sự cố nào khác đang mở không
-      const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' }).session(session)
-      if (openCount === 0) {
-        const room = await Room.findOne({ _id: issue.room, branch: branchId }).session(session)
-        if (room && room.status === 'maintenance') {
-          room.status = 'available'
-          await room.save({ session })
-        }
-      }
-
-      await session.commitTransaction()
-      session.endSession()
-      return issue
-    } catch (error) {
-      if (session) {
-        if (session.inTransaction()) {
-          await session.abortTransaction()
-        }
-        session.endSession()
-      }
-      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
-        throw new Error('Transactions are enabled but MongoDB does not support them')
-      }
-      throw error
-    }
-  } else {
-    const issue = await findBranchEntity(RoomIssue, id, branchId)
-    if (!issue) fail('Sự cố không tồn tại', 404)
-
-    if (issue.status !== 'open') {
-      fail('Chỉ có thể hủy sự cố đang mở')
-    }
-
-    issue.status = 'cancelled'
-    issue.cancelledBy = managerId
-    issue.cancelledAt = new Date()
-    issue.cancellationReason = cancellationReason?.trim() || ''
-    await issue.save()
-
-    // Kiểm tra xem phòng còn sự cố nào khác đang mở không
-    const openCount = await RoomIssue.countDocuments({ room: issue.room, status: 'open' })
-    if (openCount === 0) {
-      const room = await findBranchEntity(Room, issue.room, branchId)
-      if (room && room.status === 'maintenance') {
-        room.status = 'available'
-        await room.save()
-      }
-    }
-
-    return issue
-  }
+  const issue = await findBranchEntity(RoomIssue, id, branchId)
+  if (!issue) fail('Sự cố không tồn tại', 404)
+  if (!['open', 'maintaining', 'fix_requested'].includes(issue.status)) fail('Chỉ huỷ yêu cầu chưa kết thúc')
+  issue.status = 'cancelled'
+  issue.cancelledBy = managerId
+  issue.cancelledAt = new Date()
+  issue.cancellationReason = data?.cancellationReason?.trim() || ''
+  await issue.save()
+  await reopenRoomIfClear(issue.room, branchId)
+  try {
+    await notificationService.notifyUser(issue.reporter, {
+      type: 'general', title: 'Yêu cầu bảo trì bị từ chối',
+      body: issue.cancellationReason || 'Quản lý đã từ chối yêu cầu bảo trì.', refType: 'room', refId: issue.room, branch: branchId,
+    })
+  } catch { /* ignore */ }
+  return issue
 }
 
 // Báo cáo sự cố phòng phát sinh từ Housekeeping Task
@@ -817,77 +748,16 @@ exports.createRoomIssueFromTask = async (taskId, data, branchId, reporterId) => 
   const room = await Room.findOne({ _id: task.room, branch: branchId, isDeleted: { $ne: true } })
   if (!room) fail('Phòng không tồn tại', 404)
 
-  if (supportsTransactions) {
-    let session
-    try {
-      session = await mongoose.startSession()
-      session.startTransaction()
-      const issue = await RoomIssue.create([{
-        branch: branchId,
-        room: task.room,
-        reporter: reporterId,
-        description: description.trim(),
-        severity: severity || 'medium',
-        status: 'open',
-        housekeepingTask: taskId
-      }], { session }).then(res => res[0])
-
-      // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
-      if (['available', 'cleaning'].includes(room.status)) {
-        room.status = 'maintenance'
-        await room.save({ session })
-      }
-
-      // Nối thêm/cập nhật issueNote của task dọn dẹp
-      if (task.issueNote) {
-        task.issueNote = `${task.issueNote}\n- ${description.trim()}`
-      } else {
-        task.issueNote = description.trim()
-      }
-      await task.save({ session })
-
-      await session.commitTransaction()
-      session.endSession()
-      return issue
-    } catch (error) {
-      if (session) {
-        if (session.inTransaction()) {
-          await session.abortTransaction()
-        }
-        session.endSession()
-      }
-      if (error.message.includes('replica set') || error.message.includes('transaction') || error.message.includes('Session') || error.codeName === 'InvalidOptions') {
-        throw new Error('Transactions are enabled but MongoDB does not support them')
-      }
-      throw error
-    }
-  } else {
-    const issue = await RoomIssue.create({
-      branch: branchId,
-      room: task.room,
-      reporter: reporterId,
-      description: description.trim(),
-      severity: severity || 'medium',
-      status: 'open',
-      housekeepingTask: taskId
-    })
-
-    // Cập nhật trạng thái phòng: 'available' hoặc 'cleaning' chuyển thành 'maintenance'
-    if (['available', 'cleaning'].includes(room.status)) {
-      room.status = 'maintenance'
-      await room.save()
-    }
-
-    // Nối thêm/cập nhật issueNote của task dọn dẹp
-    if (task.issueNote) {
-      task.issueNote = `${task.issueNote}\n- ${description.trim()}`
-    } else {
-      task.issueNote = description.trim()
-    }
-    await task.save()
-
-    return issue
-  }
+  // Manager tạo từ task -> maintaining luôn + phòng maintenance
+  const issue = await RoomIssue.create({
+    branch: branchId, room: task.room, reporter: reporterId,
+    description: description.trim(), severity: severity || 'medium',
+    status: 'maintaining', approvedBy: reporterId, approvedAt: new Date(), housekeepingTask: taskId,
+  })
+  if (room.status !== 'occupied') { room.status = 'maintenance'; await room.save() }
+  task.issueNote = task.issueNote ? `${task.issueNote}\n- ${description.trim()}` : description.trim()
+  await task.save()
+  return issue
 }
 
 // ─── Housekeeping Monitor (UC69) ──────────────────────────────────────────────────
@@ -1004,6 +874,28 @@ exports.getHousekeepers = async (branchId) => {
   return assignments
     .map(a => a.account)
     .filter(acc => acc && acc.isActive)
+}
+
+// ─── Phân tầng housekeeper ───────────────────────────────────────────────────────
+// Danh sách housekeeper kèm tầng phụ trách (cho màn phân tầng + banner "chưa phân tầng")
+exports.getHousekeeperFloors = async (branchId) => {
+  const ras = await RoleAssignment.find({ branch: branchId, role: 'housekeeper', isActive: true })
+    .populate('account', '_id email fullName isActive').lean()
+  return ras
+    .filter(r => r.account && r.account.isActive !== false)
+    .map(r => ({ account: r.account, floors: r.floors || [] }))
+}
+
+// Set tầng phụ trách cho 1 housekeeper (accountId) trong chi nhánh
+exports.setHousekeeperFloors = async (accountId, floors, branchId) => {
+  if (!Array.isArray(floors)) fail('Danh sách tầng không hợp lệ')
+  const clean = [...new Set(floors.map(f => Number(f)).filter(f => Number.isFinite(f) && f >= 0))].sort((a, b) => a - b)
+  const ra = await RoleAssignment.findOneAndUpdate(
+    { account: accountId, branch: branchId, role: 'housekeeper', isActive: true },
+    { $set: { floors: clean } }, { new: true }
+  ).populate('account', '_id email fullName')
+  if (!ra) fail('Nhân viên buồng phòng không thuộc chi nhánh', 404)
+  return { account: ra.account, floors: ra.floors || [] }
 }
 
 
