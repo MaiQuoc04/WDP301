@@ -43,7 +43,11 @@
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
   z-index: 10;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .admin-sidebar-logo {
@@ -692,6 +696,53 @@
   margin-top: var(--space-1);
   display: block;
 }
+
+/* ---------- Password Toggle & Form Error States ---------- */
+.admin-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.admin-password-wrapper input {
+  width: 100%;
+  height: 42px;
+  padding-right: 42px !important;
+}
+
+.admin-password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--color-light-gray);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  user-select: none;
+  z-index: 1;
+}
+
+.admin-password-toggle:hover {
+  color: var(--color-gold);
+}
+
+.admin-form-group.has-error input,
+.admin-form-group.has-error select,
+.admin-form-group.has-error textarea {
+  border-color: var(--color-error);
+  background-color: rgba(199, 76, 77, 0.03);
+}
+
+.admin-form-group.has-error input:focus,
+.admin-form-group.has-error select:focus,
+.admin-form-group.has-error textarea:focus {
+  box-shadow: 0 0 0 3px rgba(199, 76, 77, 0.1);
+  border-color: var(--color-error);
+}
+
 
 /* ---------- SVG Chart Accents ---------- */
 .chart-svg-line {

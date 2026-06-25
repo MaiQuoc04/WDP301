@@ -11,6 +11,8 @@ import {
   removeStaffBranch
 } from '../../redux/slices/adminSlice'
 
+const PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/
+
 const BranchStaff = () => {
   const { branchId } = useParams()
   const dispatch = useDispatch()
@@ -24,8 +26,11 @@ const BranchStaff = () => {
   const [selectedBranchId, setSelectedBranchId] = useState('')
 
   const [formData, setFormData] = useState({
-    email: '', password: '', fullName: '', phone: '', gender: 'male', role: 'receptionist', branchId: ''
+    email: '', password: '', confirmPassword: '', fullName: '', phone: '', gender: 'male', role: 'receptionist', branchId: ''
   })
+  const [formErrors, setFormErrors] = useState({})
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     dispatch(fetchStaff())
@@ -53,12 +58,52 @@ const BranchStaff = () => {
     (s.account?.role && s.account.role.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
+  const validateForm = () => {
+    const errors = {}
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Vui lòng nhập họ tên nhân viên'
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Vui lòng nhập email'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Email không đúng định dạng'
+    }
+    if (!formData.password) {
+      errors.password = 'Vui lòng nhập mật khẩu'
+    } else if (formData.password.length < 6) {
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự'
+    }
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Vui lòng xác nhận mật khẩu'
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Mật khẩu xác nhận không khớp'
+    }
+    if (formData.phone && !PHONE_REGEX.test(formData.phone)) {
+      errors.phone = 'Số điện thoại không hợp lệ (VD: 0912345678)'
+    }
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
-    await dispatch(createStaff({ ...formData, branchId }))
+    if (!validateForm()) return
+    const { confirmPassword, ...submitData } = formData
+    await dispatch(createStaff({ ...submitData, branchId }))
     setShowModal(false)
-    setFormData({ email: '', password: '', fullName: '', phone: '', gender: 'male', role: 'receptionist', branchId })
+    setFormData({ email: '', password: '', confirmPassword: '', fullName: '', phone: '', gender: 'male', role: 'receptionist', branchId })
+    setFormErrors({})
+    setShowPassword(false)
+    setShowConfirmPassword(false)
     dispatch(fetchStaff())
+  }
+
+  const handleCloseCreateModal = () => {
+    setShowModal(false)
+    setFormErrors({})
+    setShowPassword(false)
+    setShowConfirmPassword(false)
+    setFormData({ email: '', password: '', confirmPassword: '', fullName: '', phone: '', gender: 'male', role: 'receptionist', branchId })
   }
 
   const handleToggle = (accountId, name, currentStatus) => {
@@ -126,6 +171,25 @@ const BranchStaff = () => {
       default: return role
     }
   }
+
+  // Eye icon for show/hide password
+  const EyeIcon = ({ visible, onClick }) => (
+    <span className="admin-password-toggle" onClick={onClick} title={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+      {visible ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+          <line x1="1" y1="1" x2="23" y2="23"></line>
+          <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      )}
+    </span>
+  )
 
   return (
     <div>
@@ -267,26 +331,81 @@ const BranchStaff = () => {
           <div className="admin-modal">
             <div className="admin-modal-header">
               <h3>Tạo Tài Khoản Nhân Viên — {currentBranch?.name}</h3>
-              <span className="admin-modal-close" onClick={() => setShowModal(false)}>&times;</span>
+              <span className="admin-modal-close" onClick={handleCloseCreateModal}>&times;</span>
             </div>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleCreate} noValidate autoComplete="off">
               <div className="admin-modal-body">
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.fullName ? 'has-error' : ''}`}>
                   <label>Họ tên nhân viên:</label>
-                  <input required type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                  <input 
+                    type="text" 
+                    autoComplete="off"
+                    value={formData.fullName} 
+                    onChange={e => {
+                      setFormData({...formData, fullName: e.target.value})
+                      if (formErrors.fullName) setFormErrors(prev => ({...prev, fullName: ''}))
+                    }} 
+                  />
+                  {formErrors.fullName && <span className="admin-form-error">{formErrors.fullName}</span>}
                 </div>
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.email ? 'has-error' : ''}`}>
                   <label>Email (Tên đăng nhập):</label>
-                  <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                  <input 
+                    type="text" 
+                    autoComplete="nope"
+                    value={formData.email} 
+                    onChange={e => {
+                      setFormData({...formData, email: e.target.value})
+                      if (formErrors.email) setFormErrors(prev => ({...prev, email: ''}))
+                    }} 
+                  />
+                  {formErrors.email && <span className="admin-form-error">{formErrors.email}</span>}
                 </div>
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.password ? 'has-error' : ''}`}>
                   <label>Mật khẩu đăng nhập:</label>
-                  <input required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                  <div className="admin-password-wrapper">
+                    <input 
+                      type={showPassword ? 'text' : 'password'} 
+                      autoComplete="new-password"
+                      value={formData.password} 
+                      onChange={e => {
+                        setFormData({...formData, password: e.target.value})
+                        if (formErrors.password) setFormErrors(prev => ({...prev, password: ''}))
+                      }} 
+                    />
+                    <EyeIcon visible={showPassword} onClick={() => setShowPassword(!showPassword)} />
+                  </div>
+                  {formErrors.password && <span className="admin-form-error">{formErrors.password}</span>}
+                </div>
+                <div className={`admin-form-group ${formErrors.confirmPassword ? 'has-error' : ''}`}>
+                  <label>Xác nhận mật khẩu:</label>
+                  <div className="admin-password-wrapper">
+                    <input 
+                      type={showConfirmPassword ? 'text' : 'password'} 
+                      autoComplete="new-password"
+                      value={formData.confirmPassword} 
+                      onChange={e => {
+                        setFormData({...formData, confirmPassword: e.target.value})
+                        if (formErrors.confirmPassword) setFormErrors(prev => ({...prev, confirmPassword: ''}))
+                      }} 
+                    />
+                    <EyeIcon visible={showConfirmPassword} onClick={() => setShowConfirmPassword(!showConfirmPassword)} />
+                  </div>
+                  {formErrors.confirmPassword && <span className="admin-form-error">{formErrors.confirmPassword}</span>}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="admin-form-group">
+                  <div className={`admin-form-group ${formErrors.phone ? 'has-error' : ''}`}>
                     <label>Số điện thoại:</label>
-                    <input type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                    <input 
+                      type="text" 
+                      value={formData.phone} 
+                      onChange={e => {
+                        setFormData({...formData, phone: e.target.value})
+                        if (formErrors.phone) setFormErrors(prev => ({...prev, phone: ''}))
+                      }} 
+                      placeholder="VD: 0912345678"
+                    />
+                    {formErrors.phone && <span className="admin-form-error">{formErrors.phone}</span>}
                   </div>
                   <div className="admin-form-group">
                     <label>Giới tính:</label>
@@ -306,7 +425,7 @@ const BranchStaff = () => {
                 </div>
               </div>
               <div className="admin-modal-footer">
-                <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setShowModal(false)}>Hủy bỏ</button>
+                <button type="button" className="admin-btn admin-btn-secondary" onClick={handleCloseCreateModal}>Hủy bỏ</button>
                 <button type="submit" className="admin-btn admin-btn-primary">Tạo Staff</button>
               </div>
             </form>
@@ -365,3 +484,4 @@ const BranchStaff = () => {
 }
 
 export default BranchStaff
+

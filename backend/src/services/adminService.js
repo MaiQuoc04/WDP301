@@ -199,7 +199,8 @@ exports.getAllAccounts = async (roleFilter) => {
 }
 
 exports.getDashboardStats = async () => {
-  const activeBranchesCount = await Branch.countDocuments({ isActive: true })
+  const activeBranches = await Branch.find({ isActive: true }).lean()
+  const activeBranchesCount = activeBranches.length
 
   // 1. Doanh thu theo chi nhánh
   const revenue = await Booking.aggregate([
@@ -246,6 +247,19 @@ exports.getDashboardStats = async () => {
       }
     }
   ])
+
+  // Merge: đảm bảo tất cả chi nhánh active đều xuất hiện, kể cả chưa có phòng
+  const occupancyByBranch = activeBranches.map(b => {
+    const roomStat = roomStats.find(r => String(r._id) === String(b._id))
+    return {
+      _id: b._id,
+      name: b.name,
+      code: b.code,
+      totalRooms: roomStat ? roomStat.totalRooms : 0,
+      occupiedRooms: roomStat ? roomStat.occupiedRooms : 0,
+      occupancyRate: roomStat ? roomStat.occupancyRate : 0
+    }
+  })
 
   // 3. Xu hướng đặt phòng 6 tháng
   const sixMonthsAgo = new Date()
@@ -310,6 +324,19 @@ exports.getDashboardStats = async () => {
     }
   ])
 
+  // Merge housekeeping: đảm bảo tất cả chi nhánh active đều có dữ liệu
+  const housekeepingKPI = activeBranches.map(b => {
+    const hkStat = housekeepingStats.find(h => String(h._id) === String(b._id))
+    return {
+      _id: b._id,
+      name: b.name,
+      code: b.code,
+      totalTasks: hkStat ? hkStat.totalTasks : 0,
+      missedTasks: hkStat ? hkStat.missedTasks : 0,
+      missedRate: hkStat ? hkStat.missedRate : 0
+    }
+  })
+
   // 5. Thống kê tổng hợp (Summary)
   const totalRevenueResult = await Booking.aggregate([
     { $match: { status: { $in: ['completed', 'checked_out'] } } },
@@ -317,12 +344,12 @@ exports.getDashboardStats = async () => {
   ])
   const totalRevenue = totalRevenueResult.length > 0 ? totalRevenueResult[0].total : 0
 
-  const totalRoomsCount = roomStats.reduce((acc, curr) => acc + curr.totalRooms, 0)
-  const occupiedRoomsCount = roomStats.reduce((acc, curr) => acc + curr.occupiedRooms, 0)
+  const totalRoomsCount = occupancyByBranch.reduce((acc, curr) => acc + curr.totalRooms, 0)
+  const occupiedRoomsCount = occupancyByBranch.reduce((acc, curr) => acc + curr.occupiedRooms, 0)
   const averageOccupancy = totalRoomsCount > 0 ? Math.round((occupiedRoomsCount / totalRoomsCount) * 100) : 0
 
-  const totalTasksCount = housekeepingStats.reduce((acc, curr) => acc + curr.totalTasks, 0)
-  const missedTasksCount = housekeepingStats.reduce((acc, curr) => acc + curr.missedTasks, 0)
+  const totalTasksCount = housekeepingKPI.reduce((acc, curr) => acc + curr.totalTasks, 0)
+  const missedTasksCount = housekeepingKPI.reduce((acc, curr) => acc + curr.missedTasks, 0)
   const averageMissedRate = totalTasksCount > 0 ? Math.round((missedTasksCount / totalTasksCount) * 100) : 0
 
   return {
@@ -333,9 +360,9 @@ exports.getDashboardStats = async () => {
       averageMissedRate
     },
     revenueByBranch: revenue,
-    occupancyByBranch: roomStats,
+    occupancyByBranch,
     monthlyBookingTrend: trendList,
-    housekeepingKPI: housekeepingStats
+    housekeepingKPI
   }
 }
 
