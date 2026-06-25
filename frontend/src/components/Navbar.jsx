@@ -99,13 +99,9 @@ const Navbar = () => {
     if (!mobileOpen) setMobileExpanded(null) // fixed bug logic
   }
 
-  const handleBookingClick = (e) => {
+  const handleLoginClick = (e) => {
     e.preventDefault()
-    if (!user) {
-      navigate('/login?redirect=/booking')
-    } else {
-      navigate('/booking')
-    }
+    navigate('/login')
   }
 
   const handleLogout = () => {
@@ -158,8 +154,8 @@ const Navbar = () => {
         {/* Desktop CTA & Actions */}
         <div className="navbar__actions">
           {!user ? (
-            <a href="/booking" onClick={handleBookingClick} className="navbar__cta">
-              ĐẶT PHÒNG
+            <a href="/login" onClick={handleLoginClick} className="navbar__cta">
+              Đăng nhập
             </a>
           ) : (
             <div 
@@ -275,8 +271,8 @@ const Navbar = () => {
         </ul>
 
         {!user && (
-          <a href="/booking" onClick={handleBookingClick} className="navbar__mobile-cta">
-            ĐẶT PHÒNG
+          <a href="/login" onClick={handleLoginClick} className="navbar__mobile-cta">
+            Đăng nhập
           </a>
         )}
       </div>

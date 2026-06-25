@@ -15,10 +15,15 @@ exports.getBookingDetail = handle((req) => svc.getBookingDetail(req.user.id, req
 // GĐ2 — vòng đời
 exports.walkIn = handle((req) => svc.walkIn(req.user.id, req.body), 201)              // UC-29
 exports.confirmDeposit = handle((req) => svc.confirmDeposit(req.user.id, req.params.id, req.body))
+exports.createDepositQR = handle((req) => svc.createDepositQR(req.user.id, req.params.id)) // Gen QR PayOS thu cọc
 exports.checkIn = handle((req) => svc.checkIn(req.user.id, req.params.id, req.body))  // UC-30
 exports.checkOut = handle((req) => svc.checkOut(req.user.id, req.params.id, req.body)) // UC-31
 exports.complete = handle((req) => svc.complete(req.user.id, req.params.id))
+exports.createCheckoutQR = handle((req) => svc.createCheckoutQR(req.user.id, req.params.id)) // Gen QR PayOS khi checkout
+exports.checkOutCash = handle((req) => svc.checkOutCash(req.user.id, req.params.id, req.body)) // Tiền mặt
 exports.setBedSurcharge = handle((req) => svc.setBedSurcharge(req.user.id, req.params.id, req.body.apply))
+exports.setEarlyCheckin = handle((req) => svc.setEarlyCheckin(req.user.id, req.params.id, req.body.hours))
+exports.setLateCheckout = handle((req) => svc.setLateCheckout(req.user.id, req.params.id, req.body.hours))
 
 // GĐ3 — bill
 exports.getBill = handle((req) => svc.getBill(req.user.id, req.params.id))                      // UC-34
@@ -28,9 +33,10 @@ exports.serviceBoard = handle((req) => svc.getServiceBoard(req.user.id))  // b�
 exports.setServiceDelivered = handle((req) => svc.setServiceDelivered(req.user.id, req.params.id, req.params.lineId, req.body.delivered))
 
 // Housekeeping — yêu cầu kiểm tra / dọn phòng + trạng thái
-exports.requestInspection = handle((req) => svc.requestInspection(req.user.id, req.params.id), 201)
-exports.requestCleaning = handle((req) => svc.requestCleaning(req.user.id, req.params.id), 201)
+exports.requestInspection = handle((req) => svc.requestInspection(req.user.id, req.params.id, req.body.housekeeperId), 201)
+exports.requestCleaning = handle((req) => svc.requestCleaning(req.user.id, req.params.id, req.body.housekeeperId), 201)
 exports.getBookingHousekeeping = handle((req) => svc.getBookingHousekeeping(req.user.id, req.params.id))
+exports.getHousekeeperSuggestions = handle((req) => svc.getHousekeeperSuggestions(req.user.id, req.params.id))
 exports.addMissingAmenity = handle((req) => svc.addMissingAmenity(req.user.id, req.params.id, req.body), 201) // UC-33
 exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user.id, req.params.id, req.params.lineId))
 
@@ -39,6 +45,9 @@ exports.cancel = handle((req) => svc.cancel(req.user.id, req.params.id, req.body
 exports.markNoShow = handle((req) => svc.markNoShow(req.user.id, req.params.id))        // UC-36
 exports.transfer = handle((req) => svc.transfer(req.user.id, req.params.id, req.body))  // UC-37
 exports.update = handle((req) => svc.update(req.user.id, req.params.id, req.body))       // UC-38
+
+// Dashboard — thông số trong ngày
+exports.getDashboard = handle((req) => svc.getDashboard(req.user.id))
 
 // GĐ5 — lịch phòng + giao dịch
 exports.getSchedule = handle((req) => svc.getSchedule(req.user.id, req.query))                 // UC-39/40

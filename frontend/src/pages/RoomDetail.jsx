@@ -188,7 +188,7 @@ const RoomDetail = () => {
               ))}
             </Row>
             <div className="rd-action">
-              <Button type="primary" className="rd-btn" onClick={() => navigate(`/booking?roomType=${room._id}`)}>
+              <Button type="primary" className="rd-btn" onClick={() => navigate('/')}>
                 ĐẶT PHÒNG
               </Button>
             </div>
@@ -217,7 +217,7 @@ const RoomDetail = () => {
                       <span><EyeOutlined /> View: Opened window, street view</span>
                     </div>
                     <div className="rd-related-actions">
-                      <Button className="rd-btn-sm" onClick={() => navigate(`/booking?roomType=${rel._id}`)}>Đặt Phòng</Button>
+                      <Button className="rd-btn-sm" onClick={() => navigate('/')}>Đặt Phòng</Button>
                       <Button className="rd-btn-outline" onClick={() => {navigate(`/rooms/${rel._id}`); window.scrollTo(0,0);}}>Chi Tiết &rarr;</Button>
                     </div>
                   </div>

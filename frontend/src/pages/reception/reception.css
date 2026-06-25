@@ -105,14 +105,16 @@
 
 /* ---------- Main ---------- */
 .rc-main {
-  padding: 40px;
-  max-width: 1280px;
-  margin: 0 auto;
+  padding: 32px 40px;
+  flex: 1;
+  min-width: 0;          /* cho phép giãn đầy trong flex container, không co theo nội dung */
   animation: fadeUp 0.5s ease-out forwards;
 }
+/* Chỉ fade opacity, KHÔNG dùng transform — vì transform trên .rc-main sẽ làm position:fixed
+   của modal bị neo theo .rc-main thay vì viewport (modal không ở giữa màn + cuộn theo trang). */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .rc-main h2 {
@@ -173,7 +175,8 @@
 }
 
 /* ---------- Buttons ---------- */
-.rc-main button:not(.link):not(.rc-chip), .rc-btn {
+/* :not(.ant-btn) để KHÔNG đè lên nút Ant Design ở trang Dashboard lễ tân */
+.rc-main button:not(.link):not(.rc-chip):not(.ant-btn), .rc-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -188,11 +191,11 @@
   transition: var(--rc-transition);
   box-shadow: 0 4px 12px rgba(161, 131, 72, 0.2);
 }
-.rc-main button:not(.link):not(.rc-chip):hover, .rc-btn:hover {
+.rc-main button:not(.link):not(.rc-chip):not(.ant-btn):hover, .rc-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(161, 131, 72, 0.3);
 }
-.rc-main button:not(.link):not(.rc-chip):active {
+.rc-main button:not(.link):not(.rc-chip):not(.ant-btn):active {
   transform: translateY(0);
 }
 .rc-actions button.danger {
@@ -202,7 +205,7 @@
 .rc-actions button.danger:hover {
   box-shadow: 0 6px 16px rgba(225, 29, 72, 0.3);
 }
-.rc-main button:disabled {
+.rc-main button:not(.ant-btn):disabled {
   background: #cbd5e1;
   color: #fff;
   cursor: not-allowed;
@@ -546,6 +549,39 @@
 .rc-svcboard .svc-card button.svc-toggle.undo:hover { background: #E2E8F0; color: var(--rc-text-main); transform: none; box-shadow: none; }
 .rc-svcboard .svc-card button.svc-toggle:disabled { opacity: 0.6; cursor: default; transform: none; box-shadow: none; }
 
+/* ---------- Validate form (walk-in bước 1) ---------- */
+.req { color: #e11d48; font-weight: 700; }
+.rc-field-err { display: block; color: #e11d48; font-size: 12px; margin-top: 4px; font-weight: 500; }
+.rc-form input.err { border-color: #e11d48; }
+.rc-form input.err:focus { border-color: #e11d48; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15); }
+
+/* ---------- Lọc loại phòng (walk-in bước 2) — chọn nhiều ---------- */
+.rc-type-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rc-type-filter-label { font-size: 14px; color: var(--rc-text-muted); font-weight: 600; margin-right: 4px; }
+.rc-type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--rc-border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+  transition: var(--rc-transition);
+  user-select: none;
+}
+.rc-type-chip:hover { border-color: var(--rc-gold); }
+.rc-type-chip.on { border-color: var(--rc-gold); background: #FAF8F3; box-shadow: 0 0 0 2px var(--rc-gold-glow); }
+.rc-type-chip input { accent-color: var(--rc-gold); cursor: pointer; }
+.rc-type-chip small { color: var(--rc-text-muted); }
+
 /* ---------- Tóm tắt thông tin tìm phòng (walk-in bước 2) ---------- */
 .rc-search-summary {
   display: flex;
@@ -572,12 +608,7 @@
 }
 .rc-hk > h3 { margin: 0 0 14px; }
 .rc-hk-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
-/* nút "Dọn phòng" kiểu phụ (outline) để phân biệt với nút chính gold */
-.rc-main .rc-hk button.hk-clean {
-  background: #fff; color: var(--rc-gold);
-  border: 1.5px solid var(--rc-gold); box-shadow: none;
-}
-.rc-main .rc-hk button.hk-clean:hover { background: #FAF8F3; box-shadow: var(--rc-shadow-soft); }
+/* nút "Dọn phòng" dùng style gold mặc định như các nút khác (bỏ outline gây hover trắng-trên-trắng) */
 .hk-state {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
@@ -612,6 +643,7 @@
   background: #fff; border-radius: var(--rc-radius-lg);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
   max-width: 460px; width: 100%; padding: 28px;
+  max-height: 90vh; overflow-y: auto; /* nội dung dài thì cuộn trong modal, không tràn ra ngoài */
 }
 .rc-modal h3 { margin: 0 0 12px; color: #B91C1C; }
 .rc-modal p { margin: 0 0 10px; line-height: 1.5; color: var(--rc-text-main); }
@@ -623,3 +655,208 @@
   box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
 }
 .rc-main .rc-modal button.rc-modal-danger:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+
+/* Picker chọn housekeeper để giao việc */
+.hk-pick-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.hk-pick-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--rc-border); border-radius: var(--rc-radius-md); }
+.hk-pick-list li:hover { border-color: var(--rc-gold); }
+.hk-pick-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hk-pick-info b { font-size: 14px; }
+.hk-pick-info small { color: var(--rc-text-muted); font-size: 12px; }
+.rc-main .hk-pick-list button { padding: 6px 16px; font-size: 13px; border-radius: 999px; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════
+   PayOS Payment Modal — Lễ tân (Reception)
+   ══════════════════════════════════════════════════════════ */
+
+/* Nút mở modal thanh toán PayOS */
+.rc-main button.btn-payos {
+  background: linear-gradient(135deg, #1a56db, #3b82f6);
+  color: #fff;
+  border: none;
+  border-radius: var(--rc-radius-md);
+  padding: 10px 22px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(26, 86, 219, 0.3);
+  transition: var(--rc-transition);
+}
+.rc-main button.btn-payos:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(26, 86, 219, 0.4);
+}
+
+/* Nút confirm primary trong PayOS modal */
+.rc-main button.btn-primary {
+  background: linear-gradient(135deg, var(--rc-gold), var(--rc-gold-light));
+  color: #fff;
+  border: none;
+  border-radius: var(--rc-radius-md);
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--rc-transition);
+  box-shadow: 0 4px 12px rgba(161, 131, 72, 0.2);
+}
+.rc-main button.btn-primary:hover { transform: translateY(-2px); }
+.rc-main button.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* Modal rộng hơn cho PayOS */
+.rc-modal.payos-modal {
+  max-width: 500px;
+}
+.rc-modal.payos-modal h3 {
+  color: var(--rc-text-main);
+  margin-bottom: 4px;
+}
+
+/* Lưới 2 nút chọn phương thức */
+.payos-method-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.payos-method-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border-radius: 14px;
+  border: 2px solid var(--rc-border);
+  cursor: pointer;
+  background: #fafbfc;
+  font-family: inherit;
+  transition: var(--rc-transition);
+  text-align: center;
+}
+.payos-method-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.payos-method-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.payos-method-btn.qr {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.payos-method-btn.qr:hover:not(:disabled) {
+  background: #dbeafe;
+  box-shadow: 0 8px 24px rgba(59,130,246,0.2);
+}
+.payos-method-btn.cash {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+.payos-method-btn.cash:hover:not(:disabled) {
+  background: #d1fae5;
+  box-shadow: 0 8px 24px rgba(16,185,129,0.2);
+}
+
+.payos-method-icon { font-size: 32px; line-height: 1; }
+.payos-method-label { font-weight: 700; font-size: 15px; color: var(--rc-text-main); }
+.payos-method-sub { font-size: 12px; color: var(--rc-text-muted); }
+
+/* Banner đã thanh toán đủ */
+.payos-paid-banner {
+  padding: 14px 18px;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: 10px;
+  color: #065f46;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  margin: 8px 0;
+}
+
+/* Khối hiển thị QR */
+.payos-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0;
+}
+.payos-qr-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.payos-amount {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--rc-gold);
+}
+
+/* Countdown */
+.rc-main .payos-expire,
+.payos-expire {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 99px;
+  color: #92400e;
+  background: #fef3c7;
+}
+.payos-expire.urgent { color: #dc2626; background: #fef2f2; animation: payos-pulse 1s infinite; }
+.payos-expire.expired { color: #dc2626; background: #fef2f2; }
+@keyframes payos-pulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
+
+/* Frame QR */
+.payos-qr-img-wrap {
+  padding: 12px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  border: 1px solid var(--rc-border);
+}
+.payos-qr-img {
+  width: 210px;
+  height: 210px;
+  display: block;
+  border-radius: 4px;
+}
+.payos-qr-placeholder {
+  width: 210px; height: 210px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f1f5f9; color: var(--rc-text-muted);
+  font-size: 13px; border-radius: 4px;
+}
+
+.payos-qr-hint { font-size: 13px; color: var(--rc-text-muted); text-align: center; margin: 0; }
+.payos-open-link {
+  font-size: 13px; font-weight: 600; color: #1a56db;
+  text-decoration: none; border-bottom: 1px solid #1a56db;
+}
+.payos-open-link:hover { opacity: 0.75; }
+.payos-polling-hint {
+  font-size: 12px; color: var(--rc-text-muted); text-align: center; margin: 0;
+  animation: payos-pulse 1.8s ease-in-out infinite;
+}
+
+/* Banner thành công */
+.payos-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #6ee7b7;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.payos-success-icon { font-size: 28px; }
+.payos-success-banner strong { display: block; color: #065f46; font-weight: 700; }
+.payos-success-banner p { color: #047857; font-size: 13px; margin: 4px 0 0; }
+

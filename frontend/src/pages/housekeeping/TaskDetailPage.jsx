@@ -95,7 +95,7 @@ export default function TaskDetailPage() {
 
   const submitIssue = async () => {
     const values = await issueForm.validateFields()
-    await act(() => taskService.reportIssue(id, values), 'Đã báo sự cố phòng')
+    await act(() => taskService.reportIssue(id, values), 'Đã gửi yêu cầu bảo trì — chờ quản lý duyệt')
     issueForm.resetFields()
     setIssueOpen(false)
   }
@@ -188,18 +188,12 @@ export default function TaskDetailPage() {
           {task.issueNote && <p><b>Ghi chú sự cố:</b><br />{task.issueNote}</p>}
 
           <Space wrap>
-            {!assigned && !done && (
-              <Button loading={saving} onClick={() => act(() => taskService.claimTask(id), 'Đã nhận task')}>Nhận task</Button>
-            )}
             {canStart && (
               <Button type="primary" loading={saving} onClick={() => act(() => taskService.startTask(id), 'Đã bắt đầu task')}>Bắt đầu</Button>
             )}
             {canEdit && (
               <>
-                <Button onClick={() => setIssueOpen(true)}>Báo sự cố</Button>
-                <Button danger onClick={() => act(() => taskService.markMaintenance(id, { note: 'Housekeeper chuyển phòng sang bảo trì' }), 'Đã chuyển phòng sang bảo trì')}>
-                  Mark maintenance
-                </Button>
+                <Button onClick={() => setIssueOpen(true)}>Báo cần bảo trì</Button>
                 <Button type="primary" disabled={needsInventory && !task.amenityChecked} loading={saving} onClick={() => act(() => taskService.completeTask(id), 'Đã hoàn tất task')}>
                   Hoàn tất
                 </Button>
@@ -245,7 +239,7 @@ export default function TaskDetailPage() {
       )}
 
       <Modal
-        title="Báo sự cố phòng"
+        title="Báo cần bảo trì (chờ quản lý duyệt)"
         open={issueOpen}
         onCancel={() => setIssueOpen(false)}
         onOk={submitIssue}

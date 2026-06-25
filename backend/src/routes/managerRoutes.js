@@ -58,6 +58,7 @@ router.patch('/services/:id/deactivate', managerController.deactivateService)
 router.get('/room-issues', managerController.getRoomIssues)
 router.get('/room-issues/:id', managerController.getRoomIssueById)
 router.post('/room-issues', managerController.createRoomIssue)
+router.patch('/room-issues/:id/approve-maintenance', managerController.approveRoomMaintenance)
 router.patch('/room-issues/:id/resolve', managerController.resolveRoomIssue)
 router.patch('/room-issues/:id/cancel', managerController.cancelRoomIssue)
 
@@ -68,6 +69,8 @@ router.patch('/housekeeping/tasks/:id/assign', managerController.assignHousekeep
 router.patch('/housekeeping/tasks/:id/urgent', managerController.markHousekeepingTaskUrgent)
 router.post('/housekeeping/tasks/:taskId/issues', managerController.createRoomIssueFromTask)
 router.get('/housekeepers', managerController.getHousekeepers)
+router.get('/housekeeper-floors', managerController.getHousekeeperFloors)
+router.put('/housekeepers/:id/floors', managerController.setHousekeeperFloors)
 
 module.exports = router
 

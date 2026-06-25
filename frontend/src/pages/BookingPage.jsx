@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { notification } from 'antd';
@@ -8,378 +8,265 @@ import { customerService } from '../services';
 import { socket, connectSocket, disconnectSocket } from '../services/socketService';
 import './BookingPage.css';
 
+// Đặt phòng DATE-FIRST: chọn chi nhánh + ngày + số khách -> tìm phòng TRỐNG (gộp theo loại phòng) -> đặt.
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [rooms, setRooms] = useState([]);
-  const [offer, setOffer] = useState(null);
+  const { user, token } = useSelector((s) => s.auth || {});
+
+  const [catalog, setCatalog] = useState([]);   // loại phòng (ảnh, tiện ích, diện tích...)
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const { user, token } = useSelector((s) => s.auth || {});
+  // Tiêu chí tìm (lấy từ query param khi đến từ trang chủ)
+  const sp = new URLSearchParams(location.search);
+  const [branch, setBranch] = useState(sp.get('branch') || '');
+  const [checkIn, setCheckIn] = useState(sp.get('checkIn') || sp.get('checkin') || '');
+  const [checkOut, setCheckOut] = useState(sp.get('checkOut') || sp.get('checkout') || '');
+  const [adults, setAdults] = useState(sp.get('adults') || '2');
+  const [children, setChildren] = useState(sp.get('children') || '0');
 
-  // Parse query params for search state
-  const searchParams = new URLSearchParams(location.search);
-  const [checkIn, setCheckIn] = useState(searchParams.get('checkin') || '');
-  const [checkOut, setCheckOut] = useState(searchParams.get('checkout') || '');
-  const [promoCode, setPromoCode] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState(searchParams.get('branch') || '');
-  const [selectedRoomType, setSelectedRoomType] = useState(searchParams.get('roomType') || '');
+  const [avail, setAvail] = useState([]);        // phòng trống (searchAvailableRooms)
+  const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState({});
 
-  const [modalCheckIn, setModalCheckIn] = useState('');
-  const [modalCheckOut, setModalCheckOut] = useState('');
-
-  const [errors, setErrors] = useState({});
-
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [bookingPayload, setBookingPayload] = useState(null);
+  // Modal nhập thông tin khách
+  const [modalRoom, setModalRoom] = useState(null);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErr, setFormErr] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      setGuestName(user.fullName || user.name || '');
-      setGuestPhone(user.phone || '');
-    }
+    if (user) { setGuestName(user.fullName || user.name || ''); setGuestPhone(user.phone || ''); }
   }, [user]);
 
-
-
+  // Load catalog loại phòng + chi nhánh
   useEffect(() => {
-    const fetchRooms = async () => {
+    (async () => {
       try {
         const res = await customerService.getPublicRooms();
-        if (res.success && res.data) {
-          // Check if data is array (old format) or object (new format)
-          if (Array.isArray(res.data)) {
-            setRooms(res.data);
-          } else {
-            setRooms(res.data.rooms || []);
-            setOffer(res.data.offer || null);
-            setBranches(res.data.branches || []);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRooms();
+        const data = res.data || {};
+        setCatalog(Array.isArray(data) ? data : (data.rooms || []));
+        setBranches(data.branches || []);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const formatPrice = (p) => new Intl.NumberFormat('vi-VN').format(p || 0) + 'đ';
+  const getBedText = (t) => ({ king: '1 Giường đôi lớn', double: '1 Giường đôi', twin: '2 Giường đơn' }[t] || '1 Giường đơn');
+  const parseGuestCount = (value, min) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n >= min ? n : null;
+  };
+  const displayAdults = parseGuestCount(adults, 1) ?? 1;
+  const displayChildren = parseGuestCount(children, 0) ?? 0;
+  const getFitText = (r) => {
+    if (!r) return '';
+    if (r.fit === 'short') return `Cần ${r.extraBeds} giường phụ (+${formatPrice(r.surcharge)})`;
+    if (r.fit === 'surplus') return 'Còn trống';
+    return 'Vừa khít';
+  };
+
+  const doSearch = useCallback(async (opts = {}) => {
+    const b = opts.branch ?? branch, ci = opts.checkIn ?? checkIn, co = opts.checkOut ?? checkOut;
+    const adultCount = parseGuestCount(opts.adults ?? adults, 1);
+    const childCount = parseGuestCount(opts.children ?? children, 0);
+    const e = {};
+    if (!b) e.branch = 'Chọn chi nhánh';
+    if (!ci) e.checkIn = 'Chọn ngày nhận';
+    if (!co) e.checkOut = 'Chọn ngày trả';
+    else if (ci && new Date(co) <= new Date(ci)) e.checkOut = 'Ngày trả phải sau ngày nhận';
+    if (adultCount == null) e.adults = 'Số người lớn phải từ 1 trở lên';
+    if (childCount == null) e.children = 'Số trẻ em không hợp lệ';
+    setSearchErr(e);
+    if (Object.keys(e).length) return;
+    setSearching(true); setSearched(true);
+    try {
+      const res = await customerService.searchAvailableRooms({ branch: b, checkIn: ci, checkOut: co, adults: adultCount, children: childCount });
+      setAvail(res.data || []);
+    } catch (err) {
+      notification.error({ message: err.response?.data?.message || 'Lỗi tìm phòng', placement: 'bottomRight' });
+      setAvail([]);
+    } finally { setSearching(false); }
+  }, [branch, checkIn, checkOut, adults, children]);
+
+  // Tự tìm khi đến từ trang chủ (đã có đủ tham số)
+  useEffect(() => {
+    if (branch && checkIn && checkOut) doSearch({ branch, checkIn, checkOut });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     connectSocket();
-    
-    const handleNewBooking = (data) => {
-      const bookedRoom = rooms.find(r => r._id === data.roomTypeId);
-      if (bookedRoom) {
-        notification.info({
-          message: 'Phòng vừa được đặt!',
-          description: `Khách hàng khác vừa đặt hạng phòng ${bookedRoom.name}. Hãy nhanh tay đặt ngay trước khi hết phòng!`,
-          placement: 'bottomRight',
-          duration: 5
-        });
+    const onNew = () => { if (searched) doSearch(); }; // có người vừa đặt -> làm mới phòng trống
+    socket.on('new_booking', onNew);
+    return () => { socket.off('new_booking', onNew); disconnectSocket(); };
+  }, [searched, doSearch]);
+
+  // Gộp phòng trống theo LOẠI PHÒNG (giá thấp nhất + số phòng trống)
+  const availByType = useMemo(() => {
+    const m = {};
+    for (const r of avail) {
+      const k = r.roomType?._id; if (!k) continue;
+      if (!m[k]) m[k] = {
+        total: r.total,
+        perNight: Math.round(r.roomCharge / Math.max(1, r.nights)),
+        nights: r.nights,
+        count: 0,
+        fit: r.fit,
+        extraBeds: r.extraBeds,
+        surcharge: r.surcharge,
+      };
+      m[k].count++;
+      if (r.total < m[k].total) {
+        m[k].total = r.total;
+        m[k].perNight = Math.round(r.roomCharge / Math.max(1, r.nights));
+        m[k].fit = r.fit;
+        m[k].extraBeds = r.extraBeds;
+        m[k].surcharge = r.surcharge;
       }
-    };
-
-    socket.on('new_booking', handleNewBooking);
-
-    return () => {
-      socket.off('new_booking', handleNewBooking);
-      disconnectSocket();
-    };
-  }, [rooms]);
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  };
-
-  const getBedText = (type) => {
-    switch(type) {
-      case 'king': return '1 Giường đôi lớn';
-      case 'double': return '1 Giường đôi';
-      case 'twin': return '2 Giường đơn';
-      default: return '1 Giường đơn';
     }
-  };
+    return m;
+  }, [avail]);
 
-  // Hàm lấy đối tượng chi nhánh từ object room
-  const getBranchObj = (room) => {
-    if (room.branch && typeof room.branch === 'object') return room.branch;
-    if (room.branchId && typeof room.branchId === 'object') return room.branchId;
-    return null;
-  };
+  // Loại phòng hiển thị = catalog có trong kết quả phòng trống
+  const displayRooms = useMemo(() => catalog.filter((rt) => availByType[rt._id]), [catalog, availByType]);
 
-  // Lọc danh sách phòng theo chi nhánh và loại phòng đã chọn
-  const filteredRooms = rooms.filter(room => {
-    if (selectedRoomType && room._id !== selectedRoomType) return false;
-    if (!selectedBranch) return true;
-    const bObj = getBranchObj(room);
-    return bObj && bObj._id === selectedBranch;
-  });
-
-  // Xác định thông tin chi nhánh đang hiển thị trên Banner
-  const displayBranch = selectedBranch 
-    ? branches.find(b => b._id === selectedBranch) || branches[0] || {}
-    : branches[0] || { name: 'Hà Nội', location: 'Chưa cập nhật', hotline: 'Chưa cập nhật' };
-
-  const handleBookNow = (room, ratePlan, qty) => {
+  const openBook = (room) => {
     if (!token) {
-      alert("Vui lòng đăng nhập để đặt phòng!");
-      navigate('/login', { state: { from: window.location.pathname + window.location.search } });
+      notification.warning({ message: 'Vui lòng đăng nhập để đặt phòng' });
+      navigate('/login', { state: { from: location.pathname + location.search } });
       return;
     }
-
-    if (qty > 0) {
-      setBookingPayload({
-        branchId: selectedBranch || getBranchObj(room)?._id,
-        roomTypeId: room._id,
-        roomName: room.name,
-        adults: 1,
-        children: 0
-      });
-      setModalCheckIn(checkIn);
-      setModalCheckOut(checkOut);
-      setErrors({});
-      setIsModalVisible(true);
-    } else {
-      alert('Vui lòng chọn số lượng phòng (ít nhất 1 room) trước khi đặt.');
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!modalCheckIn) newErrors.checkIn = 'Vui lòng chọn Ngày nhận phòng';
-    else {
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const checkInDate = new Date(modalCheckIn);
-      if (checkInDate < today) newErrors.checkIn = 'Không thể chọn ngày trong quá khứ';
-    }
-
-    if (!modalCheckOut) newErrors.checkOut = 'Vui lòng chọn Ngày trả phòng';
-    
-    if (modalCheckIn && modalCheckOut) {
-      if (new Date(modalCheckIn) >= new Date(modalCheckOut)) {
-        newErrors.checkOut = 'Ngày trả phòng phải sau ngày nhận phòng';
-      }
-    }
-
-    if (!guestName.trim()) {
-      newErrors.guestName = 'Vui lòng điền Họ và tên';
-    } else if (guestName.trim().length < 2) {
-      newErrors.guestName = 'Họ và tên quá ngắn';
-    }
-
-    const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
-    if (!guestPhone.trim()) {
-      newErrors.guestPhone = 'Vui lòng điền Số điện thoại';
-    } else if (!phoneRegex.test(guestPhone.trim())) {
-      newErrors.guestPhone = 'Số điện thoại không hợp lệ (Ví dụ: 0987654321)';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setFormErr({});
+    setModalRoom(room);
   };
 
   const submitBooking = async () => {
-    if (!validateForm()) return;
-
-    try {
-      setIsSubmitting(true);
-      const res = await customerService.createBooking({
-        ...bookingPayload,
-        checkIn: modalCheckIn,
-        checkOut: modalCheckOut,
-        guestName,
-        guestPhone
-      });
-      if (res.success) {
-        setIsModalVisible(false);
-        navigate('/checkout/' + res.data._id);
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || err.message || "Có lỗi xảy ra khi đặt phòng");
-    } finally {
-      setIsSubmitting(false);
+    const e = {};
+    if (!guestName.trim() || guestName.trim().length < 2) e.guestName = 'Nhập họ tên hợp lệ';
+    if (!/^0\d{9,10}$/.test(guestPhone.trim())) e.guestPhone = 'SĐT không hợp lệ (VD: 0987654321)';
+    setFormErr(e);
+    if (Object.keys(e).length) return;
+    const adultCount = parseGuestCount(adults, 1);
+    const childCount = parseGuestCount(children, 0);
+    if (adultCount == null || childCount == null) {
+      notification.warning({ message: 'Vui lòng nhập số người lớn/trẻ em hợp lệ' });
+      return;
     }
+    setSubmitting(true);
+    try {
+      const res = await customerService.createBooking({
+        branchId: branch, roomTypeId: modalRoom._id,
+        checkIn, checkOut, adults: adultCount, children: childCount, guestName, guestPhone,
+      });
+      if (res.success) { setModalRoom(null); navigate('/checkout/' + res.data._id); }
+    } catch (err) {
+      notification.error({ message: err.response?.data?.message || 'Có lỗi khi đặt phòng' });
+    } finally { setSubmitting(false); }
   };
+
+  const branchName = branches.find((b) => b._id === branch)?.name;
 
   return (
     <div className="bk-page">
       <Navbar />
-      
-      {/* Hero Banner */}
-      <div className="bk-hero">
-        <div className="bk-hero-image-left">
-          {offer?.image ? (
-            <img src={offer.image} alt="Promotion" />
-          ) : (
-            <div style={{ width: '100%', height: '100%', backgroundColor: '#444' }}></div>
-          )}
-        </div>
-        <div className="bk-hero-gradient-overlay"></div>
-        <div className="bk-hero-content">
-          <div className="bk-direct-booking">
-            {offer ? (
-              <>
-                <p>{offer.title}</p>
-                {offer.link && <div className="bk-code">MÃ: {offer.link}</div>}
-                <p>Nhập mã vào ô Mã khuyến mãi để nhận ưu đãi</p>
-                <p className="bk-discount">{offer.description}</p>
-              </>
-            ) : (
-              <p>ĐẶT PHÒNG KHÁCH SẠN</p>
-            )}
-          </div>
-          <div className="bk-contact-info">
-            <p>A. {displayBranch.location || 'Chưa cập nhật địa chỉ'}</p>
-            <p>T. {displayBranch.hotline || 'Chưa cập nhật SĐT'}</p>
-            <p>W. hanoihotel.com.vn</p>
-          </div>
-        </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="bk-search-bar-wrapper">
+      {/* Thanh tìm phòng (date-first) */}
+      <div className="bk-search-bar-wrapper" style={{ marginTop: 90 }}>
         <div className="bk-search-bar">
-          <div className="bk-dates">
-            <select 
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              className="bk-date-input"
-              style={{ width: '180px', backgroundColor: '#fff', cursor: 'pointer' }}
-            >
-              <option value="">Tất cả chi nhánh</option>
+          <div className="bk-dates" style={{ flexWrap: 'wrap', gap: 12 }}>
+            <select value={branch} onChange={(e) => setBranch(e.target.value)} className="bk-date-input" style={{ minWidth: 180, background: '#fff', borderColor: searchErr.branch ? 'red' : undefined }}>
+              <option value="">-- Chọn chi nhánh --</option>
               {branches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
             </select>
-            <select 
-              value={selectedRoomType}
-              onChange={(e) => setSelectedRoomType(e.target.value)}
+            <input type="date" value={checkIn} min={new Date().toISOString().split('T')[0]} onChange={(e) => setCheckIn(e.target.value)} className="bk-date-input" style={{ borderColor: searchErr.checkIn ? 'red' : undefined }} title="Ngày nhận (14:00)" />
+            <input type="date" value={checkOut} min={checkIn || new Date().toISOString().split('T')[0]} onChange={(e) => setCheckOut(e.target.value)} className="bk-date-input" style={{ borderColor: searchErr.checkOut ? 'red' : undefined }} title="Ngày trả (12:00)" />
+            <input
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              value={adults}
+              onChange={(e) => setAdults(e.target.value)}
               className="bk-date-input"
-              style={{ width: '180px', backgroundColor: '#fff', cursor: 'pointer' }}
-            >
-              <option value="">Tất cả hạng phòng</option>
-              {rooms.map((r) => <option key={r._id} value={r._id}>{r.name}</option>)}
-            </select>
-            <input 
-              type="date" 
-              value={checkIn} 
-              onChange={(e) => setCheckIn(e.target.value)} 
-              className="bk-date-input"
+              style={{ width: 130, background: '#fff', borderColor: searchErr.adults ? 'red' : undefined }}
+              placeholder="Người lớn"
+              title="Người lớn"
             />
-            <input 
-              type="date" 
-              value={checkOut} 
-              onChange={(e) => setCheckOut(e.target.value)} 
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={children}
+              onChange={(e) => setChildren(e.target.value)}
               className="bk-date-input"
+              style={{ width: 120, background: '#fff', borderColor: searchErr.children ? 'red' : undefined }}
+              placeholder="Trẻ em"
+              title="Trẻ em"
             />
+            <button className="bk-btn-apply" onClick={() => doSearch()} disabled={searching}>{searching ? 'Đang tìm...' : 'Tìm phòng'}</button>
           </div>
-          <div className="bk-promo-currency">
-            <div className="bk-promo-group">
-              <input 
-                type="text" 
-                placeholder="Mã khuyến mãi" 
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                className="bk-promo-input"
-              />
-              <button className="bk-btn-apply">Áp dụng</button>
-            </div>
-            <select className="bk-currency-select">
-              <option>VNĐ</option>
-              <option>USD</option>
-            </select>
-          </div>
+          <div style={{ fontSize: 12, color: '#fff', marginTop: 6, opacity: 0.85 }}>Nhận phòng 14:00 · Trả phòng 12:00 · Giá tính theo đêm</div>
         </div>
       </div>
 
-      {/* Room List */}
+      {/* Kết quả */}
       <div className="bk-main">
-        {loading ? (
-          <div className="bk-loading">Đang tải danh sách phòng...</div>
+        {!searched ? (
+          <div className="bk-loading">Chọn chi nhánh & ngày rồi bấm “Tìm phòng” để xem phòng trống.</div>
+        ) : searching ? (
+          <div className="bk-loading">Đang tìm phòng trống...</div>
+        ) : displayRooms.length === 0 ? (
+          <div className="bk-loading">Không còn phòng trống cho {branchName} trong khoảng ngày đã chọn.</div>
         ) : (
           <div className="bk-room-list">
-            {filteredRooms.length === 0 && <div className="bk-loading">Không có phòng trống theo tiêu chí của bạn.</div>}
-            {filteredRooms.map((room) => {
-              // Dummy rate plans calculation
-              const basePrice = room.basePrice;
-              const dealPrice = basePrice * 0.85; // 15% off example
-              const nrfPrice = basePrice * 0.75; // 25% off example
-
+            {displayRooms.map((room) => {
+              const a = availByType[room._id];
+              const fit = getFitText(a);
               return (
                 <div key={room._id} className="bk-room-card">
-                  {/* Room Info Section */}
                   <div className="bk-room-info-section">
                     <div className="bk-room-image">
-                      {room.images && room.images.length > 0 ? (
-                        <img src={room.images[0]} alt={room.name} />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span>Chưa có ảnh</span>
-                        </div>
+                      {room.images?.length ? <img src={room.images[0]} alt={room.name} /> : (
+                        <div style={{ width: '100%', height: '100%', backgroundColor: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span>Chưa có ảnh</span></div>
                       )}
-                      <div className="bk-image-hint">Nhấp vào ảnh để xem chi tiết</div>
                     </div>
                     <div className="bk-room-details">
                       <h3>{room.name}</h3>
-                      <p className="bk-room-subtitle">{room.name}</p>
-                      
                       <div className="bk-room-icons">
-                        {room.amenities && room.amenities.length > 0 ? (
-                          room.amenities.map((amenity, idx) => (
-                            <span key={idx} title={amenity.name}>{amenity.icon || '✨'}</span>
-                          ))
-                        ) : (
-                          <span style={{ fontSize: '14px', color: '#888' }}>Chưa cập nhật tiện ích</span>
-                        )}
-                        <span className="bk-view-amenities">xem tất cả tiện ích</span>
+                        {room.amenities?.length ? room.amenities.map((am, i) => <span key={i} title={am.name}>{am.icon || '✨'}</span>) : <span style={{ fontSize: 14, color: '#888' }}>Chưa cập nhật tiện ích</span>}
                       </div>
-                      
                       <div className="bk-room-specs">
                         <span><strong>Loại giường:</strong> {getBedText(room.bedType)}</span>
                         <span><strong>Diện tích:</strong> {room.area} m²</span>
+                        <span><strong>Sức chứa:</strong> {room.capacity || 2} khách</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Room Book Action (Real DB Data) */}
                   <div className="bk-rate-plans">
                     <div className="bk-rate-row">
                       <div className="bk-rate-info">
-                        <h4>{room.name}</h4>
-                        <div className="bk-rate-deals">
-                          Giá Tiêu Chuẩn (Standard)
-                        </div>
-                        <div className="bk-rate-perks">
-                          <span className="bk-grey">Áp dụng theo chính sách chi nhánh ℹ️</span>
-                        </div>
+                        <h4>Giá tiêu chuẩn</h4>
+                        <div className="bk-rate-perks"><span className="bk-grey">{a.nights} đêm · {branchName}</span></div>
                       </div>
-                      
                       <div className="bk-rate-occupancy">
                         <span className="bk-occ-icon">👥</span>
                         <span className="bk-occ-text">Tối đa {room.capacity || 2} khách</span>
+                        {fit && <span className="bk-occ-fit">{fit}</span>}
                       </div>
-
                       <div className="bk-rate-price">
-                        <div className="bk-rooms-left">Có thể đặt ngay</div>
-                        <div className="bk-price-current">đ {formatPrice(room.basePrice).replace('₫', '').trim()} <span className="bk-info-icon">ℹ️</span></div>
-                        <div className="bk-price-note">mỗi đêm</div>
+                        <div className="bk-rooms-left">Còn {a.count} phòng</div>
+                        <div className="bk-price-current">đ {formatPrice(a.perNight).replace('đ', '').trim()}</div>
+                        <div className="bk-price-note">/ đêm · Tổng {formatPrice(a.total)}</div>
                       </div>
-
                       <div className="bk-rate-action">
-                        <select className="bk-room-select" value="1" disabled>
-                          <option value="1">1 phòng</option>
-                        </select>
-
-                        <button 
-                          className="bk-btn-book active" 
-                          onClick={() => handleBookNow(room, {name: 'Standard Rate'}, 1)}
-                        >
-                          ĐẶT NGAY
-                        </button>
+                        <button className="bk-btn-book active" onClick={() => openBook(room)}>ĐẶT NGAY</button>
                       </div>
                     </div>
                   </div>
@@ -390,82 +277,33 @@ const BookingPage = () => {
         )}
       </div>
 
-      {/* Floating Customer Support Button */}
-      <button className="rd-floating-btn" onClick={() => alert('Customer support clicked')} style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        backgroundColor: '#d2b356',
-        color: '#fff',
-        border: 'none',
-        padding: '10px 20px',
-        borderRadius: '30px',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        zIndex: 9999
-      }}>
-        Hỗ trợ khách hàng
-      </button>
-
-      {/* Booking Modal */}
-      {isModalVisible && (
-        <div className="bk-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-          <div className="bk-modal-content" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', width: '400px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ marginBottom: '20px', color: '#333' }}>Đặt phòng: {bookingPayload?.roomName}</h3>
-            
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#555' }}>Ngày nhận phòng <span style={{color:'red'}}>*</span></label>
-              <input 
-                type="date" 
-                min={new Date().toISOString().split('T')[0]}
-                value={modalCheckIn} 
-                onChange={e => setModalCheckIn(e.target.value)} 
-                style={{ width: '100%', padding: '10px', border: errors.checkIn ? '1px solid red' : '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }} 
-              />
-              {errors.checkIn && <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>{errors.checkIn}</div>}
+      {/* Modal nhập thông tin khách (ngày đã chọn ở thanh tìm) */}
+      {modalRoom && (
+        <div className="bk-modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+          <div className="bk-modal-content" style={{ backgroundColor: '#fff', padding: 24, borderRadius: 8, width: 420, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ marginBottom: 12, color: '#333' }}>Đặt phòng: {modalRoom.name}</h3>
+            <div style={{ background: '#faf8f3', padding: '10px 14px', borderRadius: 6, marginBottom: 16, fontSize: 14 }}>
+              <div>🏨 {branchName}</div>
+              <div>📅 Nhận {checkIn} 14:00 → Trả {checkOut} 12:00</div>
+              <div>👥 {displayAdults} người lớn{displayChildren ? ` + ${displayChildren} trẻ em` : ''}</div>
+              <div style={{ marginTop: 4, fontWeight: 700, color: '#a18348' }}>Tổng: {formatPrice(availByType[modalRoom._id]?.total)}</div>
             </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#555' }}>Ngày trả phòng <span style={{color:'red'}}>*</span></label>
-              <input 
-                type="date" 
-                min={modalCheckIn ? new Date(new Date(modalCheckIn).getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                value={modalCheckOut} 
-                onChange={e => setModalCheckOut(e.target.value)} 
-                style={{ width: '100%', padding: '10px', border: errors.checkOut ? '1px solid red' : '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }} 
-              />
-              {errors.checkOut && <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>{errors.checkOut}</div>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold', color: '#555' }}>Họ và tên <span style={{ color: 'red' }}>*</span></label>
+              <input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Nguyễn Văn A"
+                style={{ width: '100%', padding: 10, border: formErr.guestName ? '1px solid red' : '1px solid #ccc', borderRadius: 4, boxSizing: 'border-box' }} />
+              {formErr.guestName && <div style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{formErr.guestName}</div>}
             </div>
-            
-            <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px dashed #ccc' }} />
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#555' }}>Họ và tên <span style={{color:'red'}}>*</span></label>
-              <input 
-                type="text" 
-                value={guestName} 
-                onChange={e => setGuestName(e.target.value)} 
-                style={{ width: '100%', padding: '10px', border: errors.guestName ? '1px solid red' : '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }} 
-                placeholder="Ví dụ: Nguyễn Văn A" 
-              />
-              {errors.guestName && <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>{errors.guestName}</div>}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold', color: '#555' }}>Số điện thoại <span style={{ color: 'red' }}>*</span></label>
+              <input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="0987654321"
+                style={{ width: '100%', padding: 10, border: formErr.guestPhone ? '1px solid red' : '1px solid #ccc', borderRadius: 4, boxSizing: 'border-box' }} />
+              {formErr.guestPhone && <div style={{ color: 'red', fontSize: 12, marginTop: 4 }}>{formErr.guestPhone}</div>}
             </div>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#555' }}>Số điện thoại <span style={{color:'red'}}>*</span></label>
-              <input 
-                type="text" 
-                value={guestPhone} 
-                onChange={e => setGuestPhone(e.target.value)} 
-                style={{ width: '100%', padding: '10px', border: errors.guestPhone ? '1px solid red' : '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }} 
-                placeholder="Ví dụ: 0987654321" 
-              />
-              {errors.guestPhone && <div style={{ color: 'red', fontSize: '12px', marginTop: '4px' }}>{errors.guestPhone}</div>}
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '25px' }}>
-              <button onClick={() => setIsModalVisible(false)} style={{ padding: '10px 20px', border: '1px solid #ccc', backgroundColor: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Huỷ</button>
-              <button onClick={submitBooking} disabled={isSubmitting} style={{ padding: '10px 20px', border: 'none', backgroundColor: '#d2b356', color: '#fff', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                {isSubmitting ? 'Đang xử lý...' : 'Xác nhận đặt'}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button onClick={() => setModalRoom(null)} style={{ padding: '10px 20px', border: '1px solid #ccc', background: '#fff', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>Huỷ</button>
+              <button onClick={submitBooking} disabled={submitting} style={{ padding: '10px 20px', border: 'none', background: '#d2b356', color: '#fff', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
+                {submitting ? 'Đang xử lý...' : 'Xác nhận đặt'}
               </button>
             </div>
           </div>
