@@ -214,3 +214,10 @@
 
 .ov-empty { text-align: center; color: var(--ov-muted); padding: 40px 0; }
 .ov-empty .anticon { font-size: 30px; color: #cdc4b8; display: block; margin-bottom: 10px; }
+
+/* Giữ serif cho khu overview — thắng rule `.admin-container ... { font-family: Inter !important }` của admin.css */
+.ov-wrap .ov-head h2,
+.ov-wrap .ov-card-title,
+.ov-wrap .ov-kpi-value {
+  font-family: var(--font-display) !important;
+}
