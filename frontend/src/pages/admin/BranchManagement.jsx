@@ -3,6 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { fetchBranches, createBranch, toggleBranch, updateBranch } from '../../redux/slices/adminSlice'
 
+const PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/
+
 const BranchManagement = () => {
   const dispatch = useDispatch()
   const { branches, loading, error } = useSelector(state => state.admin)
@@ -20,6 +22,7 @@ const BranchManagement = () => {
     depositRate: 30, // Default 30%
     pendingTimeoutMinutes: 15
   })
+  const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
     dispatch(fetchBranches())
@@ -36,6 +39,7 @@ const BranchManagement = () => {
       pendingTimeoutMinutes: branch.pendingTimeoutMinutes || 15
     })
     setEditMode(true)
+    setFormErrors({})
     setShowModal(true)
   }
 
@@ -43,6 +47,7 @@ const BranchManagement = () => {
     setShowModal(false)
     setEditMode(false)
     setSelectedBranchId(null)
+    setFormErrors({})
     setFormData({ 
       code: '', 
       name: '', 
@@ -53,8 +58,34 @@ const BranchManagement = () => {
     })
   }
 
+  const validateForm = () => {
+    const errors = {}
+    if (!formData.code.trim()) {
+      errors.code = 'Vui lòng nhập mã chi nhánh'
+    }
+    if (!formData.name.trim()) {
+      errors.name = 'Vui lòng nhập tên chi nhánh'
+    }
+    if (formData.hotline && !PHONE_REGEX.test(formData.hotline)) {
+      errors.hotline = 'Số hotline không hợp lệ (VD: 0912345678)'
+    }
+    if (!formData.depositRate && formData.depositRate !== 0) {
+      errors.depositRate = 'Vui lòng nhập tỷ lệ đặt cọc'
+    } else if (formData.depositRate < 0 || formData.depositRate > 100) {
+      errors.depositRate = 'Tỷ lệ đặt cọc phải từ 0% đến 100%'
+    }
+    if (!formData.pendingTimeoutMinutes) {
+      errors.pendingTimeoutMinutes = 'Vui lòng nhập thời gian giữ phòng'
+    } else if (formData.pendingTimeoutMinutes < 5 || formData.pendingTimeoutMinutes > 120) {
+      errors.pendingTimeoutMinutes = 'Thời gian giữ phòng phải từ 5 đến 120 phút'
+    }
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!validateForm()) return
     // Convert depositRate percentage back to decimal
     const payload = {
       ...formData,
@@ -219,25 +250,31 @@ const BranchManagement = () => {
               <h3>{editMode ? 'Cập Nhật Chi Nhánh' : 'Thêm Chi Nhánh Mới'}</h3>
               <span className="admin-modal-close" onClick={handleCloseModal}>&times;</span>
             </div>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className="admin-modal-body">
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.code ? 'has-error' : ''}`}>
                   <label>Mã chi nhánh (ví dụ: HN01, DN02):</label>
                   <input 
-                    required 
                     type="text"
                     value={formData.code} 
-                    onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} 
+                    onChange={e => {
+                      setFormData({...formData, code: e.target.value.toUpperCase()})
+                      if (formErrors.code) setFormErrors(prev => ({...prev, code: ''}))
+                    }} 
                   />
+                  {formErrors.code && <span className="admin-form-error">{formErrors.code}</span>}
                 </div>
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.name ? 'has-error' : ''}`}>
                   <label>Tên chi nhánh:</label>
                   <input 
-                    required 
                     type="text"
                     value={formData.name} 
-                    onChange={e => setFormData({...formData, name: e.target.value})} 
+                    onChange={e => {
+                      setFormData({...formData, name: e.target.value})
+                      if (formErrors.name) setFormErrors(prev => ({...prev, name: ''}))
+                    }} 
                   />
+                  {formErrors.name && <span className="admin-form-error">{formErrors.name}</span>}
                 </div>
                 <div className="admin-form-group">
                   <label>Địa chỉ:</label>
@@ -247,37 +284,48 @@ const BranchManagement = () => {
                     onChange={e => setFormData({...formData, location: e.target.value})} 
                   />
                 </div>
-                <div className="admin-form-group">
+                <div className={`admin-form-group ${formErrors.hotline ? 'has-error' : ''}`}>
                   <label>Hotline:</label>
                   <input 
                     type="text"
                     value={formData.hotline} 
-                    onChange={e => setFormData({...formData, hotline: e.target.value})} 
+                    onChange={e => {
+                      setFormData({...formData, hotline: e.target.value})
+                      if (formErrors.hotline) setFormErrors(prev => ({...prev, hotline: ''}))
+                    }} 
+                    placeholder="VD: 0912345678"
                   />
+                  {formErrors.hotline && <span className="admin-form-error">{formErrors.hotline}</span>}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="admin-form-group">
+                  <div className={`admin-form-group ${formErrors.depositRate ? 'has-error' : ''}`}>
                     <label>Tỷ lệ đặt cọc (%):</label>
                     <input 
-                      required
                       type="number"
                       min="0"
                       max="100"
                       value={formData.depositRate} 
-                      onChange={e => setFormData({...formData, depositRate: parseInt(e.target.value) || 0})} 
+                      onChange={e => {
+                        setFormData({...formData, depositRate: parseInt(e.target.value) || 0})
+                        if (formErrors.depositRate) setFormErrors(prev => ({...prev, depositRate: ''}))
+                      }} 
                     />
+                    {formErrors.depositRate && <span className="admin-form-error">{formErrors.depositRate}</span>}
                   </div>
-                  <div className="admin-form-group">
+                  <div className={`admin-form-group ${formErrors.pendingTimeoutMinutes ? 'has-error' : ''}`}>
                     <label>Thời gian giữ phòng (phút):</label>
                     <input 
-                      required
                       type="number"
                       min="5"
                       max="120"
                       value={formData.pendingTimeoutMinutes} 
-                      onChange={e => setFormData({...formData, pendingTimeoutMinutes: parseInt(e.target.value) || 15})} 
+                      onChange={e => {
+                        setFormData({...formData, pendingTimeoutMinutes: parseInt(e.target.value) || 15})
+                        if (formErrors.pendingTimeoutMinutes) setFormErrors(prev => ({...prev, pendingTimeoutMinutes: ''}))
+                      }} 
                     />
+                    {formErrors.pendingTimeoutMinutes && <span className="admin-form-error">{formErrors.pendingTimeoutMinutes}</span>}
                   </div>
                 </div>
               </div>
@@ -299,3 +347,4 @@ const BranchManagement = () => {
 }
 
 export default BranchManagement
+
