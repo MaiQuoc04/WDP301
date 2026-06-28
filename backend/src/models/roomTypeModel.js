@@ -4,6 +4,8 @@ const mongoose = require('mongoose')
 const roomTypeSchema = new mongoose.Schema({
   branch:      { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   name:        { type: String, required: true, trim: true },
+  // Hạng phòng — manager set thay vì suy đoán theo tên (UC-57→59)
+  tier:        { type: String, enum: ['standard', 'premium'], default: 'standard' },
   bedType:     { type: String, enum: ['single', 'double', 'twin', 'king'] },
   capacity:    { type: Number, default: 2 },
   totalBeds:   { type: Number, default: 1 }, // sức chứa = totalBeds × 2 đơn vị (người lớn=1, trẻ em=0.5)

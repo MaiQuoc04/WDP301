@@ -12,7 +12,8 @@
 /* Sidebar Navigation */
 .manager-sidebar {
   width: 260px;
-  background: linear-gradient(180deg, #111111 0%, #1e1e24 100%);
+  background: var(--dash-sidebar);
+  border-right: 1px solid var(--dash-sidebar-border);
   color: var(--color-white);
   display: flex;
   flex-direction: column;
@@ -169,6 +170,8 @@
 .manager-content {
   padding: var(--space-8);
   flex: 1;
+  background: #faf6f0; /* cream ấm theo tông Stitch */
+  overflow-y: auto;
 }
 
 /* Dashboard Overview Cards */
@@ -180,15 +183,29 @@
 }
 
 .stat-card {
+  position: relative;
   background: var(--color-white);
-  border-radius: 8px;
-  padding: var(--space-5);
+  border-radius: 10px;
+  padding: var(--space-5) var(--space-5) var(--space-5) calc(var(--space-5) + 4px);
   box-shadow: var(--shadow-subtle);
   border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Vạch gold mảnh bên trái — chạm nhẹ "Oriental Elegance" */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--color-gold) 0%, var(--color-gold-active) 100%);
+  opacity: 0.85;
 }
 
 .stat-card:hover {
@@ -224,11 +241,13 @@
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-black);
-  line-height: 1.2;
-  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--color-charcoal);
+  line-height: 1.1;
+  margin-top: 4px;
+  letter-spacing: 0.3px;
 }
 
 /* Floor/Room Grid View */

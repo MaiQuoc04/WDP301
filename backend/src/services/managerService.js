@@ -65,18 +65,19 @@ exports.getRoomTypeById = async (id, branchId) => {
 
 // UC-57: Tạo mới RoomType
 exports.createRoomType = async (data, branchId) => {
-  const { name, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
+  const { name, tier, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
 
   if (!name?.trim()) fail('Tên loại phòng không được để trống')
   if (!basePrice || basePrice <= 0) fail('Giá cơ bản phải lớn hơn 0')
   if (capacity != null && capacity <= 0) fail('Sức chứa phải lớn hơn 0')
   if (extraBedFee != null && extraBedFee < 0) fail('Phụ phí giường phụ không được âm')
+  if (tier != null && !['standard', 'premium'].includes(tier)) fail('Hạng phòng không hợp lệ')
 
   // Kiểm tra trùng tên trong chi nhánh
   const exists = await RoomType.findOne({ branch: branchId, name: name.trim() })
   if (exists) fail(`Loại phòng "${name.trim()}" đã tồn tại trong chi nhánh`)
 
-  return RoomType.create({ branch: branchId, name: name.trim(), bedType, capacity, area, basePrice, extraBedFee: extraBedFee || 0, description, images })
+  return RoomType.create({ branch: branchId, name: name.trim(), tier: tier || 'standard', bedType, capacity, area, basePrice, extraBedFee: extraBedFee || 0, description, images })
 }
 
 // UC-58: Cập nhật RoomType
@@ -84,7 +85,7 @@ exports.updateRoomType = async (id, data, branchId) => {
   const rt = await findBranchEntity(RoomType, id, branchId)
   if (!rt) fail('Loại phòng không tồn tại', 404)
 
-  const { name, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
+  const { name, tier, bedType, capacity, area, basePrice, extraBedFee, description, images } = data
 
   if (name != null) {
     const trimmed = name.trim()
@@ -105,6 +106,10 @@ exports.updateRoomType = async (id, data, branchId) => {
   if (extraBedFee != null) {
     if (extraBedFee < 0) fail('Phụ phí giường phụ không được âm')
     rt.extraBedFee = extraBedFee
+  }
+  if (tier != null) {
+    if (!['standard', 'premium'].includes(tier)) fail('Hạng phòng không hợp lệ')
+    rt.tier = tier
   }
   if (bedType != null) rt.bedType = bedType
   if (area != null) rt.area = area

@@ -2,6 +2,8 @@
 const router = require('express').Router()
 const { protect, authorize } = require('../middlewares/authMiddleware')
 const adminController = require('../controllers/adminController')
+const galleryController = require('../controllers/galleryController')
+const upload = require('../middlewares/uploadMiddleware')
 
 router.use(protect, authorize('super_admin'))
 
@@ -21,6 +23,12 @@ router.delete('/staff/assignments/:assignmentId', adminController.removeStaffBra
 router.get('/users', adminController.getAllAccounts)
 router.get('/dashboard/stats', adminController.getDashboardStats)
 router.get('/dashboard/branches/:branchId', adminController.getBranchDashboard)
+
+// --- GALLERY / MEDIA (ảnh thư viện + ẩm thực, global) ---
+router.get('/gallery', galleryController.listImages)
+router.post('/gallery', upload.single('image'), galleryController.createImage)
+router.put('/gallery/:id', galleryController.updateImage)
+router.delete('/gallery/:id', galleryController.deleteImage)
 
 module.exports = router
 

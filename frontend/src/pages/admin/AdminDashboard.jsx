@@ -4,6 +4,17 @@ import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
 import './admin.css'
 
+// Logo sen — đồng bộ với Manager/Reception sidebar
+const LotusLogo = () => (
+  <svg viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 40, height: 35 }}>
+    <path d="M32 4C34 14 36 24 34 38C32 42 32 42 30 38C28 24 30 14 32 4Z" fill="currentColor" />
+    <path d="M24 12C27 20 29 28 28 40C26 42 24 40 22 36C19 28 20 18 24 12Z" fill="currentColor" opacity="0.85" />
+    <path d="M40 12C37 20 35 28 36 40C38 42 40 40 42 36C45 28 44 18 40 12Z" fill="currentColor" opacity="0.85" />
+    <path d="M16 20C20 26 23 32 24 42C21 43 18 40 15 34C12 28 13 23 16 20Z" fill="currentColor" opacity="0.65" />
+    <path d="M48 20C44 26 41 32 40 42C43 43 46 40 49 34C52 28 51 23 48 20Z" fill="currentColor" opacity="0.65" />
+  </svg>
+)
+
 const AdminDashboard = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -30,8 +41,9 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <aside className="admin-sidebar">
         <div className="admin-sidebar-logo">
+          <span className="admin-lotus"><LotusLogo /></span>
           <h2>HANOI HOTEL</h2>
-          <p>System Admin</p>
+          <p>Quản trị</p>
         </div>
         <nav className="admin-sidebar-menu">
           {/* Reports Collapsible Dropdown */}
@@ -120,6 +132,18 @@ const AdminDashboard = () => {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
             <span>Quản lý khách hàng</span>
+          </NavLink>
+
+          <NavLink
+            to="/admin/gallery"
+            className={({ isActive }) => `admin-menu-item ${isActive ? 'active' : ''}`}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span>Thư viện ảnh</span>
           </NavLink>
         </nav>
 

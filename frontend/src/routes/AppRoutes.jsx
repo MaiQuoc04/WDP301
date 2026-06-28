@@ -9,16 +9,13 @@ import BookingPage from '../pages/BookingPage'
 import BookingCheckout from '../pages/BookingCheckout'
 
 // --- STATIC PAGES ---
-import AsianRestaurant from '../pages/dining/AsianRestaurant'
-import WesternRestaurant from '../pages/dining/WesternRestaurant'
-import BarLounge from '../pages/dining/BarLounge'
-import Offers from '../pages/Offers'
+import Dining from '../pages/Dining'
 import Facilities from '../pages/Facilities'
-import Events from '../pages/Events'
 import Gallery from '../pages/Gallery'
 import Contact from '../pages/Contact'
 
 import CustomerHome from '../pages/customer/CustomerHome'
+import CustomerProfile from '../pages/customer/CustomerProfile'
 import BookingHistoryPage from '../pages/customer/BookingHistoryPage'
 import ReceptionDashboard from '../pages/reception/ReceptionDashboard'
 import HousekeepingDashboard from '../pages/housekeeping/HousekeepingDashboard'
@@ -29,6 +26,7 @@ import StaffManagement from '../pages/admin/StaffManagement'
 import DashboardIndex from '../pages/admin/DashboardIndex'
 import BranchDashboard from '../pages/admin/BranchDashboard'
 import BranchStaff from '../pages/admin/BranchStaff'
+import GalleryManagement from '../pages/admin/GalleryManagement'
 
 
 const AppRoutes = () => (
@@ -43,14 +41,11 @@ const AppRoutes = () => (
       <Route path="/checkout/:id" element={<BookingCheckout />} />
 
       {/* Static Pages Routes */}
-      <Route path="/dining" element={<Navigate to="/dining/asian" replace />} />
-      <Route path="/dining/asian" element={<AsianRestaurant />} />
-      <Route path="/dining/western" element={<WesternRestaurant />} />
-      <Route path="/dining/bar" element={<BarLounge />} />
+      <Route path="/dining" element={<Dining />} />
+      {/* Giữ redirect cho link cũ (/dining/asian...) về trang Ẩm thực gộp */}
+      <Route path="/dining/*" element={<Navigate to="/dining" replace />} />
       
-      <Route path="/offers" element={<Offers />} />
       <Route path="/amenities" element={<Facilities />} />
-      <Route path="/events" element={<Events />} />
       <Route path="/gallery" element={<Gallery />} />
       <Route path="/contact" element={<Contact />} />
 
@@ -58,7 +53,7 @@ const AppRoutes = () => (
       <Route path="/customer/*" element={
         <ProtectedRoute allow={['customer']}>
           <Routes>
-            <Route path="" element={<CustomerHome />} />
+            <Route path="" element={<CustomerProfile />} />
             <Route path="booking-history" element={<BookingHistoryPage />} />
           </Routes>
         </ProtectedRoute>
@@ -88,6 +83,7 @@ const AppRoutes = () => (
         <Route path="reports" element={<BranchDashboard />} />
         <Route path="reports/:branchId" element={<BranchDashboard />} />
         <Route path="staff" element={<StaffManagement />} />
+        <Route path="gallery" element={<GalleryManagement />} />
         <Route index element={<DashboardIndex />} />
       </Route>
     </Routes>

@@ -63,6 +63,7 @@ export default function RoomTypesPage() {
     setEditingType(record)
     form.setFieldsValue({
       name: record.name,
+      tier: record.tier || 'standard',
       bedType: record.bedType,
       capacity: record.capacity,
       area: record.area,
@@ -155,6 +156,16 @@ export default function RoomTypesPage() {
       dataIndex: 'name',
       key: 'name',
       render: (text) => <strong>{text}</strong>
+    },
+    {
+      title: 'Hạng phòng',
+      dataIndex: 'tier',
+      key: 'tier',
+      render: (tier) => (
+        <Tag color={tier === 'premium' ? 'gold' : 'default'}>
+          {tier === 'premium' ? 'Cao cấp' : 'Tiêu chuẩn'}
+        </Tag>
+      )
     },
     {
       title: 'Kiểu giường',
@@ -251,7 +262,7 @@ export default function RoomTypesPage() {
           form={form}
           layout="vertical"
           onFinish={handleFormSubmit}
-          initialValues={{ capacity: 2, bedType: 'double', extraBedFee: 0 }}
+          initialValues={{ capacity: 2, bedType: 'double', extraBedFee: 0, tier: 'standard' }}
         >
           <Form.Item
             name="name"
@@ -259,6 +270,18 @@ export default function RoomTypesPage() {
             rules={[{ required: true, message: 'Vui lòng nhập tên loại phòng!' }]}
           >
             <Input placeholder="Ví dụ: Standard, Deluxe Ocean View..." />
+          </Form.Item>
+
+          <Form.Item
+            name="tier"
+            label="Hạng phòng"
+            rules={[{ required: true, message: 'Vui lòng chọn hạng phòng!' }]}
+            tooltip="Quyết định phòng nằm ở tab Tiêu chuẩn hay Cao cấp trên trang khách"
+          >
+            <Select>
+              <Select.Option value="standard">Phòng Tiêu Chuẩn</Select.Option>
+              <Select.Option value="premium">Phòng Cao Cấp</Select.Option>
+            </Select>
           </Form.Item>
 
           <Row gutter={16}>

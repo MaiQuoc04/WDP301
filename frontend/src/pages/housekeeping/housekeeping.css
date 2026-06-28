@@ -24,7 +24,8 @@
 
 .hk-sidebar {
   width: 250px;
-  background: #122033;
+  background: var(--dash-sidebar);
+  border-right: 1px solid var(--dash-sidebar-border);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -46,7 +47,7 @@
 
 .hk-brand span,
 .hk-user span {
-  color: #b7c3d2;
+  color: rgba(255, 255, 255, 0.5);
   font-size: 13px;
 }
 
@@ -58,16 +59,17 @@
 }
 
 .hk-nav a {
-  color: #d6deea;
+  color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
   padding: 11px 12px;
   border-radius: 8px;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .hk-nav a.active,
 .hk-nav a:hover {
-  background: #d2b356;
-  color: #111827;
+  background: var(--color-gold);
+  color: #fff;
 }
 
 .hk-user {
