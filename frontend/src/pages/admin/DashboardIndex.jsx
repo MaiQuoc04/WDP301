@@ -1,212 +1,192 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { Button } from 'antd'
+import {
+  DollarOutlined,
+  RiseOutlined,
+  ApartmentOutlined,
+  ClockCircleOutlined,
+  ShopOutlined,
+  TeamOutlined,
+  PictureOutlined,
+  BarChartOutlined,
+  RightOutlined,
+  SyncOutlined,
+} from '@ant-design/icons'
 import { fetchDashboardStats } from '../../redux/slices/adminSlice'
+import '../manager/dashboard-overview.css'
+
+const compactVND = (n) => {
+  n = n || 0
+  if (n >= 1e9) return (n / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ ₫'
+  if (n >= 1e6) return (n / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' Tr ₫'
+  return (n).toLocaleString('vi-VN') + ' ₫'
+}
+const fullVND = (n) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0)
 
 const DashboardIndex = () => {
   const dispatch = useDispatch()
-  const { dashboardStats, loading, error } = useSelector(state => state.admin)
+  const navigate = useNavigate()
+  const { dashboardStats, loading, error } = useSelector((state) => state.admin)
+  const [grown, setGrown] = useState(false)
 
+  useEffect(() => { dispatch(fetchDashboardStats()) }, [dispatch])
+
+  // Cột mọc từ 0 mỗi khi stats sẵn sàng
   useEffect(() => {
-    dispatch(fetchDashboardStats())
-  }, [dispatch])
+    if (!dashboardStats) { setGrown(false); return }
+    const t = setTimeout(() => setGrown(true), 90)
+    return () => clearTimeout(t)
+  }, [dashboardStats])
 
   if (loading && !dashboardStats) {
-    return (
-      <div className="admin-card text-center" style={{ padding: '80px 0' }}>
-        <p style={{ color: 'var(--color-light-gray)' }}>Đang tải dữ liệu báo cáo hệ thống...</p>
-      </div>
-    )
+    return <div className="ov-empty" style={{ padding: '90px 0' }}>Đang tải dữ liệu báo cáo hệ thống...</div>
   }
-
   if (error) {
     return (
-      <div className="admin-card" style={{ borderLeft: '4px solid var(--color-error)' }}>
-        <h4 style={{ color: 'var(--color-error)', marginBottom: '8px' }}>Lỗi Tải Dữ Liệu</h4>
+      <div className="ov-card" style={{ borderLeft: '4px solid #c0392b' }}>
+        <h4 style={{ color: '#c0392b', margin: '0 0 8px' }}>Lỗi tải dữ liệu</h4>
         <p style={{ margin: 0 }}>{error}</p>
       </div>
     )
   }
 
-  // Fallbacks if stats not loaded yet
   const summary = dashboardStats?.summary || { totalBranches: 0, totalRevenue: 0, averageOccupancy: 0, averageMissedRate: 0 }
   const revenueByBranch = dashboardStats?.revenueByBranch || []
-  const occupancyByBranch = dashboardStats?.occupancyByBranch || []
   const monthlyBookingTrend = dashboardStats?.monthlyBookingTrend || []
-  const housekeepingKPI = dashboardStats?.housekeepingKPI || []
 
-  // Formatting currency
-  const formatVND = (num) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0)
-  }
+  const totalRevenue = summary.totalRevenue || 0
 
-  // Booking Trend SVG parameters
-  const maxTrendVal = Math.max(...monthlyBookingTrend.map(t => t.count), 5)
-  const svgWidth = 500
-  const svgHeight = 220
-  const paddingX = 40
-  const paddingY = 30
-  const chartWidth = svgWidth - paddingX * 2
-  const chartHeight = svgHeight - paddingY * 2
+  // ---- KPI ----
+  const kpis = [
+    { icon: <DollarOutlined />, label: 'Tổng doanh thu chuỗi', value: compactVND(totalRevenue), ctx: 'toàn hệ thống', tone: 'flat' },
+    { icon: <RiseOutlined />, label: 'Tỷ lệ lấp đầy bình quân', value: `${summary.averageOccupancy || 0}%`, ctx: (summary.averageOccupancy || 0) >= 70 ? 'tốt' : 'theo dõi', tone: (summary.averageOccupancy || 0) >= 70 ? 'up' : 'flat' },
+    { icon: <ApartmentOutlined />, label: 'Chi nhánh hoạt động', value: `${summary.totalBranches || 0}`, ctx: 'đang mở', tone: 'flat' },
+    { icon: <ClockCircleOutlined />, label: 'Tỷ lệ dọn dẹp trễ', value: `${summary.averageMissedRate || 0}%`, ctx: (summary.averageMissedRate || 0) > 0 ? 'cần cải thiện' : 'đúng hạn', tone: (summary.averageMissedRate || 0) > 0 ? 'down' : 'up' },
+  ]
 
-  const trendPoints = monthlyBookingTrend.map((t, index) => {
-    const x = paddingX + (index * chartWidth) / Math.max(monthlyBookingTrend.length - 1, 1)
-    const y = svgHeight - paddingY - (t.count / maxTrendVal) * chartHeight
-    return { x, y, label: t.label, count: t.count }
-  })
+  // ---- Bar chart: lượt đặt phòng theo tháng ----
+  const bars = monthlyBookingTrend.map((t) => ({ label: t.label, value: t.count }))
+  const maxBar = Math.max(...bars.map((b) => b.value), 1)
 
-  const linePath = trendPoints.length > 0 
-    ? `M ${trendPoints[0].x} ${trendPoints[0].y} ` + trendPoints.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') 
-    : ''
+  // ---- Quick actions ----
+  const actions = [
+    { icon: <ShopOutlined />, label: 'Quản lý chi nhánh', to: '/admin/branches' },
+    { icon: <TeamOutlined />, label: 'Quản lý khách hàng', to: '/admin/staff' },
+    { icon: <PictureOutlined />, label: 'Thư viện ảnh', to: '/admin/gallery' },
+    { icon: <BarChartOutlined />, label: 'Báo cáo chi tiết', to: '/admin/reports' },
+  ]
 
-  const areaPath = trendPoints.length > 0 
-    ? `${linePath} L ${trendPoints[trendPoints.length - 1].x} ${svgHeight - paddingY} L ${trendPoints[0].x} ${svgHeight - paddingY} Z`
-    : ''
-
-  const maxRevenue = Math.max(...revenueByBranch.map(r => r.total), 1000000)
+  // ---- Bảng hiệu suất theo chi nhánh ----
+  const topRevenue = Math.max(...revenueByBranch.map((r) => r.total), 0)
+  const rankedBranches = [...revenueByBranch].sort((a, b) => b.total - a.total)
 
   return (
-    <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: '0 0 4px 0' }}>Báo Cáo Toàn Doanh Nghiệp</h2>
-        <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>Dữ liệu tổng hợp tình hình kinh doanh và dịch vụ của toàn bộ hệ thống</p>
+    <div className="ov-wrap">
+      <div className="ov-head">
+        <div>
+          <h2>Báo cáo toàn doanh nghiệp</h2>
+          <p>Dữ liệu tổng hợp tình hình kinh doanh & dịch vụ của toàn hệ thống</p>
+        </div>
+        <Button type="primary" icon={<SyncOutlined />} onClick={() => dispatch(fetchDashboardStats())}>Làm mới</Button>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="admin-kpi-grid">
-        <div className="admin-kpi-card kpi-revenue">
-          <div className="admin-kpi-info">
-            <h3>Tổng doanh thu chuỗi</h3>
-            <div className="admin-kpi-val">{formatVND(summary.totalRevenue)}</div>
-          </div>
-          <div className="admin-kpi-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
-        </div>
-
-        <div className="admin-kpi-card kpi-occupancy">
-          <div className="admin-kpi-info">
-            <h3>Tỷ lệ lấp đầy bình quân</h3>
-            <div className="admin-kpi-val">{summary.averageOccupancy}%</div>
-          </div>
-          <div className="admin-kpi-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
-          </div>
-        </div>
-
-        <div className="admin-kpi-card kpi-missed">
-          <div className="admin-kpi-info">
-            <h3>Tỷ lệ dọn dẹp trễ</h3>
-            <div className="admin-kpi-val">{summary.averageMissedRate}%</div>
-          </div>
-          <div className="admin-kpi-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-          </div>
-        </div>
-
-        <div className="admin-kpi-card">
-          <div className="admin-kpi-info">
-            <h3>Chi nhánh hoạt động</h3>
-            <div className="admin-kpi-val">{summary.totalBranches}</div>
-          </div>
-          <div className="admin-kpi-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="admin-charts-grid">
-        {/* Branch Revenue Chart */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <h3 className="admin-card-title">Doanh thu theo chi nhánh</h3>
-          </div>
-          {revenueByBranch.length === 0 ? (
-            <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-light-gray)' }}>
-              Chưa có dữ liệu doanh thu
+      {/* KPI */}
+      <div className="ov-kpis">
+        {kpis.map((k) => (
+          <div className="ov-kpi" key={k.label}>
+            <div className="ov-kpi-top">
+              <span className="ov-kpi-icon">{k.icon}</span>
+              <span className={`ov-kpi-trend ${k.tone}`}>{k.ctx}</span>
             </div>
+            <div className="ov-kpi-value">{k.value}</div>
+            <div className="ov-kpi-label">{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart + Quick actions */}
+      <div className="ov-mid">
+        <div className="ov-card">
+          <div className="ov-card-head">
+            <h3 className="ov-card-title">Lượt đặt phòng theo tháng</h3>
+            <button className="ov-link" onClick={() => navigate('/admin/reports')}>Báo cáo chi tiết</button>
+          </div>
+          {bars.length === 0 ? (
+            <div className="ov-empty"><BarChartOutlined />Chưa có dữ liệu xu hướng đặt phòng</div>
           ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 220, paddingBottom: '16px' }}>
-              {revenueByBranch.map(r => {
-                const percentHeight = (r.total / maxRevenue) * 100
-                return (
-                  <div key={r._id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '20%' }} title={`${r.name}: ${formatVND(r.total)}`}>
-                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-charcoal)', marginBottom: '4px', whiteSpace: 'nowrap' }}>
-                      {(r.total / 1000000).toLocaleString('vi-VN')} Tr ₫
+            <div className="ov-bars">
+              {bars.map((b) => (
+                <div className="ov-bar-col" key={b.label}>
+                  <div className="ov-bar-track">
+                    <div
+                      className={`ov-bar ${b.value === maxBar && maxBar > 0 ? 'is-max' : ''} ${grown ? 'grown' : ''}`}
+                      style={{ height: grown ? `${Math.max((b.value / maxBar) * 100, b.value > 0 ? 8 : 0)}%` : '0%' }}
+                    >
+                      <span className="ov-bar-val">{b.value}</span>
                     </div>
-                    <div style={{ height: 140, width: '28px', backgroundColor: '#f0f0f0', borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-                      <div className="chart-svg-bar" style={{ width: '100%', height: `${percentHeight}%`, background: 'linear-gradient(to top, var(--color-gold), #d4af37)', borderRadius: '4px', transition: 'height 0.6s ease' }} />
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-light-gray)', marginTop: '8px' }}>{r.code}</div>
                   </div>
+                  <span className="ov-bar-label">{b.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="ov-card">
+          <div className="ov-card-head"><h3 className="ov-card-title">Tác vụ nhanh</h3></div>
+          <div className="ov-actions">
+            {actions.map((a) => (
+              <button className="ov-action" key={a.to} onClick={() => navigate(a.to)}>
+                {a.icon}
+                <span style={{ flex: 1 }}>{a.label}</span>
+                <RightOutlined style={{ fontSize: 12, color: '#c9bfb2' }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bảng hiệu suất theo chi nhánh */}
+      <div className="ov-card">
+        <div className="ov-card-head">
+          <h3 className="ov-card-title">Hiệu suất theo chi nhánh</h3>
+          <button className="ov-link" onClick={() => navigate('/admin/branches')}>Quản lý chi nhánh</button>
+        </div>
+        {rankedBranches.length === 0 ? (
+          <div className="ov-empty"><ShopOutlined />Chưa có dữ liệu doanh thu chi nhánh</div>
+        ) : (
+          <table className="ov-table">
+            <thead>
+              <tr>
+                <th>Chi nhánh</th>
+                <th>Mã</th>
+                <th>Doanh thu</th>
+                <th>Tỷ trọng</th>
+                <th>Xếp hạng</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankedBranches.map((r, i) => {
+                const share = totalRevenue > 0 ? Math.round((r.total / totalRevenue) * 100) : 0
+                return (
+                  <tr key={r._id || r.code || i}>
+                    <td style={{ fontWeight: 600 }}>{r.name}</td>
+                    <td><span className="ov-room-chip">{r.code}</span></td>
+                    <td>{fullVND(r.total)}</td>
+                    <td>{share}%</td>
+                    <td>
+                      <span className={`ov-pill ${r.total === topRevenue && topRevenue > 0 ? 'gold' : 'neutral'}`}>
+                        {r.total === topRevenue && topRevenue > 0 ? 'Dẫn đầu' : 'Hoạt động'}
+                      </span>
+                    </td>
+                  </tr>
                 )
               })}
-            </div>
-          )}
-        </div>
-
-        {/* Booking Trend Chart */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <h3 className="admin-card-title">Xu hướng đặt phòng (6 tháng)</h3>
-          </div>
-          {monthlyBookingTrend.length === 0 ? (
-            <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-light-gray)' }}>
-              Chưa có dữ liệu xu hướng đặt phòng
-            </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible' }}>
-                <defs>
-                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-gold)" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="var(--color-gold)" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                
-                {/* Grid Lines */}
-                {[0, 0.25, 0.5, 0.75, 1].map((p, idx) => {
-                  const y = paddingY + p * chartHeight
-                  const gridVal = Math.round(maxTrendVal * (1 - p))
-                  return (
-                    <g key={idx}>
-                      <line x1={paddingX} y1={y} x2={svgWidth - paddingX} y2={y} className="chart-svg-grid" strokeDasharray="3 3" />
-                      <text x={paddingX - 10} y={y + 4} fill="var(--color-light-gray)" fontSize="10" textAnchor="end">{gridVal}</text>
-                    </g>
-                  )
-                })}
-
-                {/* Shaded Area */}
-                {areaPath && <path d={areaPath} fill="url(#areaGrad)" />}
-
-                {/* Line Path */}
-                {linePath && <path d={linePath} fill="none" stroke="var(--color-gold)" strokeWidth="3" strokeLinecap="round" />}
-
-                {/* Dots */}
-                {trendPoints.map((p, idx) => (
-                  <g key={idx}>
-                    <circle cx={p.x} cy={p.y} r="5" fill="var(--color-gold)" stroke="var(--color-white)" strokeWidth="2" />
-                    <text x={p.x} y={p.y - 10} fill="var(--color-black)" fontSize="11" fontWeight="bold" textAnchor="middle">{p.count}</text>
-                    <text x={p.x} y={svgHeight - paddingY + 18} fill="var(--color-light-gray)" fontSize="10" textAnchor="middle">{p.label}</text>
-                  </g>
-                ))}
-              </svg>
-            </div>
-          )}
-        </div>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

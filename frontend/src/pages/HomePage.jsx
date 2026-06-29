@@ -3,7 +3,6 @@ import Navbar from '../components/Navbar'
 import Hero from '../components/Hero'
 import Welcome from '../components/Welcome'
 import FeaturedRoom from '../components/FeaturedRoom'
-import SpecialOffers from '../components/SpecialOffers'
 import Dining from '../components/Dining'
 import Amenities from '../components/Amenities'
 import RoomCards from '../components/RoomCards'
@@ -46,7 +45,6 @@ const HomePage = () => {
         <Welcome />
         <FeaturedRoom rooms={homeData?.featuredRooms || []} />
         <RoomCards rooms={homeData?.featuredRooms || []} />
-        <SpecialOffers offers={homeData?.offers || []} />
         <Dining dining={homeData?.dining || []} />
         <Amenities />
         <Testimonials reviews={homeData?.reviews || []} />

@@ -14,6 +14,10 @@ export const customerService = {
     const response = await axiosInstance.get('/public/branches')
     return response.data // { success, data: branches }
   },
+  getGallery: async (category) => {
+    const response = await axiosInstance.get('/public/gallery', { params: { category } })
+    return response.data // { success, data: [{imageUrl, caption, category, ...}] }
+  },
   searchAvailableRooms: async (params) => {
     const response = await axiosInstance.get('/public/rooms/available', { params })
     return response.data // { success, data: rooms }

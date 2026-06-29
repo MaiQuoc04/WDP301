@@ -36,7 +36,8 @@
 /* ---------- Sidebar ---------- */
 .admin-sidebar {
   width: 280px;
-  background-color: #1a1a1a;
+  background: var(--dash-sidebar);
+  border-right: 1px solid var(--dash-sidebar-border);
   color: var(--color-white);
   display: flex;
   flex-direction: column;
@@ -54,6 +55,12 @@
   padding: var(--space-8) var(--space-6);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   text-align: center;
+}
+
+.admin-lotus {
+  display: inline-flex;
+  color: var(--color-gold);
+  margin-bottom: 8px;
 }
 
 .admin-sidebar-logo h2 {
@@ -210,6 +217,7 @@
   padding: var(--space-8);
   flex: 1;
   overflow-y: auto;
+  background: #faf6f0; /* cream ấm theo tông Stitch — đồng bộ với manager */
   animation: fadeIn 0.4s ease-out;
 }
 

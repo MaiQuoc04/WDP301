@@ -1,58 +1,55 @@
-import './Testimonials.css'
+import Reveal from './common/Reveal'
 
-const LotusWatermark = () => (
-  <svg className="testimonial-card__watermark" viewBox="0 0 64 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M32 4C34 14 36 24 34 38C32 42 32 42 30 38C28 24 30 14 32 4Z" fill="#A18348" />
-    <path d="M24 12C27 20 29 28 28 40C26 42 24 40 22 36C19 28 20 18 24 12Z" fill="#A18348" />
-    <path d="M40 12C37 20 35 28 36 40C38 42 40 40 42 36C45 28 44 18 40 12Z" fill="#A18348" />
-    <path d="M16 20C20 26 23 32 24 42C21 43 18 40 15 34C12 28 13 23 16 20Z" fill="#A18348" />
-    <path d="M48 20C44 26 41 32 40 42C43 43 46 40 49 34C52 28 51 23 48 20Z" fill="#A18348" />
-  </svg>
+const Stars = ({ rating = 0 }) => (
+  <div className="flex gap-0.5 text-gold" aria-label={`${rating} sao`}>
+    {Array.from({ length: 5 }).map((_, i) => (
+      <svg key={i} className={`h-4 w-4 ${i < rating ? 'text-gold' : 'text-black/15'}`} viewBox="0 0 20 20" fill="currentColor">
+        <path d="M10 1.5l2.6 5.27 5.82.85-4.21 4.1.99 5.79L10 14.77l-5.2 2.74.99-5.79L1.58 7.62l5.82-.85L10 1.5z" />
+      </svg>
+    ))}
+  </div>
 )
+
+const initialsOf = (name) =>
+  name ? name.trim().split(' ').slice(-2).map((w) => w[0]).join('').toUpperCase() : 'KH'
 
 const Testimonials = ({ reviews = [] }) => {
   if (!reviews || reviews.length === 0) return null
 
-  return (
-    <section className="section testimonials">
-      <div className="container" style={{ position: 'relative' }}>
-        <h2 className="testimonials__heading">Phản hồi của khách hàng</h2>
-        
-        <div className="testimonials__slider">
-          <button className="testimonials__nav-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          
-          <div className="testimonials__grid">
-            {reviews.map(review => (
-              <div key={review._id} className="testimonial-card">
-                <LotusWatermark />
-                <h4 className="testimonial-card__title">Đánh giá {review.rating} sao</h4>
-                <div className="testimonial-card__stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
-                <p className="testimonial-card__text">"{review.comment}"</p>
-                
-                <div className="testimonial-card__footer">
-                  <div className="testimonial-card__avatar">
-                    <span className="google-text">Customer</span>
-                  </div>
-                  <div className="testimonial-card__author-info">
-                    <span className="testimonial-card__author">— {review.customer?.fullName || 'Khách hàng'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+  const shown = reviews.slice(0, 6)
 
-          <div className="testimonials__pagination">
-            <span className="dot dot--active"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-          </div>
+  return (
+    <section className="bg-white py-20 md:py-28">
+      <div className="container mx-auto px-5 lg:px-10">
+        <Reveal className="mx-auto mb-14 max-w-2xl text-center">
+          <span className="font-nav text-xs font-semibold uppercase tracking-luxe text-gold">Cảm nhận</span>
+          <h2 className="mt-4 font-display text-4xl font-medium text-charcoal md:text-5xl">Khách hàng nói về chúng tôi</h2>
+        </Reveal>
+
+        <div className="grid gap-7 md:grid-cols-2 lg:grid-cols-3">
+          {shown.map((review, i) => (
+            <Reveal
+              as="figure"
+              key={review._id}
+              delay={i * 100}
+              className="relative flex h-full flex-col rounded-lg border border-black/5 bg-off-white p-7 shadow-subtle transition-shadow duration-300 hover:shadow-raised"
+            >
+              <span className="pointer-events-none absolute right-6 top-4 font-display text-6xl leading-none text-gold/15">”</span>
+              <Stars rating={review.rating} />
+              <blockquote className="mt-4 flex-1 font-body text-[15px] italic leading-relaxed text-charcoal/75">
+                “{review.comment}”
+              </blockquote>
+              <figcaption className="mt-6 flex items-center gap-3 border-t border-black/5 pt-5">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/15 font-nav text-sm font-semibold text-gold">
+                  {initialsOf(review.customer?.fullName)}
+                </span>
+                <div>
+                  <p className="font-nav text-sm font-semibold text-charcoal">{review.customer?.fullName || 'Khách hàng'}</p>
+                  <p className="font-body text-xs text-charcoal/50">Khách lưu trú</p>
+                </div>
+              </figcaption>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>

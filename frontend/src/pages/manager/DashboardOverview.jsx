@@ -1,32 +1,32 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Card, Row, Col, Progress, Table, Tag, Button, Spin, Empty, Alert } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { Spin, Button, Alert } from 'antd'
 import { roomService } from '../../services/roomService'
-import { vnd } from '../../services'
-import { 
-  HomeOutlined, 
-  ToolOutlined, 
-  WarningOutlined, 
+import {
+  HomeOutlined,
   CheckCircleOutlined,
-  SyncOutlined
+  SyncOutlined,
+  WarningOutlined,
+  AppstoreOutlined,
+  DollarOutlined,
+  ApartmentOutlined,
+  CustomerServiceOutlined,
+  RightOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
+import './dashboard-overview.css'
 
 export default function DashboardOverview() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  const [grown, setGrown] = useState(false) // trigger animate cột mọc từ 0
   const [error, setError] = useState('')
   const [data, setData] = useState({
-    rooms: [],
-    roomTypes: [],
-    amenities: [],
-    services: [],
-    issues: [],
-    tasks: [],
-    hkFloors: []
+    rooms: [], roomTypes: [], amenities: [], services: [], issues: [], tasks: [], hkFloors: [],
   })
 
   const loadData = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
       const [rooms, roomTypes, amenities, services, issues, tasks, hkFloors] = await Promise.all([
         roomService.getRooms(),
@@ -35,7 +35,7 @@ export default function DashboardOverview() {
         roomService.getServices(),
         roomService.getRoomIssues(),
         roomService.getHousekeepingTasks(),
-        roomService.getHousekeeperFloors().catch(() => [])
+        roomService.getHousekeeperFloors().catch(() => []),
       ])
       setData({ rooms, roomTypes, amenities, services, issues, tasks, hkFloors })
     } catch (err) {
@@ -45,195 +45,199 @@ export default function DashboardOverview() {
     }
   }
 
+  useEffect(() => { loadData() }, [])
+
+  // Cột biểu đồ mọc từ 0 lên mỗi khi data sẵn sàng (và khi bấm "Làm mới")
   useEffect(() => {
-    loadData()
-  }, [])
+    if (loading) { setGrown(false); return }
+    const t = setTimeout(() => setGrown(true), 90)
+    return () => clearTimeout(t)
+  }, [loading])
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
         <Spin size="large" tip="Đang tải dữ liệu tổng quan..." />
       </div>
     )
   }
 
   const totalRooms = data.rooms.length
-  const occupiedRooms = data.rooms.filter(r => r.status === 'occupied').length
-  const availableRooms = data.rooms.filter(r => r.status === 'available').length
-  const cleaningRooms = data.rooms.filter(r => r.status === 'cleaning').length
-  const maintenanceRooms = data.rooms.filter(r => r.status === 'maintenance').length
-  const lockedRooms = data.rooms.filter(r => r.status === 'locked').length
+  const byStatus = (s) => data.rooms.filter((r) => r.status === s).length
+  const occupiedRooms = byStatus('occupied')
+  const availableRooms = byStatus('available')
+  const cleaningRooms = byStatus('cleaning')
+  const maintenanceRooms = byStatus('maintenance')
+  const lockedRooms = byStatus('locked')
 
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0
-  const activeAmenities = data.amenities.filter(a => a.status === 'active').length
-  const activeServices = data.services.filter(s => s.status === 'active').length
-  const openIssues = data.issues.filter(i => i.status === 'open')
-  const pendingTasks = data.tasks.filter(t => t.status === 'pending')
+  const openIssues = data.issues.filter((i) => i.status === 'open')
+  const pendingTasks = data.tasks.filter((t) => t.status === 'pending')
+  const unassignedFloors = data.hkFloors.filter((h) => !h.floors || h.floors.length === 0).length
 
-  const issueColumns = [
+  // ---- KPI ----
+  const kpis = [
     {
-      title: 'Phòng',
-      dataIndex: ['room', 'roomNumber'],
-      key: 'roomNumber',
-      render: (text) => <strong>{text}</strong>
+      icon: <HomeOutlined />, label: 'Hiệu suất phòng', value: `${occupancyRate}%`,
+      ctx: `${occupiedRooms} đang ở`, tone: 'flat',
     },
     {
-      title: 'Mô tả sự cố',
-      dataIndex: 'description',
-      key: 'description'
+      icon: <CheckCircleOutlined />, label: 'Phòng trống sẵn sàng', value: `${availableRooms}`,
+      ctx: `/ ${totalRooms} phòng`, tone: 'flat',
     },
     {
-      title: 'Độ nghiêm trọng',
-      dataIndex: 'severity',
-      key: 'severity',
-      render: (severity) => {
-        const colorMap = { high: 'error', medium: 'warning', low: 'processing' }
-        const labelMap = { high: 'Cao', medium: 'Trung bình', low: 'Thấp' }
-        return <Tag color={colorMap[severity]}>{labelMap[severity] || severity}</Tag>
-      }
+      icon: <SyncOutlined />, label: 'Dọn dẹp chờ xử lý', value: `${pendingTasks.length}`,
+      ctx: pendingTasks.length > 0 ? 'cần làm' : 'đã xong', tone: pendingTasks.length > 0 ? 'down' : 'up',
     },
     {
-      title: 'Ngày báo cáo',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => new Date(date).toLocaleString('vi-VN')
-    }
+      icon: <WarningOutlined />, label: 'Sự cố chưa giải quyết', value: `${openIssues.length}`,
+      ctx: openIssues.length > 0 ? 'cần xử lý' : 'ổn định', tone: openIssues.length > 0 ? 'down' : 'up',
+    },
   ]
 
+  // ---- Bar chart: phân bổ trạng thái phòng vật lý ----
+  const bars = [
+    { label: 'Trống', value: availableRooms },
+    { label: 'Đang ở', value: occupiedRooms },
+    { label: 'Đang dọn', value: cleaningRooms },
+    { label: 'Bảo trì', value: maintenanceRooms },
+    { label: 'Khóa', value: lockedRooms },
+  ]
+  const maxBar = Math.max(...bars.map((b) => b.value), 1)
+
+  // ---- Quick actions ----
+  const actions = [
+    { icon: <AppstoreOutlined />, label: 'Quản lý loại phòng', to: '/manager/room-types' },
+    { icon: <DollarOutlined />, label: 'Cấu hình giá phòng', to: '/manager/room-prices' },
+    { icon: <ApartmentOutlined />, label: 'Phân tầng buồng phòng', to: '/manager/floors' },
+    { icon: <CustomerServiceOutlined />, label: 'Quản lý dịch vụ', to: '/manager/services' },
+  ]
+
+  const SEV = {
+    high: { cls: 'high', label: 'Cao' },
+    medium: { cls: 'medium', label: 'Trung bình' },
+    low: { cls: 'low', label: 'Thấp' },
+  }
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+    <div className="ov-wrap">
+      {/* Header */}
+      <div className="ov-head">
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Xin chào Quản lý</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Tổng quan tình trạng hoạt động của chi nhánh hôm nay</p>
+          <h2>Xin chào, Quản lý</h2>
+          <p>Tổng quan tình trạng hoạt động của chi nhánh hôm nay</p>
         </div>
         <Button type="primary" icon={<SyncOutlined />} onClick={loadData}>Làm mới</Button>
       </div>
 
-      {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 24 }} />}
-
-      {data.hkFloors.filter((h) => !h.floors || h.floors.length === 0).length > 0 && (
+      {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 20 }} />}
+      {unassignedFloors > 0 && (
         <Alert
-          type="warning" showIcon style={{ marginBottom: 24 }}
-          message={`Có ${data.hkFloors.filter((h) => !h.floors || h.floors.length === 0).length} nhân viên buồng phòng chưa được phân tầng`}
+          type="warning" showIcon style={{ marginBottom: 20 }}
+          message={`Có ${unassignedFloors} nhân viên buồng phòng chưa được phân tầng`}
           description="Lễ tân giao việc theo tầng phụ trách — hãy phân tầng để hệ thống gợi ý chính xác."
-          action={<Link to="/manager/floors"><Button size="small" type="primary">Phân tầng ngay</Button></Link>}
+          action={<Button size="small" type="primary" onClick={() => navigate('/manager/floors')}>Phân tầng ngay</Button>}
         />
       )}
 
-      {/* KPI Cards */}
-      <div className="dashboard-grid">
-        <div className="stat-card">
-          <div className="stat-icon rooms"><HomeOutlined /></div>
-          <div className="stat-info">
-            <span className="stat-title">Hiệu suất phòng</span>
-            <span className="stat-value">{occupancyRate}%</span>
+      {/* KPI */}
+      <div className="ov-kpis">
+        {kpis.map((k) => (
+          <div className="ov-kpi" key={k.label}>
+            <div className="ov-kpi-top">
+              <span className="ov-kpi-icon">{k.icon}</span>
+              <span className={`ov-kpi-trend ${k.tone}`}>{k.ctx}</span>
+            </div>
+            <div className="ov-kpi-value">{k.value}</div>
+            <div className="ov-kpi-label">{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart + Quick actions */}
+      <div className="ov-mid">
+        <div className="ov-card">
+          <div className="ov-card-head">
+            <h3 className="ov-card-title">Phân bổ trạng thái phòng vật lý</h3>
+            <button className="ov-link" onClick={() => navigate('/manager/rooms')}>Xem phòng</button>
+          </div>
+          <div className="ov-bars">
+            {bars.map((b) => (
+              <div className="ov-bar-col" key={b.label}>
+                <div className="ov-bar-track">
+                  <div
+                    className={`ov-bar ${b.value === maxBar && maxBar > 0 ? 'is-max' : ''} ${grown ? 'grown' : ''}`}
+                    style={{ height: grown ? `${Math.max((b.value / maxBar) * 100, b.value > 0 ? 8 : 0)}%` : '0%' }}
+                  >
+                    <span className="ov-bar-val">{b.value}</span>
+                  </div>
+                </div>
+                <span className="ov-bar-label">{b.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon types"><CheckCircleOutlined /></div>
-          <div className="stat-info">
-            <span className="stat-title">Phòng trống sẵn sàng</span>
-            <span className="stat-value">{availableRooms} / {totalRooms}</span>
+        <div className="ov-card">
+          <div className="ov-card-head">
+            <h3 className="ov-card-title">Tác vụ nhanh</h3>
           </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon clean"><SyncOutlined spin={pendingTasks.length > 0} /></div>
-          <div className="stat-info">
-            <span className="stat-title">Dọn dẹp chờ xử lý</span>
-            <span className="stat-value">{pendingTasks.length} tác vụ</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon issues"><WarningOutlined /></div>
-          <div className="stat-info">
-            <span className="stat-title">Sự cố chưa giải quyết</span>
-            <span className="stat-value">{openIssues.length} báo cáo</span>
+          <div className="ov-actions">
+            {actions.map((a) => (
+              <button className="ov-action" key={a.to} onClick={() => navigate(a.to)}>
+                {a.icon}
+                <span style={{ flex: 1 }}>{a.label}</span>
+                <RightOutlined style={{ fontSize: 12, color: '#c9bfb2' }} />
+              </button>
+            ))}
+            <div className="ov-hint">
+              <InboxOutlined />
+              <div>
+                <b>Bổ sung thiết bị</b>
+                <span>Kiểm tra & nhập kho phòng</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Charts & Breakdowns */}
-      <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
-        <Col xs={24} md={10}>
-          <Card title="Phân bổ trạng thái phòng vật lý" style={{ height: '100%' }}>
-            <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <Progress type="circle" percent={occupancyRate} strokeColor="var(--color-gold)" format={() => `${occupiedRooms} Phòng Đang ở`} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🟢 Trống sẵn sàng (Available)</span>
-                <strong>{availableRooms} phòng</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🔴 Khách đang ở (Occupied)</span>
-                <strong>{occupiedRooms} phòng</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🟡 Đang dọn dẹp (Cleaning)</span>
-                <strong>{cleaningRooms} phòng</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🛠️ Đang bảo trì (Maintenance)</span>
-                <strong>{maintenanceRooms} phòng</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>🔒 Đang khóa (Locked)</span>
-                <strong>{lockedRooms} phòng</strong>
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} md={14}>
-          <Card title="Dữ liệu danh mục & Phân khúc" style={{ height: '100%' }}>
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <Card type="inner" title="Loại phòng (Room Types)">
-                  <h3 style={{ fontSize: 36, margin: '12px 0 6px 0', color: 'var(--color-gold)' }}>{data.roomTypes.length}</h3>
-                  <p style={{ margin: 0, color: 'var(--color-light-gray)' }}>Phân khúc loại phòng</p>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card type="inner" title="Tiện nghi (Amenities)">
-                  <h3 style={{ fontSize: 36, margin: '12px 0 6px 0', color: 'var(--color-gold)' }}>{activeAmenities}</h3>
-                  <p style={{ margin: 0, color: 'var(--color-light-gray)' }}>Tiện nghi đang hoạt động</p>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card type="inner" title="Dịch vụ (Services)">
-                  <h3 style={{ fontSize: 36, margin: '12px 0 6px 0', color: 'var(--color-gold)' }}>{activeServices}</h3>
-                  <p style={{ margin: 0, color: 'var(--color-light-gray)' }}>Dịch vụ đang phục vụ</p>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card type="inner" title="Tác vụ buồng phòng">
-                  <h3 style={{ fontSize: 36, margin: '12px 0 6px 0', color: 'var(--color-gold)' }}>{data.tasks.length}</h3>
-                  <p style={{ margin: 0, color: 'var(--color-light-gray)' }}>Tổng số tác vụ được tạo hôm nay</p>
-                </Card>
-              </Col>
-            </Row>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Recent Issues Table */}
-      <Card title="Sự cố phòng cần xử lý gấp (Open Issues)">
+      {/* Recent issues */}
+      <div className="ov-card">
+        <div className="ov-card-head">
+          <h3 className="ov-card-title">Sự cố phòng cần xử lý gấp</h3>
+          <button className="ov-link" onClick={() => navigate('/manager/issues')}>Xem tất cả</button>
+        </div>
         {openIssues.length === 0 ? (
-          <Empty description="Không có sự cố nào chưa giải quyết" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <div className="ov-empty">
+            <CheckCircleOutlined />
+            Không có sự cố nào chưa giải quyết
+          </div>
         ) : (
-          <Table 
-            dataSource={openIssues.slice(0, 5)} 
-            columns={issueColumns} 
-            rowKey="_id" 
-            pagination={false} 
-            size="middle"
-          />
+          <table className="ov-table">
+            <thead>
+              <tr>
+                <th>Phòng</th>
+                <th>Mô tả sự cố</th>
+                <th>Mức độ</th>
+                <th>Ngày báo cáo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openIssues.slice(0, 6).map((it) => {
+                const sev = SEV[it.severity] || { cls: 'low', label: it.severity }
+                return (
+                  <tr key={it._id}>
+                    <td><span className="ov-room-chip">{it.room?.roomNumber || '—'}</span></td>
+                    <td>{it.description}</td>
+                    <td><span className={`ov-pill ${sev.cls}`}>{sev.label}</span></td>
+                    <td>{new Date(it.createdAt).toLocaleString('vi-VN')}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

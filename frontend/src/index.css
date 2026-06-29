@@ -1,6 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ============================================================
    HANOI HOTEL — Design System Foundation
    ============================================================ */
+
+/* ---------- Scroll Reveal (cho redesign Tailwind) ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
 
 /* ---------- 1. Design Tokens (CSS Custom Properties) ---------- */
 html {
@@ -15,6 +34,12 @@ html {
   --color-gold-hover: #8B6F3F;
   --color-gold-active: #7D6338;
   --color-soft-green: #CEF093;
+
+  /* Dashboard shell — tông chung cho MỌI dashboard nội bộ (admin/manager/reception/housekeeping) */
+  --dash-sidebar: linear-gradient(180deg, #3d342a 0%, #2a231a 100%); /* charcoal nâu ấm (espresso) — KHÔNG đen */
+  --dash-sidebar-border: rgba(161, 131, 72, 0.18);
+  --dash-active-bg: linear-gradient(90deg, rgba(161, 131, 72, 0.18) 0%, transparent 100%);
+  --dash-active-bar: #A18348;
 
   /* Accent */
   --color-luxury-blue: #248ACC;
@@ -104,7 +129,7 @@ body {
 /* ---------- 3. Typography ---------- */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  color: var(--color-black);
+  color: inherit; /* kế thừa màu từ cha (trắng ở section tối, charcoal ở section sáng) thay vì ép đen */
   letter-spacing: 0;
 }
 
@@ -336,4 +361,64 @@ input, select, textarea {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============================================================
+   PREMIUM antd Card cho MỌI dashboard nội bộ
+   (manager / admin / reception / housekeeping)
+   — tiêu đề card serif Cormorant + divider gold + bo góc mềm
+   ============================================================ */
+.manager-content .ant-card,
+.admin-content .ant-card,
+.rc-main .ant-card,
+.hk-main .ant-card {
+  border-radius: 12px;
+  border-color: var(--color-border);
+  box-shadow: 0 4px 18px rgba(33, 28, 20, 0.05);
+}
+
+.manager-content .ant-card-head,
+.admin-content .ant-card-head,
+.rc-main .ant-card-head,
+.hk-main .ant-card-head {
+  border-bottom: 1px solid rgba(161, 131, 72, 0.16);
+  min-height: 52px;
+}
+
+.manager-content .ant-card-head-title,
+.admin-content .ant-card-head-title,
+.rc-main .ant-card-head-title,
+.hk-main .ant-card-head-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--color-charcoal);
+}
+
+/* Card "inner" (sub-card thống kê) — số gold serif */
+.manager-content .ant-card-type-inner .ant-card-head-title,
+.admin-content .ant-card-type-inner .ant-card-head-title {
+  font-family: var(--font-nav, inherit);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--color-light-gray);
+}
+
+/* Section header trong trang dashboard (h2 tiêu đề trang) */
+.dash-page-title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-charcoal);
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+.dash-page-sub {
+  font-family: var(--font-body, inherit);
+  color: var(--color-light-gray);
+  margin: 4px 0 0;
+  font-size: 14px;
 }

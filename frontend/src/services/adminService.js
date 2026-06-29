@@ -17,6 +17,14 @@ const adminService = {
   getAllAccounts: (role) => axiosInstance.get('/admin/users', { params: { role } }).then(res => res.data.data),
   getDashboardStats: () => axiosInstance.get('/admin/dashboard/stats').then(res => res.data.data),
   getBranchDashboard: (branchId) => axiosInstance.get(`/admin/dashboard/branches/${branchId}`).then(res => res.data.data),
+
+  // Gallery / Media (ảnh thư viện + ẩm thực, global)
+  getGalleryImages: (category) => axiosInstance.get('/admin/gallery', { params: { category } }).then(res => res.data.data),
+  uploadGalleryImage: (formData) => axiosInstance.post('/admin/gallery', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(res => res.data.data),
+  updateGalleryImage: (id, data) => axiosInstance.put(`/admin/gallery/${id}`, data).then(res => res.data.data),
+  deleteGalleryImage: (id) => axiosInstance.delete(`/admin/gallery/${id}`).then(res => res.data.data),
 }
 
 export default adminService

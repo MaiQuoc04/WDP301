@@ -2,6 +2,7 @@
 const bookingService = require('../services/bookingService')
 const payosService   = require('../services/payosService')
 const Booking        = require('../models/bookingModel')
+const Customer       = require('../models/customerModel')
 
 /* ── Tạo booking online ─────────────────────────────────────────── */
 exports.createBooking = async (req, res) => {
@@ -15,11 +16,17 @@ exports.createBooking = async (req, res) => {
     if (!Number.isInteger(childCount) || childCount < 0) {
       return res.status(400).json({ success: false, message: 'Số trẻ em không hợp lệ' })
     }
+    // Đơn online LUÔN gắn với khách đang đăng nhập (route đã có protect).
+    // customer field ref tới Customer profile, KHÔNG phải Account → tra theo account.
+    const customer = await Customer.findOne({ account: req.user.id })
+    if (!customer) {
+      return res.status(403).json({ success: false, message: 'Không tìm thấy hồ sơ khách hàng. Vui lòng đăng nhập lại.' })
+    }
     const booking = await bookingService.create({
       branchId, roomTypeId, checkIn, checkOut, adults: adultCount, children: childCount,
       guestName, guestPhone,
       source: 'online',
-      customerId: req.user ? req.user._id : undefined,
+      customerId: customer._id,
     })
     res.status(201).json({ success: true, data: booking })
   } catch (err) {
@@ -29,11 +36,14 @@ exports.createBooking = async (req, res) => {
 
 exports.getBookingHistory = async (req, res) => {
   try {
-    const bookings = await Booking.find({ customer: req.user._id })
+    // Chỉ trả ĐÚNG đơn của khách đang đăng nhập (theo Customer profile của họ).
+    const customer = await Customer.findOne({ account: req.user.id })
+    if (!customer) return res.json({ success: true, data: [] })
+    const bookings = await Booking.find({ customer: customer._id })
       .populate('roomType', 'name images')
       .populate('branch', 'name')
       .sort({ createdAt: -1 });
-    
+
     res.json({ success: true, data: bookings });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

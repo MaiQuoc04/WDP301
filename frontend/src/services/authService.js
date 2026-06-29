@@ -9,4 +9,6 @@ export const authService = {
   forgotPassword: (data) => axiosInstance.post(ENDPOINTS.AUTH.FORGOT_PASSWORD, data),
   resetPassword: (data) => axiosInstance.post(ENDPOINTS.AUTH.RESET_PASSWORD, data),
   googleLogin: (data) => axiosInstance.post('/auth/google', data),
+  getMe: () => axiosInstance.get('/auth/me').then((r) => r.data),
+  changePassword: (data) => axiosInstance.post('/auth/change-password', data).then((r) => r.data),
 }

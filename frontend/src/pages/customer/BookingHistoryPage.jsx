@@ -3,27 +3,36 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
+import Reveal from '../../components/common/Reveal';
 import { customerService } from '../../services';
-import './BookingHistoryPage.css';
+
+const STATUS = {
+  pending:     { label: 'Chờ thanh toán cọc', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  confirmed:   { label: 'Đã xác nhận',        cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  checked_in:  { label: 'Đang lưu trú',       cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  checked_out: { label: 'Đã trả phòng',       cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+  completed:   { label: 'Hoàn thành',         cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  cancelled:   { label: 'Đã huỷ',             cls: 'bg-red-50 text-red-600 border-red-200' },
+  no_show:     { label: 'Không đến',          cls: 'bg-red-50 text-red-600 border-red-200' },
+};
+
+const formatPrice = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
 const BookingHistoryPage = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user, token } = useSelector((state) => state.auth || {});
+  const { token } = useSelector((state) => state.auth || {});
 
   useEffect(() => {
     if (!token) {
       navigate('/login', { state: { from: '/customer/booking-history' } });
       return;
     }
-
     const fetchHistory = async () => {
       try {
         const res = await customerService.getBookingHistory();
-        if (res.success) {
-          setBookings(res.data);
-        }
+        if (res.success) setBookings(res.data);
       } catch (err) {
         alert('Lỗi khi tải lịch sử đặt phòng: ' + (err.response?.data?.message || err.message));
       } finally {
@@ -33,110 +42,90 @@ const BookingHistoryPage = () => {
     fetchHistory();
   }, [token, navigate]);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pending': return 'Chờ thanh toán cọc';
-      case 'confirmed': return 'Đã xác nhận';
-      case 'checked_in': return 'Đang lưu trú';
-      case 'checked_out': return 'Đã trả phòng';
-      case 'cancelled': return 'Đã huỷ';
-      case 'no_show': return 'Không đến';
-      default: return status;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="bk-history-page">
-        <Navbar />
-        <div style={{ padding: '100px', textAlign: 'center', fontSize: '18px' }}>Đang tải lịch sử đặt phòng...</div>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
-    <div className="bk-history-page">
+    <div className="min-h-screen bg-off-white">
       <Navbar />
-      <div className="bk-history-container">
-        <h2 className="bk-history-title">Lịch sử đặt phòng</h2>
-        
-        {bookings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <p style={{ fontSize: '18px', color: '#666' }}>Bạn chưa có đơn đặt phòng nào.</p>
-            <button onClick={() => navigate('/booking')} style={{ marginTop: '15px', padding: '10px 20px', backgroundColor: '#d2b356', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+
+      <div className="mx-auto max-w-4xl px-5 py-12 lg:py-16">
+        <Reveal className="mb-10 text-center">
+          <span className="font-nav text-xs font-semibold uppercase tracking-luxe text-gold">Tài khoản</span>
+          <h1 className="mt-3 font-display text-4xl font-medium text-charcoal md:text-5xl">Lịch sử đặt phòng</h1>
+        </Reveal>
+
+        {loading ? (
+          <div className="py-20 text-center font-body text-charcoal/55">Đang tải lịch sử đặt phòng...</div>
+        ) : bookings.length === 0 ? (
+          <div className="rounded-lg border border-black/5 bg-white py-16 text-center shadow-subtle">
+            <p className="font-display text-2xl text-charcoal">Bạn chưa có đơn đặt phòng nào</p>
+            <button onClick={() => navigate('/booking')} className="mt-6 rounded-sm bg-gold px-8 py-3.5 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
               Đặt phòng ngay
             </button>
           </div>
         ) : (
-          <div className="bk-history-list">
-            {bookings.map((booking) => (
-              <div key={booking._id} className="bk-history-card">
-                <div className="bk-history-image">
-                  {booking.roomType?.images && booking.roomType.images.length > 0 ? (
-                    <img src={booking.roomType.images[0]} alt={booking.roomType.name} />
-                  ) : (
-                    <span>Chưa có ảnh</span>
-                  )}
-                </div>
-                
-                <div className="bk-history-details">
-                  <div>
-                    <div className="bk-history-header">
+          <div className="space-y-6">
+            {bookings.map((b, i) => {
+              const st = STATUS[b.status] || { label: b.status, cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+              return (
+                <Reveal as="article" key={b._id} delay={(i % 4) * 90} className="grid overflow-hidden rounded-lg bg-white shadow-raised transition-shadow duration-300 hover:shadow-elevated sm:grid-cols-[200px_1fr]">
+                  <div className="h-44 overflow-hidden sm:h-auto">
+                    {b.roomType?.images?.length ? (
+                      <img src={b.roomType.images[0]} alt={b.roomType?.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-cream text-sm text-charcoal/40">Chưa có ảnh</div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col p-6">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3>{booking.roomType?.name}</h3>
-                        <div className="bk-history-branch">Chi nhánh: {booking.branch?.name}</div>
+                        <h3 className="font-display text-2xl font-semibold text-charcoal">{b.roomType?.name}</h3>
+                        <p className="mt-0.5 font-body text-sm text-charcoal/55">Chi nhánh: {b.branch?.name}</p>
                       </div>
-                      <div className={`bk-history-status status-${booking.status}`}>
-                        {getStatusText(booking.status)}
+                      <span className={`shrink-0 rounded-full border px-3 py-1 font-nav text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-black/5 pt-4 font-body text-sm sm:grid-cols-4">
+                      <div>
+                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Mã booking</div>
+                        <div className="font-medium text-charcoal">{b.code}</div>
+                      </div>
+                      <div>
+                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Khách</div>
+                        <div className="font-medium text-charcoal">{b.guestName}</div>
+                      </div>
+                      <div>
+                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Nhận phòng</div>
+                        <div className="font-medium text-charcoal">{new Date(b.checkIn).toLocaleDateString('vi-VN')}</div>
+                      </div>
+                      <div>
+                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Trả phòng</div>
+                        <div className="font-medium text-charcoal">{new Date(b.checkOut).toLocaleDateString('vi-VN')}</div>
                       </div>
                     </div>
 
-                    <div className="bk-history-info-grid">
-                      <div className="bk-history-info-item">
-                        <span className="bk-info-label">Mã Booking</span>
-                        <span className="bk-info-value">{booking.code}</span>
+                    <div className="mt-auto flex flex-col gap-3 border-t border-black/5 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="font-body text-sm text-charcoal/60">
+                        Tổng tiền: <span className="font-display text-lg font-semibold text-gold">{formatPrice(b.totalAmount)}</span>
                       </div>
-                      <div className="bk-history-info-item">
-                        <span className="bk-info-label">Khách hàng</span>
-                        <span className="bk-info-value">{booking.guestName}</span>
-                      </div>
-                      <div className="bk-history-info-item">
-                        <span className="bk-info-label">Ngày nhận phòng</span>
-                        <span className="bk-info-value">{new Date(booking.checkIn).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                      <div className="bk-history-info-item">
-                        <span className="bk-info-label">Ngày trả phòng</span>
-                        <span className="bk-info-value">{new Date(booking.checkOut).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bk-history-footer">
-                    <div className="bk-history-price">
-                      Tổng tiền: {formatPrice(booking.totalAmount)}
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button className="bk-btn-view" onClick={() => navigate(`/checkout/${booking._id}`)}>
-                        Xem chi tiết
-                      </button>
-                      {booking.status === 'pending' && (
-                        <button className="bk-btn-pay" onClick={() => navigate(`/checkout/${booking._id}`)}>
-                          Thanh toán tiếp
+                      <div className="flex gap-3">
+                        <button onClick={() => navigate(`/checkout/${b._id}`)} className="rounded-sm border border-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-gold transition-colors hover:bg-gold hover:text-white">
+                          Xem chi tiết
                         </button>
-                      )}
+                        {b.status === 'pending' && (
+                          <button onClick={() => navigate(`/checkout/${b._id}`)} className="rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
+                            Thanh toán tiếp
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                </Reveal>
+              );
+            })}
           </div>
         )}
       </div>
+
       <Footer />
     </div>
   );
