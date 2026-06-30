@@ -16,6 +16,11 @@ export const bookingService = {
   getBooking: (id) => get(`${base}/bookings/${id}`),
   getBill: (id) => get(`${base}/bookings/${id}/bill`),
   walkIn: (data) => post(`${base}/bookings`, data),
+  // Đặt nhiều phòng (nhóm): báo giá theo phân bổ khách, tạo nhóm, xem chi tiết, thu cọc gom
+  quoteGroup: (data) => post(`${base}/booking-groups/quote`, data),
+  createGroup: (data) => post(`${base}/booking-groups`, data),
+  getGroup: (id) => get(`${base}/booking-groups/${id}`),
+  confirmGroupDeposit: (id, data) => post(`${base}/booking-groups/${id}/confirm-deposit`, data || {}),
   confirmDeposit: (id, data) => post(`${base}/bookings/${id}/confirm-deposit`, data || {}),
   createDepositQR: (id) => post(`${base}/bookings/${id}/deposit-qr`, {}),
   checkIn: (id, data) => post(`${base}/bookings/${id}/check-in`, data || {}),
@@ -24,6 +29,8 @@ export const bookingService = {
   createCheckoutQR: (id) => post(`${base}/bookings/${id}/checkout-qr`, {}),
   // Tiền mặt checkout — không cần QR, lễ tân xác nhận trực tiếp
   checkOutCash: (id, data) => post(`${base}/bookings/${id}/checkout-cash`, data || {}),
+  // Polling: kiểm tra PayOS đã nhận tiền chưa (fallback khi webhook không tới)
+  syncPayments: (id) => post(`${base}/bookings/${id}/sync-payments`, {}),
   complete: (id) => post(`${base}/bookings/${id}/complete`, {}),
   cancel: (id, data) => post(`${base}/bookings/${id}/cancel`, data || {}),
   noShow: (id) => post(`${base}/bookings/${id}/no-show`, {}),

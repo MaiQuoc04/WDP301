@@ -16,6 +16,12 @@ router.get('/rooms/available', c.searchRooms)     // tìm phòng trống + hợp
 router.get('/bookings', c.listBookings)           // UC-27/43 danh sách + lọc booking
 router.get('/bookings/:id', validateObjectId('id'), c.getBookingDetail) // UC-28 chi tiết booking
 
+// UC-29 (mở rộng) — đặt nhiều phòng cho cùng nhóm khách
+router.post('/booking-groups/quote', c.quoteGroup)                                       // báo giá theo phân bổ khách
+router.post('/booking-groups', c.createGroup)                                            // tạo nhóm nhiều phòng
+router.get('/booking-groups/:id', validateObjectId('id'), c.getGroup)                    // chi tiết nhóm
+router.post('/booking-groups/:id/confirm-deposit', validateObjectId('id'), c.confirmGroupDeposit) // thu cọc gom
+
 // Giai đoạn 2 — vòng đời booking
 router.post('/bookings', c.walkIn)                                                      // UC-29 walk-in
 router.post('/bookings/:id/confirm-deposit', validateObjectId('id'), c.confirmDeposit)  // thu cọc -> confirmed
@@ -24,6 +30,7 @@ router.post('/bookings/:id/check-in', validateObjectId('id'), c.checkIn)        
 router.post('/bookings/:id/check-out', validateObjectId('id'), c.checkOut)              // UC-31 (legacy - cash mặc định)
 router.post('/bookings/:id/checkout-qr', validateObjectId('id'), c.createCheckoutQR)   // Gen QR PayOS thu tiền còn lại
 router.post('/bookings/:id/checkout-cash', validateObjectId('id'), c.checkOutCash)      // Tiền mặt — xác nhận trực tiếp
+router.post('/bookings/:id/sync-payments', validateObjectId('id'), c.syncPayments)      // Polling: kiểm tra PayOS đã nhận tiền chưa
 router.post('/bookings/:id/complete', validateObjectId('id'), c.complete)               // -> completed
 router.post('/bookings/:id/bed-surcharge', validateObjectId('id'), c.setBedSurcharge)   // bật/tắt phụ phí giường phụ
 router.post('/bookings/:id/early-checkin', validateObjectId('id'), c.setEarlyCheckin)   // nhận sớm (giờ)

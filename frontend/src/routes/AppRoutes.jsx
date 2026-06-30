@@ -1,7 +1,9 @@
 // Sprint 0 — PRE-WIRED. Không sửa khung này; mỗi người thêm route con TRONG trang của mình
 // (dùng nested route bên trong *Dashboard) để tránh đụng file.
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import ProtectedRoute from '../components/ProtectedRoute'
+import { roleHome } from '../utils/roleHome'
 import HomePage from '../pages/HomePage'
 import RoomDetail from '../pages/RoomDetail'
 import LoginPage from '../pages/auth/LoginPage'
@@ -29,11 +31,19 @@ import BranchStaff from '../pages/admin/BranchStaff'
 import GalleryManagement from '../pages/admin/GalleryManagement'
 
 
+// Route gốc: nhân viên đã đăng nhập -> dashboard theo role; customer/guest -> trang chủ.
+// Giữ phiên sau khi tắt/mở lại trình duyệt (user+token đọc từ localStorage trong authSlice).
+const RootRoute = () => {
+  const { user, token } = useSelector((s) => s.auth)
+  const home = token && user ? roleHome(user.role) : null
+  return home ? <Navigate to={home} replace /> : <HomePage />
+}
+
 const AppRoutes = () => (
   <BrowserRouter>
     <Routes>
       {/* Public / Guest — Khánh */}
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<RootRoute />} />
       <Route path="/rooms" element={<CustomerHome />} />
       <Route path="/rooms/:id" element={<RoomDetail />} />
       <Route path="/login" element={<LoginPage />} />

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { setCredentials } from '../../redux/slices/authSlice'
 import { authService } from '../../services/authService'
+import { roleHome } from '../../utils/roleHome'
 import { GoogleLogin } from '@react-oauth/google'
 import LotusMascot from '../../components/common/LotusMascot'
 
@@ -52,15 +53,7 @@ const LoginPage = () => {
   const { user } = useSelector((state) => state.auth)
 
   useEffect(() => {
-    if (user) {
-      if (from) navigate(from)
-      else if (user.role === 'customer') navigate('/')
-      else if (user.role === 'receptionist') navigate('/reception')
-      else if (user.role === 'housekeeper') navigate('/housekeeping')
-      else if (user.role === 'branch_manager') navigate('/manager')
-      else if (user.role === 'super_admin') navigate('/admin')
-      else navigate('/')
-    }
+    if (user) navigate(from || roleHome(user.role) || '/')
   }, [user, navigate])
 
   // modes: 'login' | 'register' | 'forgot-password' | 'otp-verify' | 'otp-reset'
@@ -111,13 +104,7 @@ const LoginPage = () => {
   }
 
   const roleRedirect = (u) => {
-    if (from) navigate(from)
-    else if (u.role === 'customer') navigate('/')
-    else if (u.role === 'receptionist') navigate('/reception')
-    else if (u.role === 'housekeeper') navigate('/housekeeping')
-    else if (u.role === 'branch_manager') navigate('/manager')
-    else if (u.role === 'super_admin') navigate('/admin')
-    else navigate('/')
+    navigate(from || roleHome(u.role) || '/')
   }
 
   const handleGoogleSuccess = async (credentialResponse) => {

@@ -133,12 +133,15 @@ exports.getTaskDetail = async (accountId, taskId) => {
   return loadVisibleTask(accountId, taskId)
 }
 
-// (Mô hình tự nhận đã bỏ — task do lễ tân giao trực tiếp cho housekeeper khi tạo.)
-
 exports.startTask = async (accountId, taskId) => {
   const task = await loadVisibleTask(accountId, taskId)
-  if (!task.assignedTo) fail('Task chưa được giao cho ai')
-  if (String(task.assignedTo._id || task.assignedTo) !== String(accountId)) fail('Ban khong phai nguoi duoc gan task nay', 403)
+  // Tự gán nếu task chưa có ai nhận (task cũ hoặc chưa chỉ định)
+  if (!task.assignedTo) {
+    task.assignedTo = accountId
+    task.assignedAt = new Date()
+  } else if (String(task.assignedTo._id || task.assignedTo) !== String(accountId)) {
+    fail('Ban khong phai nguoi duoc gan task nay', 403)
+  }
   if (!['pending', 'urgent'].includes(task.status)) fail('Chi task pending/urgent moi co the bat dau')
   // FIFO: phải hoàn thành task được GIAO TRƯỚC (assignedAt nhỏ hơn, còn dở) rồi mới bắt đầu task này
   const earlier = await HousekeepingTask.findOne({
@@ -155,8 +158,12 @@ exports.saveAmenityReport = async (accountId, taskId, report = []) => {
   const task = await loadVisibleTask(accountId, taskId)
   if (task.type === 'mid_stay') fail('Task don phong giua ky khong can kiem ke thiet bi')
   if (DONE_TASK_STATUSES.includes(task.status)) fail('Khong the sua bao cao cua task da ket thuc')
-  if (!task.assignedTo || String(task.assignedTo._id || task.assignedTo) !== String(accountId)) {
-    fail('Ban can nhan task truoc khi luu bao cao', 403)
+  // Tự gán nếu chưa có ai nhận
+  if (!task.assignedTo) {
+    task.assignedTo = accountId
+    task.assignedAt = new Date()
+  } else if (String(task.assignedTo._id || task.assignedTo) !== String(accountId)) {
+    fail('Task nay da duoc giao cho nguoi khac', 403)
   }
   if (!Array.isArray(report)) fail('Bao cao thiet bi khong hop le')
 

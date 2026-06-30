@@ -5,6 +5,8 @@ const PAYMENT_STATUS = ['pending', 'paid', 'failed', 'expired']
 
 const paymentSchema = new mongoose.Schema({
   booking:         { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true },
+  // Khi thu GOM cho nhóm nhiều phòng: payment gắn group + booking đại diện (phòng đầu) để ledger cũ vẫn chạy.
+  group:           { type: mongoose.Schema.Types.ObjectId, ref: 'BookingGroup' },
   type:            { type: String, enum: ['deposit', 'remaining'], required: true },
   method:          { type: String, enum: ['online_qr', 'cash', 'bank_transfer'], default: 'online_qr' },
   amount:          { type: Number, required: true },

@@ -45,6 +45,18 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
     return () => socket.off('payment_success', onPaySuccess)
   }, [bookingId])
 
+  // Polling PayOS mỗi 5s khi đang hiển thị QR (fallback khi webhook không tới localhost)
+  useEffect(() => {
+    if (step !== 'qr' || paymentDone) return
+    const timer = setInterval(async () => {
+      try {
+        const res = await bookingService.syncPayments(bookingId)
+        if (res?.synced > 0) setPaymentDone(true)
+      } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [step, paymentDone, bookingId])
+
   const handleChooseQR = async () => {
     setLoading(true)
     try {
@@ -214,11 +226,6 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
           <>
             <h3>Check-out — Tiền mặt</h3>
             <p className="rc-modal-hint">Đầu danh sách là người phụ trách đúng tầng &amp; đang rảnh.</p>
-            {!hk?.lastInspectionDone && (
-              <p className="rc-modal-hint" style={{ color: '#b45309' }}>
-                ⚠ Phòng chưa kiểm tra thiết bị — sau check-out không cộng được phụ phí thiếu vào bill.
-              </p>
-            )}
             {hkLoading ? <p>Đang tải...</p> : (
               <ul className="hk-pick-list">
                 {hkPick.map((h) => (
@@ -299,6 +306,18 @@ function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError 
     socket.on('payment_success', onPaySuccess)
     return () => socket.off('payment_success', onPaySuccess)
   }, [bookingId])
+
+  // Polling PayOS mỗi 5s khi đang hiển thị QR (fallback khi webhook không tới localhost)
+  useEffect(() => {
+    if (!qrData || paymentDone) return
+    const timer = setInterval(async () => {
+      try {
+        const res = await bookingService.syncPayments(bookingId)
+        if (res?.synced > 0) setPaymentDone(true)
+      } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [qrData, paymentDone, bookingId])
 
   const handleGenQR = async () => {
     setLoading(true)
@@ -491,6 +510,12 @@ export default function BookingDetailPage() {
       </div>
       {err && <p className="rc-err">{err}</p>}
       {msg && <p className="rc-ok">{msg}</p>}
+
+      {b.group && (
+        <p className="rc-group-banner">
+          🏨 Phòng này thuộc <Link to={`/reception/booking-groups/${b.group}`}>nhóm đặt nhiều phòng (1 mã, 1 cọc)</Link>
+        </p>
+      )}
 
       <div className="rc-actions">
         {st === 'pending' && (

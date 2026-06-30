@@ -16,6 +16,8 @@ const PAYMENT_PROGRESS = ['unpaid', 'partial', 'paid'] // BR-33
 
 const bookingSchema = new mongoose.Schema({
   code:      { type: String, unique: true },
+  // Nhóm đặt nhiều phòng (cùng khách). null = booking đơn lẻ (đường cũ giữ nguyên). docs đặt nhiều phòng.
+  group:     { type: mongoose.Schema.Types.ObjectId, ref: 'BookingGroup' },
   branch:    { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   roomType:  { type: mongoose.Schema.Types.ObjectId, ref: 'RoomType', required: true },
   room:      { type: mongoose.Schema.Types.ObjectId, ref: 'Room' }, // gán khi check-in

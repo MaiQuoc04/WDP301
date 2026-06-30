@@ -14,6 +14,12 @@ exports.getBookingDetail = handle((req) => svc.getBookingDetail(req.user.id, req
 
 // GĐ2 — vòng đời
 exports.walkIn = handle((req) => svc.walkIn(req.user.id, req.body), 201)              // UC-29
+
+// UC-29 (mở rộng) — đặt nhiều phòng (nhóm)
+exports.quoteGroup = handle((req) => svc.quoteGroup(req.user.id, req.body))                     // báo giá theo phân bổ khách
+exports.createGroup = handle((req) => svc.createGroup(req.user.id, req.body), 201)              // tạo nhóm nhiều phòng
+exports.getGroup = handle((req) => svc.getGroup(req.user.id, req.params.id))                    // chi tiết nhóm
+exports.confirmGroupDeposit = handle((req) => svc.confirmGroupDeposit(req.user.id, req.params.id, req.body)) // thu cọc gom nhóm
 exports.confirmDeposit = handle((req) => svc.confirmDeposit(req.user.id, req.params.id, req.body))
 exports.createDepositQR = handle((req) => svc.createDepositQR(req.user.id, req.params.id)) // Gen QR PayOS thu cọc
 exports.checkIn = handle((req) => svc.checkIn(req.user.id, req.params.id, req.body))  // UC-30
@@ -21,6 +27,7 @@ exports.checkOut = handle((req) => svc.checkOut(req.user.id, req.params.id, req.
 exports.complete = handle((req) => svc.complete(req.user.id, req.params.id))
 exports.createCheckoutQR = handle((req) => svc.createCheckoutQR(req.user.id, req.params.id)) // Gen QR PayOS khi checkout
 exports.checkOutCash = handle((req) => svc.checkOutCash(req.user.id, req.params.id, req.body)) // Tiền mặt
+exports.syncPayments = handle((req) => svc.syncPayments(req.user.id, req.params.id))           // Polling PayOS
 exports.setBedSurcharge = handle((req) => svc.setBedSurcharge(req.user.id, req.params.id, req.body.apply))
 exports.setEarlyCheckin = handle((req) => svc.setEarlyCheckin(req.user.id, req.params.id, req.body.hours))
 exports.setLateCheckout = handle((req) => svc.setLateCheckout(req.user.id, req.params.id, req.body.hours))

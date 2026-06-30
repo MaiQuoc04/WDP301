@@ -225,21 +225,16 @@ exports.handleWebhook = async (webhookBody) => {
   return applyPaidPayment(payment, transactionCode)
 }
 exports.syncBookingPayments = async (bookingId) => {
+  // Chỉ kiểm tra payment PENDING (chưa thanh toán) — payment đã paid không cần sync lại
   const payments = await Payment.find({
     booking: bookingId,
     method: 'online_qr',
-    status: { $in: ['pending', 'paid'] },
+    status: 'pending',
     transactionRef: { $exists: true, $ne: null },
   }).sort('-createdAt')
 
   let synced = 0
   for (const payment of payments) {
-    if (payment.status === 'paid') {
-      await applyPaidPayment(payment, payment.transactionCode || String(payment.transactionRef))
-      synced += 1
-      continue
-    }
-
     let payosPayment
     try {
       payosPayment = await payos.paymentRequests.get(Number(payment.transactionRef))

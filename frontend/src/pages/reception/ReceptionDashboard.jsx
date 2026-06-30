@@ -15,6 +15,7 @@ import {
 import ReceptionDashboardPage from './ReceptionDashboardPage'
 import BookingsPage from './BookingsPage'
 import BookingDetailPage from './BookingDetailPage'
+import GroupDetailPage from './GroupDetailPage'
 import WalkInPage from './WalkInPage'
 import RoomsPage from './RoomsPage'
 import SchedulePage from './SchedulePage'
@@ -89,6 +90,7 @@ export default function ReceptionDashboard() {
             <Route index element={<ReceptionDashboardPage />} />
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="bookings/:id" element={<BookingDetailPage />} />
+            <Route path="booking-groups/:id" element={<GroupDetailPage />} />
             <Route path="walk-in" element={<WalkInPage />} />
             <Route path="rooms" element={<RoomsPage />} />
             <Route path="schedule" element={<SchedulePage />} />

@@ -392,6 +392,25 @@
 .fit-surplus { background: #FEF3C7; color: #B45309; }
 .fit-short { background: #FEE2E2; color: #B91C1C; }
 
+/* ---------- Đặt nhiều phòng (nhóm) ---------- */
+.rc-row-on { background: var(--rc-gold-soft, #FEF3C7); }
+.rc-sticky-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-top: 16px; padding: 14px 16px;
+  background: var(--rc-surface); border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md); box-shadow: var(--rc-shadow-soft);
+}
+.rc-sticky-foot button { white-space: nowrap; }
+.rc-alloc-check { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; font-size: 13px; font-weight: 600; }
+.rc-alloc-check .ok { color: #15803D; }
+.rc-alloc-check .bad { color: #B91C1C; }
+.rc-group-banner {
+  margin: 12px 0; padding: 10px 14px; font-size: 14px;
+  background: var(--rc-gold-soft, #FEF3C7); border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+}
+.rc-group-banner a { font-weight: 600; }
+
 /* ---------- Rooms grid ---------- */
 .rc-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
 .rc-room {

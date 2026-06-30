@@ -188,7 +188,7 @@ export default function TaskDetailPage() {
           {task.issueNote && <p><b>Ghi chú sự cố:</b><br />{task.issueNote}</p>}
 
           <Space wrap>
-            {canStart && (
+            {!done && ['pending', 'urgent'].includes(task.status) && (
               <Button type="primary" loading={saving} onClick={() => act(() => taskService.startTask(id), 'Đã bắt đầu task')}>Bắt đầu</Button>
             )}
             {canEdit && (

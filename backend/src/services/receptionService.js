@@ -1,5 +1,6 @@
 // Owner: Quốc — Receptionist read logic (UC-26/27/28/43). Scope theo chi nhánh được gán (BR-30).
 const Booking = require('../models/bookingModel')
+const BookingGroup = require('../models/bookingGroupModel')
 const Room = require('../models/roomModel')
 const Payment = require('../models/paymentModel')
 const BookingStatusHistory = require('../models/bookingStatusHistoryModel')
@@ -104,6 +105,45 @@ exports.walkIn = async (accountId, body) => {
     source: 'walk_in', createdBy: accountId,
   })
 }
+
+// ---------- UC-29 (mở rộng): ĐẶT NHIỀU PHÒNG cho cùng nhóm khách ----------
+async function assertGroupInBranch(accountId, groupId) {
+  const branches = await myBranchIds(accountId)
+  const ok = await BookingGroup.exists({ _id: groupId, branch: { $in: branches } })
+  if (!ok) { const e = new Error('Không tìm thấy nhóm trong chi nhánh của bạn'); e.status = 404; throw e }
+}
+
+// Báo giá nhóm realtime theo phân bổ khách từng phòng (form walk-in bước "phân bổ")
+exports.quoteGroup = async (accountId, body = {}) => {
+  const branches = await myBranchIds(accountId)
+  if (!body.checkIn || !body.checkOut) throw new Error('Thiếu ngày nhận/trả')
+  return bookingService.quoteGroup(branches[0], body.checkIn, body.checkOut, body.items || [])
+}
+
+// Tạo nhóm nhiều phòng (mỗi phòng 1 booking, gom 1 mã + 1 cọc)
+exports.createGroup = async (accountId, body = {}) => {
+  const branches = await myBranchIds(accountId)
+  return bookingService.createGroup({
+    branchId: branches[0],
+    guestName: body.guestName, guestPhone: body.guestPhone,
+    checkIn: body.checkIn, checkOut: body.checkOut,
+    items: body.items, adultsTotal: body.adultsTotal, childrenTotal: body.childrenTotal,
+    notes: body.notes, source: 'walk_in', createdBy: accountId,
+  })
+}
+
+// Chi tiết nhóm (các phòng + 1 hoá đơn gom)
+exports.getGroup = async (accountId, groupId) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.getGroupDetail(groupId)
+}
+
+// Thu cọc gom cho cả nhóm -> mọi phòng pending chuyển confirmed
+exports.confirmGroupDeposit = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.confirmGroupDeposit(groupId, { method: body.method, transactionCode: body.transactionCode, paidFull: !!body.paidFull, by: accountId })
+}
+
 exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, by: accountId })
@@ -150,6 +190,12 @@ exports.checkOutCash = async (accountId, bookingId, body = {}) => {
 exports.complete = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.complete(bookingId, { by: accountId })
+}
+// Polling: gọi PayOS API kiểm tra payment đã thành công chưa (fallback khi webhook không tới localhost)
+exports.syncPayments = async (accountId, bookingId) => {
+  await assertInBranch(accountId, bookingId)
+  const payosService = require('./payosService')
+  return payosService.syncBookingPayments(bookingId)
 }
 exports.setBedSurcharge = async (accountId, bookingId, apply) => {
   await assertInBranch(accountId, bookingId)
