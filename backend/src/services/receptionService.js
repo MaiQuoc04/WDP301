@@ -39,8 +39,9 @@ exports.listRooms = async (accountId, { status } = {}) => {
 }
 
 // UC-27/43: danh sách + lọc theo NHÓM (mọi lần đặt = 1 nhóm). Mỗi dòng = 1 nhóm + rollup tiền/trạng thái.
-// Lọc: status (rollup), date (ngày nhận của nhóm), q (mã nhóm / tên / sđt).
-exports.listBookings = async (accountId, { status, date, q } = {}) => {
+// view='active' (mặc định): BỎ đơn đã huỷ/no-show + đơn ONLINE đang chờ cọc (giữ chỗ tạm, khách tự trả).
+// view='archived': CHỈ đơn đã huỷ/no-show (tab riêng). Lọc thêm: status (rollup), date (ngày nhận), q (mã/tên/sđt).
+exports.listBookings = async (accountId, { status, date, q, view } = {}) => {
   const branches = await myBranchIds(accountId)
   const gfilter = { branch: { $in: branches } }
   if (date) {
@@ -74,7 +75,16 @@ exports.listBookings = async (accountId, { status, date, q } = {}) => {
       ...roll, // status, roomCount, activeCount, totalAmount, paidAmount, remainingAmount, paymentStatus, depositAmount
     }
   })
-  if (status) rows = rows.filter((r) => r.status === status)
+
+  const TERMINAL = ['cancelled', 'no_show']
+  if (view === 'archived') {
+    rows = rows.filter((r) => TERMINAL.includes(r.status))
+    if (status && TERMINAL.includes(status)) rows = rows.filter((r) => r.status === status)
+  } else {
+    // active: bỏ huỷ/no-show + online chờ cọc (giữ chỗ tạm)
+    rows = rows.filter((r) => !TERMINAL.includes(r.status) && !(r.source === 'online' && r.status === 'pending'))
+    if (status) rows = rows.filter((r) => r.status === status)
+  }
   return rows
 }
 

@@ -3,12 +3,17 @@ const ContactMessage = require('../models/contactMessageModel')
 const Branch = require('../models/branchModel')
 const notificationService = require('./notificationService')
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/   // TLD là chữ, ≥2 ký tự
+const PHONE_RE = /^0\d{9,10}$/                       // SĐT VN: 0 + 9-10 số (BẮT BUỘC)
+const NAME_RE = /^\p{L}+(?:[ ]\p{L}+)*$/u            // chỉ chữ + 1 khoảng trắng giữa các từ
 
 // Khách gửi tin nhắn -> lưu + báo lễ tân & QL của chi nhánh đã chọn.
 exports.create = async ({ name, email, phone, subject, message, branchId, customerId } = {}) => {
-  if (!name || !name.trim()) throw new Error('Vui lòng nhập họ tên')
-  if (!email || !EMAIL_RE.test(email.trim())) throw new Error('Email không hợp lệ')
+  name = (name || '').trim(); email = (email || '').trim(); phone = (phone || '').trim()
+  if (!name || name.length < 2 || name.length > 50 || !NAME_RE.test(name))
+    throw new Error('Họ tên phải 2–50 ký tự, chỉ gồm chữ và khoảng trắng')
+  if (!EMAIL_RE.test(email)) throw new Error('Email không hợp lệ')
+  if (!PHONE_RE.test(phone)) throw new Error('Số điện thoại không hợp lệ (VD: 0901234567)')
   if (!subject || !subject.trim()) throw new Error('Vui lòng nhập tiêu đề')
   if (!message || !message.trim()) throw new Error('Vui lòng nhập nội dung')
   if (!branchId) throw new Error('Vui lòng chọn chi nhánh')
@@ -16,7 +21,7 @@ exports.create = async ({ name, email, phone, subject, message, branchId, custom
   if (!branch || !branch.isActive) throw new Error('Chi nhánh không hợp lệ')
 
   const doc = await ContactMessage.create({
-    name: name.trim(), email: email.trim(), phone: phone?.trim(),
+    name, email, phone,
     subject: subject.trim(), message: message.trim(),
     branch: branch._id, customer: customerId || undefined,
   })

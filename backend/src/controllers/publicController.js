@@ -37,11 +37,27 @@ exports.searchRooms = async (req, res) => {
   }
 }
 
-// Khách gửi tin nhắn liên hệ (không cần đăng nhập) -> lưu + báo lễ tân/QL chi nhánh
+// Khách gửi tin nhắn liên hệ. Guest: nhập email. ĐÃ ĐĂNG NHẬP: ép email = email tài khoản (không tin email client).
 exports.submitContact = async (req, res) => {
   try {
-    const { name, email, phone, subject, message, branchId } = req.body
-    const doc = await contactService.create({ name, email, phone, subject, message, branchId })
+    let { name, email, phone, subject, message, branchId } = req.body
+    let customerId
+    const token = req.headers.authorization?.split(' ')[1]
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken')
+        const payload = jwt.verify(token, process.env.JWT_SECRET)
+        const Account = require('../models/accountModel')
+        const acc = await Account.findById(payload.id).select('email')
+        if (acc) {
+          email = acc.email // ÉP theo account, bỏ qua email do client gửi
+          const Customer = require('../models/customerModel')
+          const cust = await Customer.findOne({ account: acc._id }).select('_id')
+          customerId = cust?._id
+        }
+      } catch { /* token hỏng/hết hạn -> coi như guest, dùng email client */ }
+    }
+    const doc = await contactService.create({ name, email, phone, subject, message, branchId, customerId })
     res.status(201).json({ success: true, data: { _id: doc._id } })
   } catch (err) {
     res.status(400).json({ success: false, message: err.message })

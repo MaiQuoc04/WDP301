@@ -139,7 +139,7 @@ exports.login = async ({ email, password }) => {
   if (!account || !(await bcrypt.compare(password, account.password)))
     throw new Error('Email hoặc mật khẩu không đúng')
   if (!account.isActive) throw new Error('Tài khoản đã bị khoá')
-  if (!account.isVerified) throw new Error('Tài khoản chưa xác thực email')
+  if (!account.isVerified) { const e = new Error('Tài khoản chưa xác thực email'); e.code = 'EMAIL_NOT_VERIFIED'; throw e }
   if (STAFF_ROLES.includes(account.role) && await isBranchBlocked(account._id))
     throw new Error('Chi nhánh của bạn đang tạm ngừng hoạt động, vui lòng liên hệ quản trị viên')
   return { token: signAccessToken(account), user: await buildUser(account) }

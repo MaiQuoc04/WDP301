@@ -15,6 +15,7 @@ router.get('/booking-groups', protect, customerController.getBookingGroupHistory
 router.post('/booking-groups/quote', customerController.quoteBookingGroup)                                 // báo giá (không cần đăng nhập)
 router.post('/booking-groups', protect, customerController.createBookingGroup)                             // tạo nhóm (gắn customer)
 router.get('/booking-groups/:id', protect, validateObjectId('id'), customerController.getBookingGroupDetail)
+router.post('/booking-groups/:id/cancel', protect, validateObjectId('id'), customerController.cancelBookingGroup)  // huỷ giữ chỗ khi rời trang
 router.post('/booking-groups/:id/payos-link', protect, validateObjectId('id'), customerController.createGroupPaymentLink)
 
 // Webhook PayOS — KHÔNG dùng auth (PayOS gọi từ server của họ)

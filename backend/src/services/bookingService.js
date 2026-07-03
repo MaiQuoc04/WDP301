@@ -756,10 +756,25 @@ exports.confirmGroupDeposit = async (groupId, { method = 'cash', transactionCode
   return exports.getGroupDetail(group._id)
 }
 
+// Khách rời trang checkout / bấm quay lại khi CHƯA cọc -> huỷ các phòng PENDING của nhóm + nhả HoldRoom NGAY
+// (không đợi timeout 15'). Chỉ đụng phòng 'pending' -> nhóm đã cọc/confirmed thì no-op (an toàn).
+exports.cancelGroup = async (groupId, { reason = 'Khách huỷ giữ chỗ', by } = {}) => {
+  const members = await Booking.find({ group: groupId, status: 'pending' })
+  for (const b of members) {
+    b.cancelReason = reason
+    await exports.transition(b, 'cancelled', by, reason)
+    await HoldRoom.deleteMany({ booking: b._id })
+  }
+  return { cancelled: members.length }
+}
+
 // Gộp trạng thái nhóm từ các phòng (rollup, chỉ để hiển thị)
 function rollupGroupStatus(members) {
   const active = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))
-  if (!active.length) return members.length ? 'cancelled' : 'pending'
+  if (!active.length) {
+    if (!members.length) return 'pending'
+    return members.every((b) => b.status === 'no_show') ? 'no_show' : 'cancelled'
+  }
   const allIs = (s) => active.every((b) => b.status === s)
   if (allIs('completed')) return 'completed'
   if (active.every((b) => ['checked_out', 'completed'].includes(b.status))) return 'checked_out'

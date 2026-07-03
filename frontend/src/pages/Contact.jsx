@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { notification } from 'antd';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -30,6 +31,8 @@ const contactBlocks = [
 const emptyForm = { name: '', email: '', phone: '', branchId: '', subject: '', message: '' };
 
 const Contact = () => {
+  const { user, token } = useSelector((s) => s.auth || {});
+  const loggedIn = !!token && !!user;
   const [branches, setBranches] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
@@ -40,12 +43,24 @@ const Contact = () => {
   useEffect(() => {
     customerService.getBranches().then((res) => setBranches(res.data || [])).catch(() => {});
   }, []);
+  // Đã đăng nhập: prefill tên (nếu trống). Email KHÔNG cho nhập — backend tự lấy theo tài khoản.
+  useEffect(() => {
+    if (user?.fullName) setForm((f) => (f.name ? f : { ...f, name: user.fullName }));
+  }, [user]);
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim() || form.name.trim().length < 2) e.name = 'Nhập họ tên hợp lệ';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Email không hợp lệ';
-    if (form.phone.trim() && !/^0\d{9,10}$/.test(form.phone.trim())) e.phone = 'SĐT không hợp lệ (VD: 0987654321)';
+    const name = form.name.trim();
+    if (!name) e.name = 'Vui lòng nhập họ và tên';
+    else if (name.length < 2 || name.length > 50 || !/^\p{L}+(?:[ ]\p{L}+)*$/u.test(name)) e.name = 'Họ tên 2–50 ký tự, chỉ gồm chữ và khoảng trắng';
+    // Email chỉ validate cho GUEST; đã đăng nhập thì backend dùng email tài khoản (không đổi được).
+    if (!loggedIn) {
+      if (!form.email.trim()) e.email = 'Vui lòng nhập email';
+      else if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(form.email.trim())) e.email = 'Email không hợp lệ';
+    }
+    // Số điện thoại BẮT BUỘC + đúng định dạng VN.
+    if (!form.phone.trim()) e.phone = 'Vui lòng nhập số điện thoại';
+    else if (!/^0\d{9,10}$/.test(form.phone.trim())) e.phone = 'SĐT không hợp lệ (VD: 0987654321)';
     if (!form.branchId) e.branchId = 'Chọn chi nhánh muốn liên hệ';
     if (!form.subject.trim()) e.subject = 'Nhập tiêu đề';
     if (!form.message.trim()) e.message = 'Nhập nội dung';
@@ -59,9 +74,10 @@ const Contact = () => {
     if (Object.keys(errs).length) return;
     setSubmitting(true);
     try {
-      await customerService.submitContact(form);
+      // Đã đăng nhập: email lấy theo tài khoản (backend cũng ép theo token — khách không đổi được).
+      await customerService.submitContact({ ...form, email: loggedIn ? user.email : form.email });
       notification.success({ message: 'Đã gửi tin nhắn! Khách sạn sẽ phản hồi qua email sớm nhất.', placement: 'bottomRight' });
-      setForm(emptyForm);
+      setForm((f) => ({ ...emptyForm, name: loggedIn ? (user.fullName || '') : '' }));
     } catch (err) {
       notification.error({ message: err.response?.data?.message || 'Gửi tin nhắn thất bại, vui lòng thử lại', placement: 'bottomRight' });
     } finally {
@@ -122,27 +138,38 @@ const Contact = () => {
               <div className="mt-2 h-px w-16 bg-gold" />
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelBase}>Họ và tên *</label>
+                  <label className={labelBase}>Họ và tên <span className="text-red-500">*</span></label>
                   <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)}
                     className={`${inputBase} ${errors.name ? '!border-red-500' : ''}`} placeholder="Nguyễn Văn A" />
                   {errors.name && <div className="mt-1 text-xs text-red-500">{errors.name}</div>}
                 </div>
                 <div>
-                  <label className={labelBase}>Email *</label>
-                  <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
-                    className={`${inputBase} ${errors.email ? '!border-red-500' : ''}`} placeholder="email@example.com" />
-                  {errors.email && <div className="mt-1 text-xs text-red-500">{errors.email}</div>}
+                  <label className={labelBase}>Email <span className="text-red-500">*</span></label>
+                  {loggedIn ? (
+                    <>
+                      <div className={`${inputBase} flex items-center bg-black/[0.03] text-charcoal/70`} title="Email tài khoản của bạn — không thể thay đổi">
+                        {user.email}
+                      </div>
+                      <div className="mt-1 text-xs text-charcoal/45">Phản hồi sẽ gửi tới email tài khoản của bạn.</div>
+                    </>
+                  ) : (
+                    <>
+                      <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
+                        className={`${inputBase} ${errors.email ? '!border-red-500' : ''}`} placeholder="email@example.com" />
+                      {errors.email && <div className="mt-1 text-xs text-red-500">{errors.email}</div>}
+                    </>
+                  )}
                 </div>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelBase}>Số điện thoại</label>
+                  <label className={labelBase}>Số điện thoại <span className="text-red-500">*</span></label>
                   <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
                     className={`${inputBase} ${errors.phone ? '!border-red-500' : ''}`} placeholder="0987654321" />
                   {errors.phone && <div className="mt-1 text-xs text-red-500">{errors.phone}</div>}
                 </div>
                 <div>
-                  <label className={labelBase}>Chi nhánh *</label>
+                  <label className={labelBase}>Chi nhánh <span className="text-red-500">*</span></label>
                   <select value={form.branchId} onChange={(e) => set('branchId', e.target.value)}
                     className={`${inputBase} ${errors.branchId ? '!border-red-500' : ''}`}>
                     <option value="">-- Chọn chi nhánh --</option>
@@ -152,13 +179,13 @@ const Contact = () => {
                 </div>
               </div>
               <div className="mt-4">
-                <label className={labelBase}>Tiêu đề *</label>
+                <label className={labelBase}>Tiêu đề <span className="text-red-500">*</span></label>
                 <input type="text" value={form.subject} onChange={(e) => set('subject', e.target.value)}
                   className={`${inputBase} ${errors.subject ? '!border-red-500' : ''}`} placeholder="Chủ đề liên hệ" />
                 {errors.subject && <div className="mt-1 text-xs text-red-500">{errors.subject}</div>}
               </div>
               <div className="mt-4">
-                <label className={labelBase}>Nội dung *</label>
+                <label className={labelBase}>Nội dung <span className="text-red-500">*</span></label>
                 <textarea value={form.message} onChange={(e) => set('message', e.target.value)} rows={5}
                   className={`${inputBase} resize-y ${errors.message ? '!border-red-500' : ''}`} placeholder="Nội dung tin nhắn..." />
                 {errors.message && <div className="mt-1 text-xs text-red-500">{errors.message}</div>}

@@ -110,6 +110,7 @@ const LoginPage = () => {
   const [otp, setOtp] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const clearFieldErr = (k) => setFieldErrors((p) => (p[k] ? { ...p, [k]: undefined } : p))
+  const [resendLeft, setResendLeft] = useState(0) // đếm ngược cooldown gửi lại OTP (giây)
 
   // Linh vật sen tương tác
   const [focusField, setFocusField] = useState(null)
@@ -191,7 +192,16 @@ const LoginPage = () => {
       setSuccess('Đăng nhập thành công!')
       setTimeout(() => roleRedirect(user), 1000)
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Đăng nhập thất bại')
+      const code = err.response?.data?.code
+      const msg = err.response?.data?.message || ''
+      // Tài khoản đã đăng ký nhưng chưa xác thực email -> đưa thẳng tới màn nhập OTP + gửi lại mã.
+      if (code === 'EMAIL_NOT_VERIFIED' || msg.includes('chưa xác thực')) {
+        setError(''); setOtp(''); setMode('otp-verify')
+        setSuccess('Tài khoản chưa xác thực email — đã gửi mã OTP tới email của bạn, vui lòng nhập để kích hoạt.')
+        try { await doResendOtp(email) } catch (_) { /* còn cooldown thì mã gửi trước đó vẫn dùng được */ }
+      } else {
+        setError(msg || err.message || 'Đăng nhập thất bại')
+      }
     } finally {
       setLoading(false)
     }
@@ -213,6 +223,24 @@ const LoginPage = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Đếm ngược cooldown gửi lại OTP
+  useEffect(() => {
+    if (resendLeft <= 0) return undefined
+    const t = setInterval(() => setResendLeft((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [resendLeft])
+
+  const doResendOtp = async (targetEmail) => {
+    await authService.resendOtp({ email: (targetEmail || email).trim() })
+    setResendLeft(60)
+  }
+  const handleResendOtp = async () => {
+    if (resendLeft > 0) return
+    clearMessages()
+    try { await doResendOtp(); setSuccess('Đã gửi lại mã OTP tới email của bạn.') }
+    catch (err) { setError(err.response?.data?.message || 'Không gửi lại được mã OTP') }
   }
 
   const handleVerifyOtp = async (e) => {
@@ -430,8 +458,11 @@ const LoginPage = () => {
                 <input type="password" maxLength="6" placeholder="••••••" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} required className={`${inputCls} text-center text-2xl tracking-[0.5em]`} />
               </div>
               <button type="submit" className={submitCls} disabled={loading}>{loading ? 'Đang xác thực...' : 'Xác thực OTP'}</button>
-              <div className="text-center">
-                <button type="button" className={linkCls} onClick={() => switchMode('register')}>Thay đổi thông tin đăng ký</button>
+              <div className="flex items-center justify-between">
+                <button type="button" className={`${linkCls} disabled:opacity-50`} disabled={resendLeft > 0} onClick={handleResendOtp}>
+                  {resendLeft > 0 ? `Gửi lại mã sau ${resendLeft}s` : 'Gửi lại mã OTP'}
+                </button>
+                <button type="button" className={linkCls} onClick={() => switchMode('login')}>← Quay lại Đăng nhập</button>
               </div>
             </form>
           )}

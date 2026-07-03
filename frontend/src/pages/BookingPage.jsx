@@ -114,6 +114,16 @@ const BookingPage = () => {
     return () => { socket.off('new_booking', onNew); disconnectSocket(); };
   }, [searched, doSearch]);
 
+  // Sửa ngày -> validate NGAY: trả <= nhận (kể cả cùng ngày) thì cảnh báo + BỎ list phòng cũ (tránh kết quả ngày cũ gây hiểu nhầm).
+  useEffect(() => {
+    if (checkIn && checkOut && new Date(checkOut) <= new Date(checkIn)) {
+      setSearchErr((p) => ({ ...p, checkOut: 'Ngày trả phải sau ngày nhận (tối thiểu 1 đêm)' }));
+      setAvail([]); setQty({}); setQuote(null); setSearched(false);
+    } else {
+      setSearchErr((p) => (p.checkOut ? { ...p, checkOut: undefined } : p));
+    }
+  }, [checkIn, checkOut]);
+
   // Gộp phòng trống theo LOẠI PHÒNG (giá thấp nhất + số phòng trống)
   const availByType = useMemo(() => {
     const m = {};
@@ -140,8 +150,13 @@ const BookingPage = () => {
   const selectedRooms = displayRooms.reduce((s, rt) => s + qtyOf(rt._id), 0);
   const capacityTotal = displayRooms.reduce((s, rt) => s + qtyOf(rt._id) * (rt.capacity || 2), 0);
   const partyUnits = displayAdults + displayChildren * CHILD_UNIT;
+  // Suất CẦN tính phí = floor(partyUnits): trẻ lẻ 0.5 quy về 0 (khớp backend floor). VD 2NL+1TE = 2.5 -> 2.
+  const requiredUnits = Math.floor(partyUnits);
   const enoughAdults = selectedRooms <= displayAdults;       // mỗi phòng cần ≥1 người lớn
-  const enoughCapacity = capacityTotal >= partyUnits;        // đủ chỗ, không phụ phí
+  // Ưu tiên phụ phí THỰC từ báo giá backend; chưa có báo giá thì so sức chứa với suất cần (đã floor).
+  const enoughCapacity = quote
+    ? (quote.totalSurcharge || 0) === 0
+    : capacityTotal >= requiredUnits;
 
   // Báo giá nhóm (debounce) — chỉ gọi khi đã chọn ≥1 phòng và đủ người lớn
   useEffect(() => {
@@ -192,6 +207,7 @@ const BookingPage = () => {
 
   const branchName = branches.find((b) => b._id === branch)?.name;
   const todayStr = new Date().toISOString().split('T')[0];
+  const dateInvalid = !!(checkIn && checkOut && new Date(checkOut) <= new Date(checkIn)); // trả <= nhận (kể cả cùng ngày)
 
   // Thông điệp + màu thanh tóm tắt theo tình huống
   const summary = (() => {
@@ -261,6 +277,11 @@ const BookingPage = () => {
               </button>
             </div>
           </div>
+          {searchErr.checkOut && (
+            <div className="mt-3 rounded-sm bg-red-50 px-4 py-2.5 text-center font-body text-xs font-semibold text-red-600">
+              {searchErr.checkOut}
+            </div>
+          )}
           <div className="mt-3 font-body text-xs text-charcoal/50">Nhận phòng 14:00 · Trả phòng 12:00 · Giá tính theo đêm · Có thể chọn nhiều phòng trong 1 lần đặt</div>
         </div>
       </div>
@@ -268,11 +289,16 @@ const BookingPage = () => {
       {/* ---------- Kết quả ---------- */}
       <section className="bg-off-white py-16 md:py-20">
         <div className="container mx-auto px-5 lg:px-10">
-          {searched && displayRooms.length > 0 && (
+          {!dateInvalid && searched && displayRooms.length > 0 && (
             <h2 className="mb-8 font-display text-3xl font-medium text-charcoal md:text-4xl">Phòng trống · chọn số lượng</h2>
           )}
 
-          {!searched ? (
+          {dateInvalid ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 py-16 text-center shadow-subtle">
+              <p className="font-display text-2xl text-red-600">Ngày chưa hợp lệ</p>
+              <p className="mt-2 font-body text-sm text-red-500">Vui lòng chọn ngày trả <b>sau</b> ngày nhận (ở tối thiểu 1 đêm).</p>
+            </div>
+          ) : !searched ? (
             <div className="py-16 text-center font-body text-charcoal/55">Chọn chi nhánh &amp; ngày rồi bấm “Tìm phòng” để xem phòng trống.</div>
           ) : searching ? (
             <div className="py-16 text-center font-body text-charcoal/55">Đang tìm phòng trống...</div>
@@ -345,7 +371,7 @@ const BookingPage = () => {
                 {summary.tone === 'ok' && '✓ '}{(summary.tone === 'warn' || summary.tone === 'bad') && '⚠ '}{summary.text}
               </div>
               <div className="mt-0.5 font-body text-xs text-charcoal/55">
-                Đã chọn <b>{selectedRooms}</b> phòng · sức chứa <b>{capacityTotal}</b> / cần <b>{partyUnits}</b> suất
+                Đã chọn <b>{selectedRooms}</b> phòng · sức chứa <b>{capacityTotal}</b> / cần <b>{requiredUnits}</b> suất
               </div>
             </div>
             <div className="flex items-center gap-5">

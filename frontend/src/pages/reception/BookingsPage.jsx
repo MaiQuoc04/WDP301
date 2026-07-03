@@ -3,10 +3,19 @@ import { Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDateTime, bookingStatusLabel } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
 
-const STATUSES = ['', 'pending', 'confirmed', 'checked_in', 'checked_out', 'completed', 'cancelled', 'no_show']
+// Tab "Đặt phòng": các trạng thái đang hoạt động. Bỏ "Chờ cọc" khỏi bộ lọc (online chờ cọc đã ẩn;
+// walk-in chờ cọc chỉ thoáng qua trước khi thu cọc nên lọc gần như không ra) — vẫn hiện ở "Tất cả".
+const ACTIVE_STATUSES = ['', 'confirmed', 'checked_in', 'checked_out', 'completed']
 
-// Mỗi dòng = 1 NHÓM đặt phòng (mọi lần đặt đều là nhóm, 1 phòng cũng vậy). Bấm vào xem các phòng chi tiết.
+const tabBtn = (on) => ({
+  padding: '8px 18px', borderRadius: 8, border: '1px solid ' + (on ? 'var(--rc-gold, #b08d57)' : '#e5e5e5'),
+  background: on ? 'var(--rc-gold, #b08d57)' : '#fff', color: on ? '#fff' : '#555',
+  fontWeight: 600, fontSize: 14, cursor: 'pointer',
+})
+
+// Mỗi dòng = 1 NHÓM đặt phòng. Tab "Đặt phòng" (đang hoạt động) và tab "Đã huỷ / No-show" (tra cứu).
 export default function BookingsPage() {
+  const [tab, setTab] = useState('active') // 'active' | 'archived'
   const [list, setList] = useState([])
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
@@ -14,10 +23,12 @@ export default function BookingsPage() {
 
   const load = useCallback(async () => {
     setErr('')
-    try { setList(await bookingService.listBookings({ status: status || undefined, q: q || undefined })) }
+    try { setList(await bookingService.listBookings({ status: status || undefined, q: q || undefined, view: tab })) }
     catch (e) { setErr(e.response?.data?.message || 'Lỗi tải') }
-  }, [status, q])
-  useEffect(() => { load() }, [status]) // eslint-disable-line
+  }, [status, q, tab])
+  useEffect(() => { load() }, [status, tab]) // eslint-disable-line
+
+  const switchTab = (t) => { if (t !== tab) { setTab(t); setStatus('') } }
 
   // Realtime: có booking đổi trạng thái / tạo mới -> làm mới danh sách (gộp nhiều sự kiện bằng debounce).
   const timerRef = useRef(null)
@@ -35,10 +46,18 @@ export default function BookingsPage() {
         <h2>Bookings</h2>
         <Link to="/reception/walk-in" className="rc-btn">+ Walk-in</Link>
       </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button style={tabBtn(tab === 'active')} onClick={() => switchTab('active')}>Đặt phòng</button>
+        <button style={tabBtn(tab === 'archived')} onClick={() => switchTab('archived')}>Đã huỷ / No-show</button>
+      </div>
+
       <div className="rc-filters">
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          {STATUSES.map((s) => <option key={s} value={s}>{s ? bookingStatusLabel(s) : 'Tất cả trạng thái'}</option>)}
-        </select>
+        {tab === 'active' && (
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            {ACTIVE_STATUSES.map((s) => <option key={s} value={s}>{s ? bookingStatusLabel(s) : 'Tất cả trạng thái'}</option>)}
+          </select>
+        )}
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã/tên/sđt"
           onKeyDown={(e) => e.key === 'Enter' && load()} />
         <button onClick={load}>Tìm</button>
@@ -67,7 +86,9 @@ export default function BookingsPage() {
               </tr>
             )
           })}
-          {!list.length && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#888' }}>Không có booking</td></tr>}
+          {!list.length && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#888' }}>
+            {tab === 'archived' ? 'Không có đơn đã huỷ / no-show' : 'Không có booking'}
+          </td></tr>}
         </tbody>
       </table>
     </div>

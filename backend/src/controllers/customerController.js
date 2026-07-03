@@ -160,6 +160,21 @@ exports.getBookingGroupDetail = async (req, res) => {
   }
 }
 
+// Huỷ giữ chỗ nhóm (khách rời trang / bấm quay lại khi chưa cọc). Chỉ chủ nhóm. Idempotent.
+exports.cancelBookingGroup = async (req, res) => {
+  try {
+    const customer = await Customer.findOne({ account: req.user.id })
+    const group = await BookingGroup.findById(req.params.id)
+    if (!group) return res.status(404).json({ success: false, message: 'Không tìm thấy nhóm đặt phòng' })
+    if (!customer || String(group.customer) !== String(customer._id))
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền huỷ nhóm này' })
+    const result = await bookingService.cancelGroup(group._id, { reason: 'Khách rời trang / huỷ giữ chỗ' })
+    res.json({ success: true, data: result })
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+}
+
 // Tạo QR PayOS cọc gom cho nhóm (chỉ chủ nhóm).
 exports.createGroupPaymentLink = async (req, res) => {
   try {

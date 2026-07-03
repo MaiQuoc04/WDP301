@@ -5,7 +5,7 @@ const handle = (fn, okCode = 200) => async (req, res) => {
   try {
     res.status(okCode).json({ success: true, data: await fn(req) })
   } catch (err) {
-    res.status(err.status || 400).json({ success: false, message: err.message })
+    res.status(err.status || 400).json({ success: false, message: err.message, code: err.code })
   }
 }
 

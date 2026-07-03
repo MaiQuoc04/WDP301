@@ -63,5 +63,9 @@ export const customerService = {
     const response = await axiosInstance.post(`/customer/booking-groups/${id}/payos-link`, { type })
     return response.data
   },
+  cancelBookingGroup: async (id) => {
+    const response = await axiosInstance.post(`/customer/booking-groups/${id}/cancel`)
+    return response.data
+  },
   // TODO(Khánh): searchRooms, getRoomDetail, getBill, review ...
 }

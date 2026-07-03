@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import PayOSQRCode from '../components/PayOSQRCode';
@@ -23,6 +23,26 @@ function QRCountdown({ expireMs }) {
   );
 }
 
+/* ── Countdown giữ chỗ (hạn thanh toán cọc của cả nhóm) ──────────── */
+function HoldCountdown({ expireMs, onExpire }) {
+  const [left, setLeft] = useState(Math.max(0, expireMs - Date.now()));
+  const fired = useRef(false);
+  useEffect(() => {
+    fired.current = false;
+    setLeft(Math.max(0, expireMs - Date.now()));
+    const t = setInterval(() => {
+      const l = Math.max(0, expireMs - Date.now());
+      setLeft(l);
+      if (l <= 0 && !fired.current) { fired.current = true; onExpire && onExpire(); }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [expireMs, onExpire]);
+  if (left <= 0) return <strong className="text-red-600">đã hết hạn</strong>;
+  const m = Math.floor(left / 60000);
+  const s = Math.floor((left % 60000) / 1000);
+  return <strong className={left < 120000 ? 'text-red-600' : 'text-amber-800'}>{m}:{String(s).padStart(2, '0')}</strong>;
+}
+
 const STATUS = {
   pending:     { label: '⏳ Chờ thanh toán cọc',          cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   confirmed:   { label: '✅ Đã xác nhận — chờ nhận phòng', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -38,6 +58,7 @@ const fmtPrice = (n) => new Intl.NumberFormat('vi-VN', { style: 'currency', curr
 const BookingGroupCheckout = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [data, setData] = useState(null);          // { group, members, payments, rollup }
   const [loading, setLoading] = useState(true);
@@ -88,6 +109,26 @@ const BookingGroupCheckout = () => {
     return () => clearInterval(timer);
   }, [paymentData, paymentDone, fetchGroup]);
 
+  // Realtime: 1 phòng trong nhóm đổi (vd job tự huỷ khi quá hạn giữ chỗ) -> cập nhật trạng thái ngay.
+  const memberIdsRef = useRef([]);
+  useEffect(() => { memberIdsRef.current = (data?.members || []).map((m) => String(m._id)); }, [data]);
+  useEffect(() => {
+    connectSocket();
+    const onUpd = (evt) => { if (evt?.bookingId && memberIdsRef.current.includes(String(evt.bookingId))) fetchGroup(); };
+    socket.on('booking_updated', onUpd);
+    return () => socket.off('booking_updated', onUpd);
+  }, [fetchGroup]);
+
+  // Rời trang khi CHƯA cọc -> nhả giữ chỗ NGAY (không đợi timeout). Chỉ đúng khi còn phòng pending & chưa thanh toán.
+  const releaseRef = useRef(false);
+  useEffect(() => {
+    const pending = (data?.members || []).some((m) => m.status === 'pending');
+    releaseRef.current = pending && !paymentDone;
+  }, [data, paymentDone]);
+  useEffect(() => () => {
+    if (releaseRef.current) customerService.cancelBookingGroup(id).catch(() => {});
+  }, [id]);
+
   const handlePayment = async (type) => {
     try {
       setProcessingPay(true); setPaymentData(null);
@@ -98,6 +139,13 @@ const BookingGroupCheckout = () => {
     } finally { setProcessingPay(false); }
   };
   const cancelQR = () => { setPaymentData(null); expireAt.current = null; };
+  // Quay lại chọn phòng: nếu chưa cọc thì HUỶ GIỮ CHỖ ngay rồi mới điều hướng.
+  const handleBackToList = async () => {
+    releaseRef.current = false; // tránh cleanup gọi lại lần 2
+    const pending = (data?.members || []).some((m) => m.status === 'pending');
+    if (pending && !paymentDone) { try { await customerService.cancelBookingGroup(id); } catch { /* ignore */ } }
+    navigate('/booking');
+  };
 
   if (loading) return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-off-white">
@@ -120,6 +168,9 @@ const BookingGroupCheckout = () => {
     <div className="min-h-screen bg-off-white">
       <Navbar />
       <div className="mx-auto max-w-5xl px-5 py-12 lg:py-16">
+        <button onClick={handleBackToList} className="mb-6 font-nav text-xs font-semibold uppercase tracking-wide text-charcoal/55 transition-colors hover:text-gold">
+          ← {isPending && !paymentDone ? 'Quay lại chọn phòng (huỷ giữ chỗ)' : 'Về trang đặt phòng'}
+        </button>
         <div className="mb-10 text-center">
           <span className="font-nav text-xs font-semibold uppercase tracking-luxe text-gold">Hoàn tất đặt phòng</span>
           <h1 className="mt-3 font-display text-4xl font-medium text-charcoal md:text-5xl">Xác nhận &amp; Thanh toán</h1>
@@ -129,6 +180,20 @@ const BookingGroupCheckout = () => {
         {group.branch && group.branch.isActive === false && (
           <div className="mb-8 rounded-md border border-amber-300 bg-amber-50 px-5 py-4 text-center font-body text-sm text-amber-800">
             ⚠ Chi nhánh <strong>{group.branch.name}</strong> đang tạm ngừng hoạt động. Đơn của bạn có thể bị ảnh hưởng — vui lòng liên hệ khách sạn để được hỗ trợ.
+          </div>
+        )}
+
+        {/* Đếm ngược HẠN GIỮ CHỖ khi còn chờ cọc */}
+        {isPending && !paymentDone && group.expiresAt && (
+          <div className="mb-8 rounded-md border border-amber-300 bg-amber-50 px-5 py-4 text-center font-body text-sm text-amber-800">
+            ⏳ Giữ chỗ còn <HoldCountdown expireMs={new Date(group.expiresAt).getTime()} onExpire={fetchGroup} /> — quá hạn hệ thống sẽ <strong>tự huỷ</strong> đặt phòng. Vui lòng thanh toán cọc để giữ phòng.
+          </div>
+        )}
+
+        {/* Nhóm đã bị huỷ (quá hạn giữ chỗ) */}
+        {rollup.status === 'cancelled' && (
+          <div className="mb-8 rounded-md border border-red-300 bg-red-50 px-5 py-4 text-center font-body text-sm text-red-700">
+            ⌛ Đơn đã hết hạn giữ chỗ và bị huỷ. Vui lòng <a href="/booking" className="font-semibold underline">đặt phòng lại</a>.
           </div>
         )}
 
