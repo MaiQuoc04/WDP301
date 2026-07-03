@@ -19,6 +19,7 @@ const bookingGroupSchema = new mongoose.Schema({
   // Snapshot tiền lúc tạo (đơn vị VND). Hiển thị "1 hoá đơn"; chi tiết vẫn đọc từ member bookings.
   totalAmount:   { type: Number, default: 0 },
   depositAmount: { type: Number, default: 0 },
+  expiresAt:     { type: Date },     // hạn thanh toán cọc (online); quá hạn -> job huỷ cả nhóm
   notes:     { type: String, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân
 }, { timestamps: true })

@@ -14,6 +14,14 @@ const notificationService = require('./notificationService')
 const ACTIVE_TASK_STATUSES = ['pending', 'in_progress', 'urgent']
 const DONE_TASK_STATUSES = ['completed', 'missed']
 
+// Realtime: báo booking vừa đổi (bill/thiết bị thiếu) để màn lễ tân tự cập nhật, không reload tay. Defensive.
+function emitBookingUpdated(bookingRef) {
+  const bookingId = bookingRef && (bookingRef._id || bookingRef)
+  if (!bookingId) return
+  try { require('../config/socket').emitBookingUpdated(bookingId) }
+  catch (e) { console.warn('[hk] emitBookingUpdated lỗi:', e.message) }
+}
+
 function fail(message, status = 400) {
   const err = new Error(message)
   err.status = status
@@ -237,6 +245,8 @@ exports.saveAmenityReport = async (accountId, taskId, report = []) => {
   }
 
   await task.save()
+  // Realtime: lễ tân đang xem/checkout phòng này thấy thiết bị thiếu + bill cập nhật ngay, không reload tay.
+  emitBookingUpdated(task.booking)
   return task
 }
 
@@ -352,6 +362,8 @@ exports.completeTask = async (accountId, taskId) => {
       refType: 'booking', refId: task.booking?._id || task.booking, branch: task.branch,
     }))
   }
+  // Realtime cho MỌI lễ tân đang mở booking này (không chỉ người yêu cầu) -> tự cập nhật trạng thái kiểm tra + bill.
+  emitBookingUpdated(task.booking)
 
   return task
 }

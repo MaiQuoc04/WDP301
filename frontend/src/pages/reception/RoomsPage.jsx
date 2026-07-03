@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { bookingService } from '../../services'
+import { socket, connectSocket } from '../../services/socketService'
 
 const ROOM_STATUS_LABEL = {
   available: 'Trống', occupied: 'Đang ở', cleaning: 'Đang dọn', maintenance: 'Bảo trì', locked: 'Khoá',
@@ -14,9 +15,20 @@ export default function RoomsPage() {
   const [err, setErr] = useState('')
   const [f, setF] = useState('')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     bookingService.listRooms().then(setRooms).catch((e) => setErr(e.response?.data?.message || 'Lỗi'))
   }, [])
+  useEffect(() => { load() }, [load])
+
+  // Realtime: check-in/out/turnover đổi trạng thái phòng -> làm mới bảng (debounce gộp nhiều sự kiện).
+  const timerRef = useRef(null)
+  useEffect(() => {
+    connectSocket()
+    const onEvt = () => { clearTimeout(timerRef.current); timerRef.current = setTimeout(load, 400) }
+    socket.on('booking_updated', onEvt)
+    socket.on('new_booking', onEvt)
+    return () => { socket.off('booking_updated', onEvt); socket.off('new_booking', onEvt); clearTimeout(timerRef.current) }
+  }, [load])
 
   const cnt = (s) => rooms.filter((r) => r.status === s).length
   const shown = f ? rooms.filter((r) => r.status === f) : rooms

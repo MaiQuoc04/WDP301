@@ -95,6 +95,14 @@ const LoginPage = () => {
 
   const clearMessages = () => { setError(''); setSuccess('') }
 
+  // Bị đá về đây do khoá tài khoản / chi nhánh -> hiện lý do rõ ràng.
+  useEffect(() => {
+    const locked = searchParams.get('locked')
+    if (locked === 'account') setError('Tài khoản của bạn đã bị khoá. Vui lòng liên hệ quản trị viên.')
+    else if (locked === 'branch') setError('Chi nhánh của bạn đang tạm ngừng hoạt động. Vui lòng liên hệ quản trị viên.')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const switchMode = (newMode) => {
     setMode(newMode)
     clearMessages()

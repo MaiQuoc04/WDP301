@@ -4,6 +4,7 @@
 const payos = require('../config/payos')
 const Payment = require('../models/paymentModel')
 const Booking = require('../models/bookingModel')
+const BookingGroup = require('../models/bookingGroupModel')
 const bookingService = require('./bookingService')
 
 const BACKEND_URL = process.env.BAC_END_URL || 'http://localhost:9999'
@@ -19,7 +20,41 @@ function genOrderCode() {
   return Number(ts + rand)
 }
 
+// Thanh toán cho 1 NHÓM (cọc gom): đánh dấu Payment paid + xác nhận cả nhóm pending -> confirmed.
+async function applyPaidGroupPayment(payment, transactionCode) {
+  const group = await BookingGroup.findById(payment.group)
+  if (!group) return { ok: true, message: 'Nhóm không tìm thấy' }
+
+  let changed = false
+  if (payment.status !== 'paid') { payment.status = 'paid'; payment.paidAt = new Date(); changed = true }
+  if (transactionCode && payment.transactionCode !== transactionCode) { payment.transactionCode = transactionCode; changed = true }
+  if (changed) await payment.save()
+
+  if (payment.type === 'deposit') {
+    const members = await Booking.find({ group: group._id, status: 'pending' })
+    if (members.length) {
+      const groupTotal = members.reduce((s, b) => s + (b.totalAmount || 0), 0)
+      const paidFull = payment.amount >= groupTotal
+      try {
+        await bookingService.confirmGroupDeposit(group._id, {
+          method: 'online_qr', transactionCode, paidFull, skipCreatePayment: true,
+        })
+        changed = true
+      } catch (e) { console.warn('[PayOS] confirmGroupDeposit lỗi:', e.message) }
+    }
+  }
+
+  if (changed) {
+    try {
+      const { getIO } = require('../config/socket')
+      getIO().emit('payment_success', { groupId: group._id, orderCode: payment.transactionRef })
+    } catch (e) { console.warn('[PayOS] socket emit (group) lỗi:', e.message) }
+  }
+  return { ok: true, message: 'Cập nhật thanh toán nhóm thành công' }
+}
+
 async function applyPaidPayment(payment, transactionCode) {
+  if (payment.group) return applyPaidGroupPayment(payment, transactionCode)
   const booking = await Booking.findById(payment.booking)
   if (!booking) return { ok: true, message: 'Booking không tìm thấy' }
 
@@ -189,6 +224,49 @@ exports.createQR = async (booking, type, by) => {
 }
 
 /**
+ * Tạo link QR PayOS cọc GOM cho cả NHÓM (1 QR cho nhiều phòng). 1 Payment gắn group + booking đại diện.
+ * @param {Object} group — BookingGroup document
+ * @param {'deposit'|'full'} type
+ * @param {string} [by]
+ */
+exports.createGroupQR = async (group, type, by) => {
+  const members = await Booking.find({ group: group._id, status: 'pending' })
+  if (!members.length) throw new Error('Nhóm không còn phòng nào chờ cọc')
+
+  let amount
+  if (type === 'full') amount = members.reduce((s, b) => s + (b.totalAmount || 0), 0)
+  else amount = members.reduce((s, b) => s + (b.depositAmount || 0), 0)
+  if (amount < 1000) throw new Error(`Số tiền quá nhỏ (${amount}đ). PayOS yêu cầu tối thiểu 1.000đ`)
+
+  const orderCode = genOrderCode()
+  const payment = await Payment.create({
+    booking: members[0]._id, group: group._id, type: 'deposit', method: 'online_qr',
+    amount, status: 'pending', transactionRef: String(orderCode),
+    expiredAt: new Date(Date.now() + 15 * 60 * 1000), confirmedBy: by || undefined,
+  })
+
+  const groupCode = group.code || String(group._id).slice(-6).toUpperCase()
+  const description = `${groupCode} dat coc`.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25)
+  const payosPayload = {
+    orderCode, amount, description,
+    returnUrl: `${CLIENT_URL}/checkout/group/${group._id}?payos=success`,
+    cancelUrl: `${CLIENT_URL}/checkout/group/${group._id}?payos=cancel`,
+    expiredAt: Math.floor((Date.now() + 15 * 60 * 1000) / 1000),
+  }
+
+  let payosRes
+  try {
+    payosRes = await payos.paymentRequests.create(payosPayload)
+  } catch (err) {
+    await Payment.deleteOne({ _id: payment._id })
+    const msg = err?.error?.message || err?.message || JSON.stringify(err)
+    throw new Error(`PayOS lỗi: ${msg}`)
+  }
+
+  return { qrCode: payosRes.qrCode, checkoutUrl: payosRes.checkoutUrl, amount, orderCode, paymentId: payment._id }
+}
+
+/**
  * Xử lý webhook từ PayOS (POST /api/customer/payos-webhook)
  * Trả về { ok, message } — không throw (caller đã trả 200 trước)
  */
@@ -253,5 +331,33 @@ exports.syncBookingPayments = async (bookingId) => {
     }
   }
 
+  return { synced }
+}
+
+// Polling cho NHÓM: kiểm tra Payment pending của group đã PAID chưa (fallback khi webhook không tới localhost).
+exports.syncGroupPayments = async (groupId) => {
+  const payments = await Payment.find({
+    group: groupId, method: 'online_qr', status: 'pending',
+    transactionRef: { $exists: true, $ne: null },
+  }).sort('-createdAt')
+
+  let synced = 0
+  for (const payment of payments) {
+    let payosPayment
+    try {
+      payosPayment = await payos.paymentRequests.get(Number(payment.transactionRef))
+    } catch (e) {
+      console.warn(`[PayOS sync group] Không lấy được orderCode=${payment.transactionRef}:`, e.message)
+      continue
+    }
+    if (payosPayment.status === 'PAID') {
+      const tx = Array.isArray(payosPayment.transactions) ? payosPayment.transactions[0] : null
+      await applyPaidPayment(payment, tx?.reference || String(payment.transactionRef))
+      synced += 1
+    } else if (['EXPIRED', 'CANCELLED', 'FAILED'].includes(payosPayment.status)) {
+      payment.status = payosPayment.status === 'EXPIRED' ? 'expired' : 'failed'
+      await payment.save()
+    }
+  }
   return { synced }
 }

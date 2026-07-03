@@ -52,6 +52,9 @@ export const bookingService = {
   schedule: (params) => get(`${base}/schedule`, params),
   transactions: (params) => get(`${base}/transactions`, params),
   dashboard: () => get(`${base}/dashboard`),
+  // Hộp thư liên hệ (khách gửi từ trang Contact)
+  contacts: (params) => get(`${base}/contacts`, params),
+  handleContact: (id) => patch(`${base}/contacts/${id}/handle`),
 }
 
 export const vnd = (n) => (n || 0).toLocaleString('vi-VN') + 'đ'

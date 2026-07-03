@@ -9,6 +9,7 @@ const Service = require('../models/serviceModel')
 const Amenity = require('../models/amenityModel')
 const bookingService = require('./bookingService')
 const housekeepingService = require('./housekeepingService')
+const contactService = require('./contactService')
 
 // Các branchId mà lễ tân được gán (BR-30: chỉ quản lý chi nhánh của mình)
 async function myBranchIds(accountId) {
@@ -37,25 +38,44 @@ exports.listRooms = async (accountId, { status } = {}) => {
   return Room.find(q).populate('roomType', 'name basePrice capacity').sort('roomNumber').lean()
 }
 
-// UC-27/43: danh sách + lọc booking (status, ngày check-in, từ khoá mã/tên/sđt)
+// UC-27/43: danh sách + lọc theo NHÓM (mọi lần đặt = 1 nhóm). Mỗi dòng = 1 nhóm + rollup tiền/trạng thái.
+// Lọc: status (rollup), date (ngày nhận của nhóm), q (mã nhóm / tên / sđt).
 exports.listBookings = async (accountId, { status, date, q } = {}) => {
   const branches = await myBranchIds(accountId)
-  const filter = { branch: { $in: branches } }
-  if (status) filter.status = status
+  const gfilter = { branch: { $in: branches } }
   if (date) {
     const d0 = new Date(date); d0.setHours(0, 0, 0, 0)
-    filter.checkIn = { $gte: d0, $lt: new Date(d0.getTime() + 86400000) }
+    gfilter.checkIn = { $gte: d0, $lt: new Date(d0.getTime() + 86400000) }
   }
-  if (q) filter.$or = [
+  if (q) gfilter.$or = [
     { code: new RegExp(q, 'i') },
     { guestName: new RegExp(q, 'i') },
     { guestPhone: new RegExp(q, 'i') },
   ]
-  return Booking.find(filter)
-    .populate('roomType', 'name')
-    .populate('room', 'roomNumber')
+  const groups = await BookingGroup.find(gfilter)
     .populate({ path: 'customer', select: 'fullName phone' })
     .sort('-createdAt').lean()
+  const members = await Booking.find({ group: { $in: groups.map((g) => g._id) } })
+    .populate('room', 'roomNumber').populate('roomType', 'name')
+    .select('group status totalAmount paidAmount remainingAmount depositAmount room roomType')
+    .lean()
+  const byGroup = {}
+  members.forEach((m) => { (byGroup[String(m.group)] = byGroup[String(m.group)] || []).push(m) })
+
+  let rows = groups.map((g) => {
+    const ms = byGroup[String(g._id)] || []
+    const roll = bookingService.groupRollup(ms)
+    return {
+      _id: g._id, code: g.code, source: g.source,
+      guestName: g.guestName, guestPhone: g.guestPhone, customer: g.customer,
+      checkIn: g.checkIn, checkOut: g.checkOut, createdAt: g.createdAt,
+      roomNumbers: ms.map((m) => m.room?.roomNumber).filter(Boolean),
+      roomTypeNames: [...new Set(ms.map((m) => m.roomType?.name).filter(Boolean))],
+      ...roll, // status, roomCount, activeCount, totalAmount, paidAmount, remainingAmount, paymentStatus, depositAmount
+    }
+  })
+  if (status) rows = rows.filter((r) => r.status === status)
+  return rows
 }
 
 // UC-28: chi tiết booking (dữ liệu cho màn 3 tab: thông tin / thiết bị / bill)
@@ -92,16 +112,16 @@ exports.searchRooms = async (accountId, q = {}) => {
   )
 }
 
-// UC-29: walk-in — lễ tân chọn PHÒNG cụ thể + dịch vụ kèm
+// UC-29: walk-in — lễ tân chọn PHÒNG cụ thể + dịch vụ kèm.
+// Mọi lần đặt = 1 nhóm: walk-in 1 phòng cũng đi qua createGroup (1 item) cho nhất quán.
 exports.walkIn = async (accountId, body) => {
   const branches = await myBranchIds(accountId)
-  return bookingService.create({
+  return bookingService.createGroup({
     branchId: branches[0],
-    roomId: body.roomId,
     guestName: body.guestName, guestPhone: body.guestPhone,
     checkIn: body.checkIn, checkOut: body.checkOut,
-    adults: body.adults, children: body.children,
-    services: body.services,
+    items: [{ roomId: body.roomId, adults: body.adults, children: body.children, services: body.services }],
+    adultsTotal: body.adults, childrenTotal: body.children,
     source: 'walk_in', createdBy: accountId,
   })
 }
@@ -309,6 +329,16 @@ exports.transfer = async (accountId, bookingId, body = {}) => {
 exports.update = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.updateBooking(bookingId, { ...body, by: accountId })
+}
+
+// ---------- Hộp thư liên hệ (khách gửi từ trang Contact) ----------
+exports.listContacts = async (accountId, query = {}) => {
+  const branches = await myBranchIds(accountId)
+  return contactService.listForBranches(branches, { status: query.status })
+}
+exports.handleContact = async (accountId, id) => {
+  const branches = await myBranchIds(accountId)
+  return contactService.markHandled(id, branches, accountId)
 }
 
 // ---------- Dashboard: thông số trong ngày của lễ tân ----------

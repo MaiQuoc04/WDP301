@@ -154,6 +154,12 @@ const BookingCheckout = () => {
           <p className="mt-3 font-body text-sm text-charcoal/60">Mã đặt phòng: <strong className="text-charcoal">{booking.code}</strong></p>
         </div>
 
+        {booking.branch && booking.branch.isActive === false && (
+          <div className="mb-8 rounded-md border border-amber-300 bg-amber-50 px-5 py-4 text-center font-body text-sm text-amber-800">
+            ⚠ Chi nhánh <strong>{booking.branch.name}</strong> đang tạm ngừng hoạt động. Đơn của bạn có thể bị ảnh hưởng — vui lòng liên hệ khách sạn để được hỗ trợ.
+          </div>
+        )}
+
         <div className="grid gap-7 lg:grid-cols-2">
           {/* ── Cột trái: Thông tin lưu trú ── */}
           <div className="rounded-lg border border-black/5 bg-white p-7 shadow-raised">

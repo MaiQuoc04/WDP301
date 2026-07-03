@@ -1,11 +1,29 @@
 const jwt = require('jsonwebtoken')
 const RoleAssignment = require('../models/roleAssignmentModel')
+const Account = require('../models/accountModel')
+const { STAFF_ROLES, isBranchBlocked } = require('../utils/access')
 
-exports.protect = (req, res, next) => {
+// Tra DB mỗi request để KHOÁ (tài khoản / chi nhánh) có hiệu lực NGAY, không đợi token hết hạn.
+// Trả code ACCOUNT_LOCKED / BRANCH_LOCKED để FE hiện đúng màn khoá.
+exports.protect = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1]
   if (!token) return res.status(401).json({ message: 'Unauthorized' })
-  try { req.user = jwt.verify(token, process.env.JWT_SECRET); next() }
-  catch { res.status(401).json({ message: 'Token invalid or expired' }) }
+  let payload
+  try { payload = jwt.verify(token, process.env.JWT_SECRET) }
+  catch { return res.status(401).json({ message: 'Token invalid or expired' }) }
+
+  try {
+    const account = await Account.findById(payload.id).select('isActive role').lean()
+    if (!account) return res.status(401).json({ code: 'ACCOUNT_LOCKED', message: 'Tài khoản không tồn tại' })
+    if (!account.isActive) return res.status(401).json({ code: 'ACCOUNT_LOCKED', message: 'Tài khoản đã bị khoá' })
+    if (STAFF_ROLES.includes(account.role) && await isBranchBlocked(account._id)) {
+      return res.status(401).json({ code: 'BRANCH_LOCKED', message: 'Chi nhánh của bạn đang tạm ngừng hoạt động' })
+    }
+    req.user = payload
+    next()
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi xác thực', error: err.message })
+  }
 }
 // Sprint 0: phân quyền theo 1 hoặc nhiều role.
 // Yêu cầu JWT payload có `role` (Quốc bổ sung khi migrate auth sang Account).

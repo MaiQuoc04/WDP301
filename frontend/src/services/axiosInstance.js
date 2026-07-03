@@ -17,8 +17,14 @@ axiosInstance.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      // Khoá tài khoản / chi nhánh -> xoá phiên + về màn đăng nhập kèm lý do (code do BE gửi).
+      const code = err.response?.data?.code
+      const reason = code === 'ACCOUNT_LOCKED' ? 'account' : code === 'BRANCH_LOCKED' ? 'branch' : ''
       localStorage.removeItem('token')
-      window.location.href = '/login'
+      localStorage.removeItem('user')
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = reason ? `/login?locked=${reason}` : '/login'
+      }
     }
     return Promise.reject(err)
   }

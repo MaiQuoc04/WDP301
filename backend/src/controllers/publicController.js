@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const RoomType = require('../models/roomTypeModel')
 const bookingService = require('../services/bookingService')
+const contactService = require('../services/contactService')
 require('../models/branchModel') // Cần thiết cho populate
 require('../models/amenityModel') // Cần thiết cho populate
 
@@ -31,6 +32,17 @@ exports.searchRooms = async (req, res) => {
     }
     const rooms = await bookingService.searchAvailableRooms(branch, checkIn, checkOut, adultCount, childCount)
     res.json({ success: true, data: rooms })
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message })
+  }
+}
+
+// Khách gửi tin nhắn liên hệ (không cần đăng nhập) -> lưu + báo lễ tân/QL chi nhánh
+exports.submitContact = async (req, res) => {
+  try {
+    const { name, email, phone, subject, message, branchId } = req.body
+    const doc = await contactService.create({ name, email, phone, subject, message, branchId })
+    res.status(201).json({ success: true, data: { _id: doc._id } })
   } catch (err) {
     res.status(400).json({ success: false, message: err.message })
   }

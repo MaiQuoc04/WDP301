@@ -73,6 +73,10 @@ exports.getHousekeepingTaskById     = handle((req) => svc.getHousekeepingTaskByI
 exports.assignHousekeepingTask     = handle((req) => svc.assignHousekeepingTask(req.params.id, req.body.assignedTo, req.branchId, req.user.id))
 exports.markHousekeepingTaskUrgent = handle((req) => svc.markHousekeepingTaskUrgent(req.params.id, req.branchId))
 exports.createRoomIssueFromTask    = handle((req) => svc.createRoomIssueFromTask(req.params.taskId, req.body, req.branchId, req.user.id), 201)
+// ─── Hộp thư liên hệ ───────────────────────────────────────────────────────────
+exports.getContacts    = handle((req) => svc.listContacts(req.branchId, req.query))
+exports.handleContact  = handle((req) => svc.handleContact(req.branchId, req.params.id, req.user.id))
+
 exports.getHousekeepers            = handle((req) => svc.getHousekeepers(req.branchId))
 exports.getHousekeeperFloors       = handle((req) => svc.getHousekeeperFloors(req.branchId))
 exports.setHousekeeperFloors       = handle((req) => svc.setHousekeeperFloors(req.params.id, req.body.floors, req.branchId))

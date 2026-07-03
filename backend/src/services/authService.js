@@ -6,6 +6,7 @@ const Employee = require('../models/employeeModel')
 const otpUtil = require('../utils/otp')
 const { sendOtpEmail } = require('../utils/email')
 const { signAccessToken } = require('../utils/token')
+const { STAFF_ROLES, isBranchBlocked } = require('../utils/access')
 
 const isDev = () => process.env.NODE_ENV !== 'production'
 
@@ -105,6 +106,8 @@ exports.login = async ({ email, password }) => {
     throw new Error('Email hoặc mật khẩu không đúng')
   if (!account.isActive) throw new Error('Tài khoản đã bị khoá')
   if (!account.isVerified) throw new Error('Tài khoản chưa xác thực email')
+  if (STAFF_ROLES.includes(account.role) && await isBranchBlocked(account._id))
+    throw new Error('Chi nhánh của bạn đang tạm ngừng hoạt động, vui lòng liên hệ quản trị viên')
   return { token: signAccessToken(account), user: await buildUser(account) }
 }
 
@@ -188,6 +191,8 @@ exports.googleLogin = async ({ credential }) => {
       }
       if (!account.isActive) throw new Error('Tài khoản đã bị khoá')
     }
+    if (STAFF_ROLES.includes(account.role) && await isBranchBlocked(account._id))
+      throw new Error('Chi nhánh của bạn đang tạm ngừng hoạt động, vui lòng liên hệ quản trị viên')
 
     // 3. Cấp token
     return { token: signAccessToken(account), user: await buildUser(account) }

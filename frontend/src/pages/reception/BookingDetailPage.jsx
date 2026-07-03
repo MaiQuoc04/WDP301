@@ -445,13 +445,17 @@ export default function BookingDetailPage() {
     connectSocket()
     const onNoti = () => reload()
     const onPaySuccess = () => { reload() }
+    // Housekeeper vừa kiểm kê / hoàn tất kiểm tra phòng NÀY -> cập nhật thiết bị thiếu + bill ngay, không reload tay.
+    const onBookingUpdated = (evt) => { if (String(evt?.bookingId) === String(id)) reload() }
     socket.on('notification', onNoti)
     socket.on('payment_success', onPaySuccess)
+    socket.on('booking_updated', onBookingUpdated)
     return () => {
       socket.off('notification', onNoti)
       socket.off('payment_success', onPaySuccess)
+      socket.off('booking_updated', onBookingUpdated)
     }
-  }, [reload])
+  }, [reload, id])
 
   const act = async (fn, okMsg) => {
     setErr(''); setMsg('')
@@ -478,7 +482,7 @@ export default function BookingDetailPage() {
     else if (type === 'cleaning') await act(() => bookingService.requestCleaning(id, hkId), 'Đã giao dọn phòng')
   }
   const askEarly = () => {
-    const h = window.prompt('Nhận sớm mấy giờ? (tối đa 2 — phí 10% giá đêm/giờ)', '1')
+    const h = window.prompt('Nhận sớm mấy giờ? (tối đa 3 — chỉ trong 4h trước giờ nhận, tự kẹp theo giờ trả phòng trước; phí 10% giá đêm/giờ)', '1')
     if (h === null) return
     act(() => bookingService.setEarlyCheckin(id, Number(h)), 'Đã ghi nhận sớm')
   }
@@ -513,7 +517,7 @@ export default function BookingDetailPage() {
 
       {b.group && (
         <p className="rc-group-banner">
-          🏨 Phòng này thuộc <Link to={`/reception/booking-groups/${b.group}`}>nhóm đặt nhiều phòng (1 mã, 1 cọc)</Link>
+          🏨 Phòng này thuộc <Link to={`/reception/booking-groups/${b.group}`}>nhóm đặt phòng (1 mã, 1 cọc)</Link>
         </p>
       )}
 

@@ -45,3 +45,10 @@ exports.emitToUser = (userId, event, payload) => {
   if (!io || !userId) return
   io.to(`user:${userId}`).emit(event, payload)
 }
+
+// Bắn realtime "booking vừa thay đổi" (broadcast) để MỌI màn đang mở đúng booking đó tự cập nhật,
+// không phải reload tay (vd: lễ tân đang checkout khi housekeeper vừa kiểm kê thiết bị). FE lọc theo bookingId.
+exports.emitBookingUpdated = (bookingId) => {
+  if (!io || !bookingId) return
+  io.emit('booking_updated', { bookingId: String(bookingId) })
+}

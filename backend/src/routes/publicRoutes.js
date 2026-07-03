@@ -9,6 +9,7 @@ router.get('/rooms/available', publicController.searchRooms)   // tìm phòng tr
 router.get('/branches', publicController.getBranches)          // danh sách chi nhánh (ô chọn)
 router.get('/home-data', publicController.getHomeData)
 router.get('/gallery', galleryController.getPublicGallery)     // ảnh thư viện/ẩm thực (?category=gallery|dining)
+router.post('/contact', publicController.submitContact)        // khách gửi tin nhắn liên hệ
 
 // TODO(Khánh): GET /branches/:id, /rooms/:id, /reviews ...
 

@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { notification } from 'antd';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import Reveal from '../components/common/Reveal';
+import { customerService } from '../services';
 
 const inputBase =
   'w-full rounded-sm border border-black/10 bg-white px-4 py-3 font-body text-sm text-charcoal outline-none transition-colors placeholder:text-charcoal/40 focus:border-gold focus:ring-1 focus:ring-gold/40';
@@ -25,13 +27,46 @@ const contactBlocks = [
   },
 ];
 
-const Contact = () => {
-  useEffect(() => { window.scrollTo(0, 0); }, []);
+const emptyForm = { name: '', email: '', phone: '', branchId: '', subject: '', message: '' };
 
-  const handleSubmit = (e) => {
+const Contact = () => {
+  const [branches, setBranches] = useState([]);
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setErrors((e) => ({ ...e, [k]: undefined })); };
+
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+  useEffect(() => {
+    customerService.getBranches().then((res) => setBranches(res.data || [])).catch(() => {});
+  }, []);
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim() || form.name.trim().length < 2) e.name = 'Nhập họ tên hợp lệ';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Email không hợp lệ';
+    if (form.phone.trim() && !/^0\d{9,10}$/.test(form.phone.trim())) e.phone = 'SĐT không hợp lệ (VD: 0987654321)';
+    if (!form.branchId) e.branchId = 'Chọn chi nhánh muốn liên hệ';
+    if (!form.subject.trim()) e.subject = 'Nhập tiêu đề';
+    if (!form.message.trim()) e.message = 'Nhập nội dung';
+    return e;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ phản hồi trong thời gian sớm nhất.');
-    e.target.reset();
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    setSubmitting(true);
+    try {
+      await customerService.submitContact(form);
+      notification.success({ message: 'Đã gửi tin nhắn! Khách sạn sẽ phản hồi qua email sớm nhất.', placement: 'bottomRight' });
+      setForm(emptyForm);
+    } catch (err) {
+      notification.error({ message: err.response?.data?.message || 'Gửi tin nhắn thất bại, vui lòng thử lại', placement: 'bottomRight' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -82,29 +117,55 @@ const Contact = () => {
 
           {/* Form */}
           <Reveal delay={120}>
-            <form onSubmit={handleSubmit} className="rounded-lg bg-white p-7 shadow-raised sm:p-8">
+            <form onSubmit={handleSubmit} noValidate className="rounded-lg bg-white p-7 shadow-raised sm:p-8">
               <h3 className="font-display text-2xl font-semibold text-charcoal">Gửi tin nhắn</h3>
               <div className="mt-2 h-px w-16 bg-gold" />
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className={labelBase}>Họ và tên *</label>
-                  <input type="text" required className={inputBase} placeholder="Nguyễn Văn A" />
+                  <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)}
+                    className={`${inputBase} ${errors.name ? '!border-red-500' : ''}`} placeholder="Nguyễn Văn A" />
+                  {errors.name && <div className="mt-1 text-xs text-red-500">{errors.name}</div>}
                 </div>
                 <div>
                   <label className={labelBase}>Email *</label>
-                  <input type="email" required className={inputBase} placeholder="email@example.com" />
+                  <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
+                    className={`${inputBase} ${errors.email ? '!border-red-500' : ''}`} placeholder="email@example.com" />
+                  {errors.email && <div className="mt-1 text-xs text-red-500">{errors.email}</div>}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={labelBase}>Số điện thoại</label>
+                  <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
+                    className={`${inputBase} ${errors.phone ? '!border-red-500' : ''}`} placeholder="0987654321" />
+                  {errors.phone && <div className="mt-1 text-xs text-red-500">{errors.phone}</div>}
+                </div>
+                <div>
+                  <label className={labelBase}>Chi nhánh *</label>
+                  <select value={form.branchId} onChange={(e) => set('branchId', e.target.value)}
+                    className={`${inputBase} ${errors.branchId ? '!border-red-500' : ''}`}>
+                    <option value="">-- Chọn chi nhánh --</option>
+                    {branches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
+                  </select>
+                  {errors.branchId && <div className="mt-1 text-xs text-red-500">{errors.branchId}</div>}
                 </div>
               </div>
               <div className="mt-4">
                 <label className={labelBase}>Tiêu đề *</label>
-                <input type="text" required className={inputBase} placeholder="Chủ đề liên hệ" />
+                <input type="text" value={form.subject} onChange={(e) => set('subject', e.target.value)}
+                  className={`${inputBase} ${errors.subject ? '!border-red-500' : ''}`} placeholder="Chủ đề liên hệ" />
+                {errors.subject && <div className="mt-1 text-xs text-red-500">{errors.subject}</div>}
               </div>
               <div className="mt-4">
                 <label className={labelBase}>Nội dung *</label>
-                <textarea required rows={5} className={`${inputBase} resize-y`} placeholder="Nội dung tin nhắn..." />
+                <textarea value={form.message} onChange={(e) => set('message', e.target.value)} rows={5}
+                  className={`${inputBase} resize-y ${errors.message ? '!border-red-500' : ''}`} placeholder="Nội dung tin nhắn..." />
+                {errors.message && <div className="mt-1 text-xs text-red-500">{errors.message}</div>}
               </div>
-              <button type="submit" className="mt-6 w-full rounded-sm bg-gold px-6 py-3.5 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
-                Gửi tin nhắn
+              <button type="submit" disabled={submitting}
+                className="mt-6 w-full rounded-sm bg-gold px-6 py-3.5 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover disabled:opacity-60">
+                {submitting ? 'Đang gửi...' : 'Gửi tin nhắn'}
               </button>
             </form>
           </Reveal>

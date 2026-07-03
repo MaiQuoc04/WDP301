@@ -8,28 +8,13 @@ import Reveal from '../components/common/Reveal';
 import { customerService } from '../services';
 import { socket, connectSocket, disconnectSocket } from '../services/socketService';
 
-// Đặt phòng DATE-FIRST: chọn chi nhánh + ngày + số khách -> tìm phòng TRỐNG (gộp theo loại phòng) -> đặt.
+// Đặt phòng DATE-FIRST: chọn chi nhánh + ngày + số khách -> tìm phòng TRỐNG (gộp theo loại phòng)
+// -> chọn SỐ LƯỢNG từng loại (giỏ) -> đặt 1 nhóm (1 mã, 1 cọc gom). Hệ thống tự chia khách + báo phụ phí.
 const fieldCls =
   'w-full rounded-sm border bg-white px-3.5 py-2.5 font-body text-sm text-charcoal outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold/40';
 const labelCls = 'mb-1.5 block font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/55';
 
-/* Icon + dòng tóm tắt cho modal xác nhận */
-const BkIcon = {
-  pin: 'M15 10.5a3 3 0 11-6 0 3 3 0 016 0zM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z',
-  calendar: 'M6.75 3v2.25M17.25 3v2.25M3 8.25h18M4.5 21h15a1.5 1.5 0 001.5-1.5V6.75a1.5 1.5 0 00-1.5-1.5h-15A1.5 1.5 0 003 6.75v12.75A1.5 1.5 0 004.5 21z',
-  clock: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
-  guest: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.1a7.5 7.5 0 0115 0A17.9 17.9 0 0112 21.75c-2.68 0-5.22-.584-7.5-1.632z',
-};
-const SummaryRow = ({ icon, label, value, sub }) => (
-  <div className="flex items-start gap-3">
-    <svg className="mt-0.5 h-5 w-5 shrink-0 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={icon} /></svg>
-    <div className="min-w-0">
-      <div className="font-nav text-[10px] font-semibold uppercase tracking-wide text-charcoal/45">{label}</div>
-      <div className="font-body text-sm font-medium text-charcoal">{value}</div>
-      {sub && <div className="font-body text-xs text-charcoal/50">{sub}</div>}
-    </div>
-  </div>
-);
+const CHILD_UNIT = 0.5;
 
 const BookingPage = () => {
   const navigate = useNavigate();
@@ -53,8 +38,13 @@ const BookingPage = () => {
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState({});
 
-  // Modal nhập thông tin khách
-  const [modalRoom, setModalRoom] = useState(null);
+  // Giỏ chọn phòng: { [roomTypeId]: số lượng }
+  const [qty, setQty] = useState({});
+  const [quote, setQuote] = useState(null);      // báo giá nhóm từ backend
+  const [quoting, setQuoting] = useState(false);
+
+  // Modal xác nhận (nhập tên/SĐT)
+  const [showConfirm, setShowConfirm] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [formErr, setFormErr] = useState({});
@@ -85,12 +75,6 @@ const BookingPage = () => {
   };
   const displayAdults = parseGuestCount(adults, 1) ?? 1;
   const displayChildren = parseGuestCount(children, 0) ?? 0;
-  const getFitText = (r) => {
-    if (!r) return '';
-    if (r.fit === 'short') return `Cần ${r.extraBeds} giường phụ (+${formatPrice(r.surcharge)})`;
-    if (r.fit === 'surplus') return 'Còn trống';
-    return 'Vừa khít';
-  };
 
   const doSearch = useCallback(async (opts = {}) => {
     const b = opts.branch ?? branch, ci = opts.checkIn ?? checkIn, co = opts.checkOut ?? checkOut;
@@ -105,9 +89,11 @@ const BookingPage = () => {
     if (childCount == null) e.children = 'Số trẻ em không hợp lệ';
     setSearchErr(e);
     if (Object.keys(e).length) return;
-    setSearching(true); setSearched(true);
+    setSearching(true); setSearched(true); setQty({}); setQuote(null);
     try {
-      const res = await customerService.searchAvailableRooms({ branch: b, checkIn: ci, checkOut: co, adults: adultCount, children: childCount });
+      // Tìm với party=1 để GIÁ MỖI PHÒNG hiển thị "thuần" (không dính phụ phí của cả nhóm dồn 1 phòng).
+      // Phụ phí giường phụ thực tế do quoteBookingGroup tính lại theo phân bổ. (availability không phụ thuộc party)
+      const res = await customerService.searchAvailableRooms({ branch: b, checkIn: ci, checkOut: co, adults: 1, children: 0 });
       setAvail(res.data || []);
     } catch (err) {
       notification.error({ message: err.response?.data?.message || 'Lỗi tìm phòng', placement: 'bottomRight' });
@@ -133,22 +119,11 @@ const BookingPage = () => {
     const m = {};
     for (const r of avail) {
       const k = r.roomType?._id; if (!k) continue;
-      if (!m[k]) m[k] = {
-        total: r.total,
-        perNight: Math.round(r.roomCharge / Math.max(1, r.nights)),
-        nights: r.nights,
-        count: 0,
-        fit: r.fit,
-        extraBeds: r.extraBeds,
-        surcharge: r.surcharge,
-      };
+      if (!m[k]) m[k] = { total: r.total, perNight: Math.round(r.roomCharge / Math.max(1, r.nights)), nights: r.nights, count: 0 };
       m[k].count++;
       if (r.total < m[k].total) {
         m[k].total = r.total;
         m[k].perNight = Math.round(r.roomCharge / Math.max(1, r.nights));
-        m[k].fit = r.fit;
-        m[k].extraBeds = r.extraBeds;
-        m[k].surcharge = r.surcharge;
       }
     }
     return m;
@@ -157,35 +132,59 @@ const BookingPage = () => {
   // Loại phòng hiển thị = catalog có trong kết quả phòng trống
   const displayRooms = useMemo(() => catalog.filter((rt) => availByType[rt._id]), [catalog, availByType]);
 
-  const openBook = (room) => {
+  // ── Giỏ: tính cục bộ cho phản hồi tức thì ──
+  const qtyOf = (id) => qty[id] || 0;
+  const inc = (id, max) => setQty((q) => ({ ...q, [id]: Math.min((q[id] || 0) + 1, max) }));
+  const dec = (id) => setQty((q) => ({ ...q, [id]: Math.max((q[id] || 0) - 1, 0) }));
+
+  const selectedRooms = displayRooms.reduce((s, rt) => s + qtyOf(rt._id), 0);
+  const capacityTotal = displayRooms.reduce((s, rt) => s + qtyOf(rt._id) * (rt.capacity || 2), 0);
+  const partyUnits = displayAdults + displayChildren * CHILD_UNIT;
+  const enoughAdults = selectedRooms <= displayAdults;       // mỗi phòng cần ≥1 người lớn
+  const enoughCapacity = capacityTotal >= partyUnits;        // đủ chỗ, không phụ phí
+
+  // Báo giá nhóm (debounce) — chỉ gọi khi đã chọn ≥1 phòng và đủ người lớn
+  useEffect(() => {
+    if (!branch || !checkIn || !checkOut) { setQuote(null); return undefined; }
+    const items = displayRooms.filter((rt) => qtyOf(rt._id) > 0).map((rt) => ({ roomTypeId: rt._id, quantity: qtyOf(rt._id) }));
+    if (!items.length || !enoughAdults) { setQuote(null); return undefined; }
+    let cancelled = false;
+    setQuoting(true);
+    const t = setTimeout(() => {
+      customerService.quoteBookingGroup({ branchId: branch, checkIn, checkOut, items, adults: displayAdults, children: displayChildren })
+        .then((res) => { if (!cancelled && res.success) setQuote(res.data); })
+        .catch(() => { if (!cancelled) setQuote(null); })
+        .finally(() => { if (!cancelled) setQuoting(false); });
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branch, checkIn, checkOut, JSON.stringify(qty), displayAdults, displayChildren]);
+
+  const openConfirm = () => {
     if (!token) {
       notification.warning({ message: 'Vui lòng đăng nhập để đặt phòng' });
       navigate('/login', { state: { from: location.pathname + location.search } });
       return;
     }
+    if (selectedRooms < 1 || !enoughAdults) return;
     setFormErr({});
-    setModalRoom(room);
+    setShowConfirm(true);
   };
 
-  const submitBooking = async () => {
+  const submitGroup = async () => {
     const e = {};
     if (!guestName.trim() || guestName.trim().length < 2) e.guestName = 'Nhập họ tên hợp lệ';
     if (!/^0\d{9,10}$/.test(guestPhone.trim())) e.guestPhone = 'SĐT không hợp lệ (VD: 0987654321)';
     setFormErr(e);
     if (Object.keys(e).length) return;
-    const adultCount = parseGuestCount(adults, 1);
-    const childCount = parseGuestCount(children, 0);
-    if (adultCount == null || childCount == null) {
-      notification.warning({ message: 'Vui lòng nhập số người lớn/trẻ em hợp lệ' });
-      return;
-    }
+    const items = displayRooms.filter((rt) => qtyOf(rt._id) > 0).map((rt) => ({ roomTypeId: rt._id, quantity: qtyOf(rt._id) }));
     setSubmitting(true);
     try {
-      const res = await customerService.createBooking({
-        branchId: branch, roomTypeId: modalRoom._id,
-        checkIn, checkOut, adults: adultCount, children: childCount, guestName, guestPhone,
+      const res = await customerService.createBookingGroup({
+        branchId: branch, checkIn, checkOut, items,
+        adults: displayAdults, children: displayChildren, guestName, guestPhone,
       });
-      if (res.success) { setModalRoom(null); navigate('/checkout/' + res.data._id); }
+      if (res.success) { setShowConfirm(false); navigate('/checkout/group/' + res.data.groupId); }
     } catch (err) {
       notification.error({ message: err.response?.data?.message || 'Có lỗi khi đặt phòng' });
     } finally { setSubmitting(false); }
@@ -193,6 +192,18 @@ const BookingPage = () => {
 
   const branchName = branches.find((b) => b._id === branch)?.name;
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Thông điệp + màu thanh tóm tắt theo tình huống
+  const summary = (() => {
+    if (selectedRooms === 0) return { tone: 'muted', text: 'Chọn số lượng phòng để tiếp tục' };
+    if (!enoughAdults) return { tone: 'bad', text: `${displayAdults} người lớn không đủ cho ${selectedRooms} phòng — mỗi phòng cần ít nhất 1 người lớn` };
+    if (!enoughCapacity) {
+      const sc = quote?.totalSurcharge || 0;
+      return { tone: 'warn', text: `Thiếu chỗ cho ${displayAdults + displayChildren} khách${sc ? ` → phụ phí giường phụ +${formatPrice(sc)}` : ''} · 💡 thêm phòng để khỏi phụ phí` };
+    }
+    return { tone: 'ok', text: `Đủ chỗ cho ${displayAdults} người lớn${displayChildren ? ` + ${displayChildren} trẻ em` : ''}` };
+  })();
+  const summaryColor = { ok: 'text-emerald-700', warn: 'text-amber-700', bad: 'text-red-600', muted: 'text-charcoal/55' }[summary.tone];
 
   return (
     <div className="bg-white">
@@ -250,7 +261,7 @@ const BookingPage = () => {
               </button>
             </div>
           </div>
-          <div className="mt-3 font-body text-xs text-charcoal/50">Nhận phòng 14:00 · Trả phòng 12:00 · Giá tính theo đêm</div>
+          <div className="mt-3 font-body text-xs text-charcoal/50">Nhận phòng 14:00 · Trả phòng 12:00 · Giá tính theo đêm · Có thể chọn nhiều phòng trong 1 lần đặt</div>
         </div>
       </div>
 
@@ -258,7 +269,7 @@ const BookingPage = () => {
       <section className="bg-off-white py-16 md:py-20">
         <div className="container mx-auto px-5 lg:px-10">
           {searched && displayRooms.length > 0 && (
-            <h2 className="mb-8 font-display text-3xl font-medium text-charcoal md:text-4xl">Phòng trống</h2>
+            <h2 className="mb-8 font-display text-3xl font-medium text-charcoal md:text-4xl">Phòng trống · chọn số lượng</h2>
           )}
 
           {!searched ? (
@@ -271,10 +282,10 @@ const BookingPage = () => {
               <p className="mt-2 font-body text-sm text-charcoal/55">Cho {branchName} trong khoảng ngày đã chọn. Vui lòng thử ngày khác.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 pb-28">
               {displayRooms.map((room) => {
                 const a = availByType[room._id];
-                const fit = getFitText(a);
+                const n = qtyOf(room._id);
                 return (
                   <Reveal as="article" key={room._id} className="grid overflow-hidden rounded-lg bg-white shadow-raised transition-shadow duration-300 hover:shadow-elevated md:grid-cols-[280px_1fr_240px]">
                     {/* Ảnh */}
@@ -297,21 +308,25 @@ const BookingPage = () => {
                       <div className="mt-4 space-y-1.5 font-body text-sm text-charcoal/70">
                         <div><span className="text-charcoal/45">Loại giường:</span> {getBedText(room.bedType)}</div>
                         <div><span className="text-charcoal/45">Diện tích:</span> {room.area} m²</div>
-                        <div><span className="text-charcoal/45">Sức chứa:</span> {room.capacity || 2} khách</div>
+                        <div><span className="text-charcoal/45">Tối đa:</span> {room.capacity || 2} khách / phòng</div>
                       </div>
                     </div>
 
-                    {/* Panel giá */}
+                    {/* Panel giá + stepper số lượng */}
                     <div className="flex flex-col justify-center border-t border-black/5 bg-off-white/40 p-6 text-right md:border-l md:border-t-0">
                       <span className="font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/50">Giá tiêu chuẩn</span>
-                      <span className="mt-1 font-body text-xs text-charcoal/55">Tối đa {room.capacity || 2} khách</span>
-                      {fit && <span className="mt-1 font-body text-xs text-gold">{fit}</span>}
+                      <span className="mt-2 font-display text-2xl font-semibold text-gold">{formatPrice(a.total)}</span>
+                      <span className="font-body text-xs text-charcoal/50">{formatPrice(a.perNight)}/đêm · {a.nights} đêm / phòng</span>
                       <span className="mt-2 font-nav text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Còn {a.count} phòng</span>
-                      <span className="mt-2 font-display text-2xl font-semibold text-gold">{formatPrice(a.perNight)}</span>
-                      <span className="font-body text-xs text-charcoal/50">/ đêm · {a.nights} đêm · Tổng {formatPrice(a.total)}</span>
-                      <button onClick={() => openBook(room)} className="mt-4 rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
-                        Đặt ngay
-                      </button>
+
+                      <div className="mt-4 flex items-center justify-end gap-3">
+                        <button onClick={() => dec(room._id)} disabled={n === 0}
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 font-display text-xl text-charcoal disabled:opacity-30 hover:border-gold hover:text-gold">−</button>
+                        <span className="min-w-8 text-center font-display text-xl font-semibold text-charcoal">{n}</span>
+                        <button onClick={() => inc(room._id, a.count)} disabled={n >= a.count}
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 font-display text-xl text-charcoal disabled:opacity-30 hover:border-gold hover:text-gold">+</button>
+                      </div>
+                      {n > 0 && <span className="mt-2 font-body text-xs text-charcoal/55">{n} phòng = {formatPrice(n * a.total)}</span>}
                     </div>
                   </Reveal>
                 );
@@ -321,37 +336,74 @@ const BookingPage = () => {
         </div>
       </section>
 
-      {/* ---------- Modal xác nhận đặt phòng (theo thiết kế Stitch) ---------- */}
-      {modalRoom && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 animate-fade-in" onClick={() => setModalRoom(null)}>
+      {/* ---------- Thanh tóm tắt sống (sticky đáy) ---------- */}
+      {searched && displayRooms.length > 0 && selectedRooms > 0 && (
+        <div className="sticky bottom-0 z-30 border-t border-black/10 bg-white/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className={`font-body text-sm font-medium ${summaryColor}`}>
+                {summary.tone === 'ok' && '✓ '}{(summary.tone === 'warn' || summary.tone === 'bad') && '⚠ '}{summary.text}
+              </div>
+              <div className="mt-0.5 font-body text-xs text-charcoal/55">
+                Đã chọn <b>{selectedRooms}</b> phòng · sức chứa <b>{capacityTotal}</b> / cần <b>{partyUnits}</b> suất
+              </div>
+            </div>
+            <div className="flex items-center gap-5">
+              <div className="text-right">
+                <div className="font-body text-xs text-charcoal/55">
+                  Tạm tính {quoting ? '…' : formatPrice(quote?.totalAmount)}
+                  {quote?.totalSurcharge > 0 && <span className="text-amber-700"> (gồm phụ phí {formatPrice(quote.totalSurcharge)})</span>}
+                </div>
+                <div className="font-display text-xl font-semibold text-gold">Cọc {quoting ? '…' : formatPrice(quote?.depositAmount)}</div>
+              </div>
+              <button
+                onClick={openConfirm}
+                disabled={!enoughAdults || selectedRooms < 1}
+                className="rounded-sm bg-gold px-7 py-3 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover disabled:opacity-50"
+              >
+                Tiếp tục →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Modal xác nhận đặt phòng ---------- */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 animate-fade-in" onClick={() => setShowConfirm(false)}>
           <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-modal" onClick={(e) => e.stopPropagation()}>
-            {/* Tiêu đề */}
             <div className="px-8 pb-5 pt-8 text-center">
-              <h3 className="font-display text-2xl font-semibold text-charcoal md:text-3xl">Xác nhận đặt phòng: {modalRoom.name}</h3>
+              <h3 className="font-display text-2xl font-semibold text-charcoal md:text-3xl">Xác nhận đặt {selectedRooms} phòng</h3>
               <div className="mx-auto mt-3 h-px w-12 bg-gold" />
             </div>
 
             <div className="px-8 pb-8">
-              {/* Ô tóm tắt */}
+              {/* Tóm tắt đơn */}
               <div className="rounded-md bg-cream p-6">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <SummaryRow icon={BkIcon.pin} label="Địa điểm" value={branchName} />
-                  </div>
-                  <SummaryRow
-                    icon={BkIcon.calendar}
-                    label="Thời gian"
-                    value={`${new Date(checkIn).toLocaleDateString('vi-VN')} → ${new Date(checkOut).toLocaleDateString('vi-VN')}`}
-                    sub={availByType[modalRoom._id]?.nights ? `${availByType[modalRoom._id].nights} đêm` : undefined}
-                  />
-                  <SummaryRow icon={BkIcon.clock} label="Giờ nhận / trả" value="Nhận 14:00 → Trả 12:00" />
-                  <div className="sm:col-span-2">
-                    <SummaryRow icon={BkIcon.guest} label="Khách hàng" value={`${displayAdults} người lớn${displayChildren ? ` + ${displayChildren} trẻ em` : ''}`} />
+                <div className="font-body text-sm text-charcoal/75">
+                  <div className="mb-1"><span className="text-charcoal/45">Chi nhánh:</span> <b>{branchName}</b></div>
+                  <div className="mb-1"><span className="text-charcoal/45">Thời gian:</span> {new Date(checkIn).toLocaleDateString('vi-VN')} → {new Date(checkOut).toLocaleDateString('vi-VN')} ({quote?.nights || ''} đêm)</div>
+                  <div className="mb-3"><span className="text-charcoal/45">Khách:</span> {displayAdults} người lớn{displayChildren ? ` + ${displayChildren} trẻ em` : ''}</div>
+                  <div className="space-y-1 border-t border-gold/25 pt-3">
+                    {displayRooms.filter((rt) => qtyOf(rt._id) > 0).map((rt) => (
+                      <div key={rt._id} className="flex justify-between">
+                        <span>{qtyOf(rt._id)}× {rt.name}</span>
+                        <span>{formatPrice(qtyOf(rt._id) * (availByType[rt._id]?.total || 0))}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="mt-5 flex items-center justify-between border-t border-gold/25 pt-4">
+                {quote?.totalSurcharge > 0 && (
+                  <div className="mt-3 flex justify-between border-t border-gold/25 pt-3 font-body text-sm text-amber-700">
+                    <span>Phụ phí giường phụ</span><span>+{formatPrice(quote.totalSurcharge)}</span>
+                  </div>
+                )}
+                <div className="mt-3 flex items-center justify-between border-t border-gold/25 pt-3">
                   <span className="font-nav text-xs font-bold uppercase tracking-wide text-charcoal/70">Tổng cộng</span>
-                  <span className="font-display text-2xl font-semibold text-gold">{formatPrice(availByType[modalRoom._id]?.total)}</span>
+                  <span className="font-display text-2xl font-semibold text-gold">{formatPrice(quote?.totalAmount)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between font-body text-sm text-charcoal/65">
+                  <span>Cọc cần đặt</span><span className="font-semibold">{formatPrice(quote?.depositAmount)}</span>
                 </div>
               </div>
 
@@ -371,10 +423,11 @@ const BookingPage = () => {
                 </div>
               </div>
 
-              {/* Nút */}
-              <div className="mt-7 flex items-center justify-end gap-3">
-                <button onClick={() => setModalRoom(null)} className="rounded-sm border border-black/15 px-7 py-2.5 font-nav text-sm font-semibold uppercase tracking-wide text-charcoal/70 transition-colors hover:bg-cream">Huỷ</button>
-                <button onClick={submitBooking} disabled={submitting} className="rounded-sm bg-gold px-8 py-2.5 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover disabled:opacity-60">
+              <p className="mt-3 font-body text-xs text-charcoal/50">Hệ thống tự sắp xếp khách vào các phòng để tối ưu chi phí. Bạn sẽ nhận 1 mã đặt phòng và thanh toán cọc gom 1 lần.</p>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button onClick={() => setShowConfirm(false)} className="rounded-sm border border-black/15 px-7 py-2.5 font-nav text-sm font-semibold uppercase tracking-wide text-charcoal/70 transition-colors hover:bg-cream">Huỷ</button>
+                <button onClick={submitGroup} disabled={submitting} className="rounded-sm bg-gold px-8 py-2.5 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover disabled:opacity-60">
                   {submitting ? 'Đang xử lý...' : 'Xác nhận đặt'}
                 </button>
               </div>

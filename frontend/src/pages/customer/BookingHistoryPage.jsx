@@ -19,7 +19,7 @@ const STATUS = {
 const formatPrice = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
 const BookingHistoryPage = () => {
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState([]); // mỗi phần tử = 1 NHÓM đặt phòng
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth || {});
@@ -31,7 +31,7 @@ const BookingHistoryPage = () => {
     }
     const fetchHistory = async () => {
       try {
-        const res = await customerService.getBookingHistory();
+        const res = await customerService.getBookingGroupHistory();
         if (res.success) setBookings(res.data);
       } catch (err) {
         alert('Lỗi khi tải lịch sử đặt phòng: ' + (err.response?.data?.message || err.message));
@@ -68,8 +68,8 @@ const BookingHistoryPage = () => {
               return (
                 <Reveal as="article" key={b._id} delay={(i % 4) * 90} className="grid overflow-hidden rounded-lg bg-white shadow-raised transition-shadow duration-300 hover:shadow-elevated sm:grid-cols-[200px_1fr]">
                   <div className="h-44 overflow-hidden sm:h-auto">
-                    {b.roomType?.images?.length ? (
-                      <img src={b.roomType.images[0]} alt={b.roomType?.name} className="h-full w-full object-cover" />
+                    {b.image ? (
+                      <img src={b.image} alt={b.roomTypeNames?.[0] || 'Phòng'} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-cream text-sm text-charcoal/40">Chưa có ảnh</div>
                     )}
@@ -78,15 +78,21 @@ const BookingHistoryPage = () => {
                   <div className="flex flex-col p-6">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-display text-2xl font-semibold text-charcoal">{b.roomType?.name}</h3>
-                        <p className="mt-0.5 font-body text-sm text-charcoal/55">Chi nhánh: {b.branch?.name}</p>
+                        <h3 className="font-display text-2xl font-semibold text-charcoal">
+                          {(b.roomTypeNames || []).join(', ') || 'Đặt phòng'}
+                          {b.roomCount > 1 && <span className="ml-2 align-middle rounded-full bg-gold px-2 py-0.5 font-nav text-[11px] font-semibold text-white">{b.roomCount} phòng</span>}
+                        </h3>
+                        <p className="mt-0.5 font-body text-sm text-charcoal/55">Chi nhánh: {b.branchName}</p>
+                        {b.branchActive === false && (
+                          <p className="mt-1 inline-block rounded-sm bg-amber-50 px-2 py-0.5 font-body text-xs text-amber-700">⚠ Chi nhánh tạm ngừng hoạt động</p>
+                        )}
                       </div>
                       <span className={`shrink-0 rounded-full border px-3 py-1 font-nav text-[11px] font-semibold ${st.cls}`}>{st.label}</span>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-black/5 pt-4 font-body text-sm sm:grid-cols-4">
                       <div>
-                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Mã booking</div>
+                        <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Mã đặt phòng</div>
                         <div className="font-medium text-charcoal">{b.code}</div>
                       </div>
                       <div>
@@ -108,11 +114,11 @@ const BookingHistoryPage = () => {
                         Tổng tiền: <span className="font-display text-lg font-semibold text-gold">{formatPrice(b.totalAmount)}</span>
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => navigate(`/checkout/${b._id}`)} className="rounded-sm border border-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-gold transition-colors hover:bg-gold hover:text-white">
+                        <button onClick={() => navigate(`/checkout/group/${b._id}`)} className="rounded-sm border border-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-gold transition-colors hover:bg-gold hover:text-white">
                           Xem chi tiết
                         </button>
                         {b.status === 'pending' && (
-                          <button onClick={() => navigate(`/checkout/${b._id}`)} className="rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
+                          <button onClick={() => navigate(`/checkout/group/${b._id}`)} className="rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
                             Thanh toán tiếp
                           </button>
                         )}

@@ -10,6 +10,13 @@ router.post('/bookings', protect, customerController.createBooking)  // đặt o
 router.get('/bookings/:id', validateObjectId('id'), customerController.getBookingDetail)
 router.post('/bookings/:id/payos-link', validateObjectId('id'), customerController.createPaymentLink)
 
+// Đặt nhiều phòng online (nhóm) — 1 mã, 1 QR cọc gom
+router.get('/booking-groups', protect, customerController.getBookingGroupHistory)                          // lịch sử theo nhóm
+router.post('/booking-groups/quote', customerController.quoteBookingGroup)                                 // báo giá (không cần đăng nhập)
+router.post('/booking-groups', protect, customerController.createBookingGroup)                             // tạo nhóm (gắn customer)
+router.get('/booking-groups/:id', protect, validateObjectId('id'), customerController.getBookingGroupDetail)
+router.post('/booking-groups/:id/payos-link', protect, validateObjectId('id'), customerController.createGroupPaymentLink)
+
 // Webhook PayOS — KHÔNG dùng auth (PayOS gọi từ server của họ)
 // Raw body middleware không cần (express.json() đủ với PayOS)
 router.post('/payos-webhook', customerController.payosWebhook)

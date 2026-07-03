@@ -81,6 +81,10 @@ export const roomService = {
   // Phân tầng housekeeper
   getHousekeeperFloors: () => get(base.HOUSEKEEPER_FLOORS),
   setHousekeeperFloors: (accountId, floors) => put(`${base.HOUSEKEEPERS}/${accountId}/floors`, { floors }),
+
+  // Hộp thư liên hệ
+  getContacts: (params) => get(base.CONTACTS, params),
+  handleContact: (id) => patch(`${base.CONTACTS}/${id}/handle`),
 }
 
 

@@ -18,6 +18,10 @@ export const customerService = {
     const response = await axiosInstance.get('/public/gallery', { params: { category } })
     return response.data // { success, data: [{imageUrl, caption, category, ...}] }
   },
+  submitContact: async (data) => {
+    const response = await axiosInstance.post('/public/contact', data)
+    return response.data // { success, data: { _id } }
+  },
   searchAvailableRooms: async (params) => {
     const response = await axiosInstance.get('/public/rooms/available', { params })
     return response.data // { success, data: rooms }
@@ -36,6 +40,27 @@ export const customerService = {
   },
   getBookingHistory: async () => {
     const response = await axiosInstance.get('/customer/bookings')
+    return response.data
+  },
+  // ── Đặt nhiều phòng online (nhóm) ──
+  quoteBookingGroup: async (data) => {
+    const response = await axiosInstance.post('/customer/booking-groups/quote', data)
+    return response.data // { success, data: quote }
+  },
+  createBookingGroup: async (data) => {
+    const response = await axiosInstance.post('/customer/booking-groups', data)
+    return response.data // { success, data: { groupId, code, roomCount } }
+  },
+  getBookingGroupHistory: async () => {
+    const response = await axiosInstance.get('/customer/booking-groups')
+    return response.data // { success, data: [groupRow] }
+  },
+  getBookingGroup: async (id) => {
+    const response = await axiosInstance.get(`/customer/booking-groups/${id}`)
+    return response.data // { success, data: { group, members, payments, rollup } }
+  },
+  createGroupPaymentLink: async (id, type) => {
+    const response = await axiosInstance.post(`/customer/booking-groups/${id}/payos-link`, { type })
     return response.data
   },
   // TODO(Khánh): searchRooms, getRoomDetail, getBill, review ...

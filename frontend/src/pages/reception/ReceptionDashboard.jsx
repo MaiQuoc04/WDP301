@@ -10,6 +10,7 @@ import {
   CalendarOutlined,
   CoffeeOutlined,
   TransactionOutlined,
+  MailOutlined,
   LogoutOutlined
 } from '@ant-design/icons'
 import ReceptionDashboardPage from './ReceptionDashboardPage'
@@ -21,6 +22,7 @@ import RoomsPage from './RoomsPage'
 import SchedulePage from './SchedulePage'
 import ServiceBoardPage from './ServiceBoardPage'
 import TransactionsPage from './TransactionsPage'
+import ContactsPage from './ContactsPage'
 import NotificationBell from '../../components/NotificationBell'
 import NotificationsPage from '../../components/NotificationsPage'
 import '../manager/manager.css'
@@ -59,6 +61,7 @@ export default function ReceptionDashboard() {
           <NavLink to="/reception/schedule" className="manager-nav-item"><CalendarOutlined /><span>Lịch</span></NavLink>
           <NavLink to="/reception/services" className="manager-nav-item"><CoffeeOutlined /><span>Dịch vụ</span></NavLink>
           <NavLink to="/reception/transactions" className="manager-nav-item"><TransactionOutlined /><span>Giao dịch</span></NavLink>
+          <NavLink to="/reception/contacts" className="manager-nav-item"><MailOutlined /><span>Liên hệ</span></NavLink>
         </nav>
 
         <div className="manager-sidebar-footer">
@@ -96,6 +99,7 @@ export default function ReceptionDashboard() {
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="services" element={<ServiceBoardPage />} />
             <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="contacts" element={<ContactsPage />} />
             <Route path="notifications" element={<NotificationsPage basePath="/reception" />} />
           </Routes>
         </main>

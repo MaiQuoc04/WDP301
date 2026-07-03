@@ -53,6 +53,10 @@ exports.markNoShow = handle((req) => svc.markNoShow(req.user.id, req.params.id))
 exports.transfer = handle((req) => svc.transfer(req.user.id, req.params.id, req.body))  // UC-37
 exports.update = handle((req) => svc.update(req.user.id, req.params.id, req.body))       // UC-38
 
+// Hộp thư liên hệ
+exports.listContacts = handle((req) => svc.listContacts(req.user.id, req.query))
+exports.handleContact = handle((req) => svc.handleContact(req.user.id, req.params.id))
+
 // Dashboard — thông số trong ngày
 exports.getDashboard = handle((req) => svc.getDashboard(req.user.id))
 

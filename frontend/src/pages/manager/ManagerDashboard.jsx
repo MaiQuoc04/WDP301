@@ -11,6 +11,7 @@ import HousekeepingPage from './HousekeepingPage'
 import RoomIssuesPage from './RoomIssuesPage'
 import RestockPage from './RestockPage'
 import HousekeeperFloorsPage from './HousekeeperFloorsPage'
+import ContactsPage from './ContactsPage'
 import NotificationBell from '../../components/NotificationBell'
 import NotificationsPage from '../../components/NotificationsPage'
 import './manager.css'
@@ -26,6 +27,7 @@ import {
   ApartmentOutlined,
   WarningOutlined,
   InboxOutlined,
+  MailOutlined,
   LogoutOutlined
 } from '@ant-design/icons'
 
@@ -100,6 +102,10 @@ export default function ManagerDashboard() {
             <WarningOutlined />
             <span>Báo cáo sự cố</span>
           </NavLink>
+          <NavLink to="/manager/contacts" className="manager-nav-item">
+            <MailOutlined />
+            <span>Liên hệ</span>
+          </NavLink>
         </nav>
 
         <div className="manager-sidebar-footer">
@@ -142,6 +148,7 @@ export default function ManagerDashboard() {
             <Route path="housekeeping" element={<HousekeepingPage />} />
             <Route path="restock" element={<RestockPage />} />
             <Route path="floors" element={<HousekeeperFloorsPage />} />
+            <Route path="contacts" element={<ContactsPage />} />
             <Route path="notifications" element={<NotificationsPage basePath="/manager" />} />
             <Route path="issues" element={<RoomIssuesPage />} />
           </Routes>

@@ -57,6 +57,10 @@ router.post('/bookings/:id/no-show', validateObjectId('id'), c.markNoShow)  // U
 router.post('/bookings/:id/transfer', validateObjectId('id'), c.transfer)   // UC-37 đổi phòng in-house
 router.patch('/bookings/:id', validateObjectId('id'), c.update)             // UC-38 cập nhật booking
 
+// Hộp thư liên hệ (khách gửi từ trang Contact)
+router.get('/contacts', c.listContacts)
+router.patch('/contacts/:id/handle', validateObjectId('id'), c.handleContact)
+
 // Dashboard — thông số trong ngày
 router.get('/dashboard', c.getDashboard)
 

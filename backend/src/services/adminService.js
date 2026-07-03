@@ -7,6 +7,15 @@ const Customer = require('../models/customerModel')
 const Booking = require('../models/bookingModel')
 const Room = require('../models/roomModel')
 const HousekeepingTask = require('../models/housekeepingTaskModel')
+const { staffAccountIdsOfBranch } = require('../utils/access')
+
+// Đá văng realtime các tài khoản (nếu đang online) -> FE tự đăng xuất về màn khoá. Defensive.
+function forceLogout(accountIds, reason) {
+  try {
+    const { emitToUser } = require('../config/socket')
+    for (const id of accountIds || []) emitToUser(String(id), 'force_logout', { reason })
+  } catch (e) { console.warn('[admin] forceLogout lỗi:', e.message) }
+}
 
 
 
@@ -33,6 +42,12 @@ exports.toggleBranchActive = async (id) => {
   if (!branch) throw { status: 404, message: 'Không tìm thấy chi nhánh' }
   branch.isActive = !branch.isActive
   await branch.save()
+  // Khoá chi nhánh -> đá văng NGAY nhân viên đang online của chi nhánh (KHÔNG đụng cờ tài khoản của họ).
+  // Mở lại chi nhánh: không cần làm gì; ai không bị khoá tài khoản sẽ đăng nhập lại bình thường.
+  if (!branch.isActive) {
+    const staffIds = await staffAccountIdsOfBranch(branch._id)
+    forceLogout(staffIds, 'branch_locked')
+  }
   return branch
 }
 
@@ -107,6 +122,7 @@ exports.toggleAccountActive = async (id) => {
   // Chỉ super_admin có quyền này, nhưng tránh tự khoá chính mình (nếu cần có thể add logic)
   account.isActive = !account.isActive
   await account.save()
+  if (!account.isActive) forceLogout([account._id], 'account_locked') // khoá tài khoản -> đá văng ngay
   return account
 }
 

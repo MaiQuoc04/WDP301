@@ -13,9 +13,14 @@ const RoomIssue = require('../models/roomIssueModel')
 const HousekeepingTask = require('../models/housekeepingTaskModel')
 const RoleAssignment = require('../models/roleAssignmentModel')
 const notificationService = require('./notificationService')
+const contactService = require('./contactService')
 const Account = require('../models/accountModel')
 
 const supportsTransactions = process.env.ENABLE_TRANSACTIONS === 'true'
+
+// ─── Hộp thư liên hệ (khách gửi từ trang Contact) ──────────────────────────────
+exports.listContacts = (branchId, query = {}) => contactService.listForBranches([branchId], { status: query.status })
+exports.handleContact = (branchId, id, by) => contactService.markHandled(id, [branchId], by)
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 // Tìm một entity thuộc chi nhánh (Branch Isolation Helper)

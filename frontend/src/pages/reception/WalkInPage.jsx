@@ -127,26 +127,18 @@ export default function WalkInPage() {
   const create = async () => {
     setErr(''); setLoading(true)
     try {
+      // Mọi lần đặt = 1 nhóm (kể cả 1 phòng). Dịch vụ kèm chỉ áp khi 1 phòng -> gắn vào item đó.
       const items = picked.map((r) => ({ roomId: r.roomId, adults: Number(alloc[r.roomId]?.adults) || 0, children: Number(alloc[r.roomId]?.children) || 0 }))
       if (picked.length === 1) {
-        // 1 phòng -> booking đơn (đường cũ), không tạo nhóm; kèm dịch vụ chọn ngay
         const svc = Object.entries(chosen).filter(([, q]) => q > 0).map(([serviceId, quantity]) => ({ serviceId, quantity }))
-        const b = await bookingService.walkIn({
-          roomId: items[0].roomId,
-          guestName: form.guestName, guestPhone: form.guestPhone,
-          checkIn: form.checkIn, checkOut: form.checkOut,
-          adults: items[0].adults, children: items[0].children,
-          services: svc,
-        })
-        nav(`/reception/bookings/${b._id}`)
-      } else {
-        const res = await bookingService.createGroup({
-          guestName: form.guestName, guestPhone: form.guestPhone,
-          checkIn: form.checkIn, checkOut: form.checkOut,
-          items, adultsTotal: Number(form.adults), childrenTotal: Number(form.children),
-        })
-        nav(`/reception/booking-groups/${res.group._id}`)
+        if (svc.length) items[0].services = svc
       }
+      const res = await bookingService.createGroup({
+        guestName: form.guestName, guestPhone: form.guestPhone,
+        checkIn: form.checkIn, checkOut: form.checkOut,
+        items, adultsTotal: Number(form.adults), childrenTotal: Number(form.children),
+      })
+      nav(`/reception/booking-groups/${res.group._id}`)
     } catch (e2) { setErr(e2.response?.data?.message || 'Lỗi tạo booking'); setLoading(false) }
   }
 
@@ -342,7 +334,7 @@ export default function WalkInPage() {
           )}
 
           <div className="rc-sticky-foot">
-            <span>{picked.length === 1 ? 'Tạo 1 booking' : `Tạo nhóm ${picked.length} phòng (1 mã, 1 cọc)`}</span>
+            <span>{picked.length === 1 ? 'Tạo đặt phòng (1 phòng · 1 mã)' : `Tạo nhóm ${picked.length} phòng (1 mã, 1 cọc)`}</span>
             <button disabled={loading || !canCreate} onClick={create}>{loading ? '...' : 'Tạo booking'}</button>
           </div>
         </div>

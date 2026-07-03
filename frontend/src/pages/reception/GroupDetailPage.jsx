@@ -1,7 +1,8 @@
 // Owner: Quốc — chi tiết NHÓM đặt nhiều phòng (1 mã, 1 cọc). Mỗi phòng vẫn mở chi tiết riêng để vận hành.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDate, fmtDateTime, bookingStatusLabel, paymentStatusLabel } from '../../services'
+import { socket, connectSocket } from '../../services/socketService'
 
 export default function GroupDetailPage() {
   const { id } = useParams()
@@ -16,6 +17,16 @@ export default function GroupDetailPage() {
     catch (e) { setErr(e.response?.data?.message || 'Lỗi tải nhóm') }
   }, [id])
   useEffect(() => { reload() }, [reload])
+
+  // Realtime: 1 phòng trong nhóm đổi (housekeeper kiểm kê / lễ tân khác check-in-out) -> tự cập nhật, không reload tay.
+  const memberIdsRef = useRef([])
+  useEffect(() => { memberIdsRef.current = (data?.members || []).map((m) => String(m._id)) }, [data])
+  useEffect(() => {
+    connectSocket()
+    const onUpd = (evt) => { if (evt?.bookingId && memberIdsRef.current.includes(String(evt.bookingId))) reload() }
+    socket.on('booking_updated', onUpd)
+    return () => socket.off('booking_updated', onUpd)
+  }, [reload])
 
   const confirmDeposit = async (paidFull) => {
     setErr(''); setMsg(''); setLoading(true)

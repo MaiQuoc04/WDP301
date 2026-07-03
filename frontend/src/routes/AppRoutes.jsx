@@ -9,6 +9,7 @@ import RoomDetail from '../pages/RoomDetail'
 import LoginPage from '../pages/auth/LoginPage'
 import BookingPage from '../pages/BookingPage'
 import BookingCheckout from '../pages/BookingCheckout'
+import BookingGroupCheckout from '../pages/BookingGroupCheckout'
 
 // --- STATIC PAGES ---
 import Dining from '../pages/Dining'
@@ -48,6 +49,7 @@ const AppRoutes = () => (
       <Route path="/rooms/:id" element={<RoomDetail />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/booking" element={<BookingPage />} />
+      <Route path="/checkout/group/:id" element={<BookingGroupCheckout />} />
       <Route path="/checkout/:id" element={<BookingCheckout />} />
 
       {/* Static Pages Routes */}

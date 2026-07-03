@@ -62,6 +62,10 @@ router.patch('/room-issues/:id/approve-maintenance', managerController.approveRo
 router.patch('/room-issues/:id/resolve', managerController.resolveRoomIssue)
 router.patch('/room-issues/:id/cancel', managerController.cancelRoomIssue)
 
+// ─── Hộp thư liên hệ ─────────────────────────────────────────────────────────────
+router.get('/contacts', managerController.getContacts)
+router.patch('/contacts/:id/handle', managerController.handleContact)
+
 // ─── Housekeeping ──────────────────────────────────────────────────────────────
 router.get('/housekeeping/tasks', managerController.getHousekeepingTasks)
 router.get('/housekeeping/tasks/:id', managerController.getHousekeepingTaskById)
