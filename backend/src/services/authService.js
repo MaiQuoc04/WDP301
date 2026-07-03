@@ -10,6 +10,35 @@ const { STAFF_ROLES, isBranchBlocked } = require('../utils/access')
 
 const isDev = () => process.env.NODE_ENV !== 'production'
 
+// Quy tắc validate dùng chung (khớp FE LoginPage). Nguồn sự thật ở BE.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/   // TLD là chữ, tối thiểu 2 ký tự
+const PHONE_RE = /^0\d{9,10}$/                       // SĐT VN: 0 + 9-10 số
+const NAME_RE = /^\p{L}+(?:[ ]\p{L}+)*$/u            // chỉ chữ (kể cả tiếng Việt) + 1 khoảng trắng giữa các từ
+// Nhà cung cấp phổ biến -> domain ĐÚNG (bắt lỗi gõ nhầm kiểu gmail.co / gmail.con / gmail.vn).
+const EMAIL_CANON = {
+  gmail: ['gmail.com'], googlemail: ['googlemail.com'], hotmail: ['hotmail.com'],
+  icloud: ['icloud.com'], outlook: ['outlook.com', 'outlook.com.vn'], yahoo: ['yahoo.com', 'yahoo.com.vn'],
+}
+// Trả message lỗi email, hoặc null nếu hợp lệ.
+function emailError(email) {
+  const v = (email || '').trim().toLowerCase()
+  if (!EMAIL_RE.test(v)) return 'Email không hợp lệ'
+  const domain = v.split('@')[1]
+  const brand = domain.split('.')[0]
+  if (EMAIL_CANON[brand] && !EMAIL_CANON[brand].includes(domain))
+    return `Email ${brand} phải là @${EMAIL_CANON[brand][0]}`
+  return null
+}
+function assertValidRegister({ fullName, email, phone, password }) {
+  if (!fullName || fullName.length < 2 || fullName.length > 50 || !NAME_RE.test(fullName))
+    throw new Error('Họ tên phải 2–50 ký tự, chỉ gồm chữ và khoảng trắng')
+  const emErr = emailError(email)
+  if (emErr) throw new Error(emErr)
+  if (!PHONE_RE.test(phone)) throw new Error('Số điện thoại không hợp lệ (VD: 0901234567)')
+  if (!password || password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password))
+    throw new Error('Mật khẩu tối thiểu 8 ký tự, gồm cả chữ và số')
+}
+
 // Hồ sơ + payload user trả về client
 async function buildUser(account) {
   const profile = account.role === 'customer'
@@ -62,7 +91,10 @@ function clearOtp(account) {
 
 // UC-01: đăng ký Customer (chưa verify) + gửi OTP
 exports.register = async ({ email, password, fullName, phone }) => {
-  if (!email || !password || !fullName) throw new Error('Thiếu email, mật khẩu hoặc họ tên')
+  fullName = (fullName || '').trim()
+  email = (email || '').trim().toLowerCase()
+  phone = (phone || '').trim()
+  assertValidRegister({ fullName, email, phone, password })
   if (await Account.findOne({ email })) throw new Error('Email đã được đăng ký')
   const account = await Account.create({
     email, password: await bcrypt.hash(password, 10), role: 'customer', isVerified: false,
@@ -101,6 +133,8 @@ exports.resendOtp = async ({ email }) => {
 
 // UC-03: đăng nhập, phát JWT kèm role
 exports.login = async ({ email, password }) => {
+  email = (email || '').trim().toLowerCase()
+  if (!email || !password) throw new Error('Vui lòng nhập email và mật khẩu')
   const account = await Account.findOne({ email })
   if (!account || !(await bcrypt.compare(password, account.password)))
     throw new Error('Email hoặc mật khẩu không đúng')

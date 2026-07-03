@@ -43,6 +43,45 @@ const Divider = () => (
   </div>
 )
 
+// Validate dùng chung (khớp BE authService). Trả object lỗi theo field.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/
+const PHONE_RE = /^0\d{9,10}$/
+const NAME_RE = /^\p{L}+(?:[ ]\p{L}+)*$/u
+// Nhà cung cấp phổ biến -> domain đúng (bắt lỗi gõ nhầm gmail.co / gmail.con / gmail.vn ...).
+const EMAIL_CANON = {
+  gmail: ['gmail.com'], googlemail: ['googlemail.com'], hotmail: ['hotmail.com'],
+  icloud: ['icloud.com'], outlook: ['outlook.com', 'outlook.com.vn'], yahoo: ['yahoo.com', 'yahoo.com.vn'],
+}
+const emailError = (email) => {
+  const v = (email || '').trim().toLowerCase()
+  if (!v) return 'Vui lòng nhập email'
+  if (!EMAIL_RE.test(v)) return 'Email không hợp lệ'
+  const domain = v.split('@')[1]
+  const brand = domain.split('.')[0]
+  if (EMAIL_CANON[brand] && !EMAIL_CANON[brand].includes(domain)) return `Email ${brand} phải là @${EMAIL_CANON[brand][0]}`
+  return null
+}
+const validateRegisterFields = ({ fullName, email, phone, password, confirmPassword }) => {
+  const e = {}
+  const name = (fullName || '').trim()
+  if (!name) e.fullName = 'Vui lòng nhập họ và tên'
+  else if (name.length < 2 || name.length > 50 || !NAME_RE.test(name)) e.fullName = 'Họ tên 2–50 ký tự, chỉ gồm chữ và khoảng trắng'
+  const em = emailError(email); if (em) e.email = em
+  if (!(phone || '').trim()) e.phone = 'Vui lòng nhập số điện thoại'
+  else if (!PHONE_RE.test(phone.trim())) e.phone = 'SĐT không hợp lệ (VD: 0901234567)'
+  if (!password) e.password = 'Vui lòng nhập mật khẩu'
+  else if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) e.password = 'Mật khẩu ≥8 ký tự, gồm cả chữ và số'
+  if (password !== confirmPassword) e.confirmPassword = 'Mật khẩu xác nhận không khớp'
+  return e
+}
+const validateLoginFields = ({ email, password }) => {
+  const e = {}
+  const em = emailError(email); if (em) e.email = em
+  if (!password) e.password = 'Vui lòng nhập mật khẩu'
+  return e
+}
+const FieldErr = ({ msg }) => (msg ? <p className="mt-1 font-body text-xs text-red-500">{msg}</p> : null)
+
 const LoginPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -69,6 +108,8 @@ const LoginPage = () => {
   const [phone, setPhone] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [otp, setOtp] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const clearFieldErr = (k) => setFieldErrors((p) => (p[k] ? { ...p, [k]: undefined } : p))
 
   // Linh vật sen tương tác
   const [focusField, setFocusField] = useState(null)
@@ -106,6 +147,7 @@ const LoginPage = () => {
   const switchMode = (newMode) => {
     setMode(newMode)
     clearMessages()
+    setFieldErrors({})
     setPassword('')
     setConfirmPassword('')
     setOtp('')
@@ -136,10 +178,13 @@ const LoginPage = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    const errs = validateLoginFields({ email, password })
+    setFieldErrors(errs)
+    if (Object.keys(errs).length) return
     setLoading(true)
     clearMessages()
     try {
-      const response = await authService.login({ email, password })
+      const response = await authService.login({ email: email.trim(), password })
       const { token, user } = response.data.data
       localStorage.setItem('token', token)
       dispatch(setCredentials({ token, user }))
@@ -154,14 +199,13 @@ const LoginPage = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault()
-    if (password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp')
-      return
-    }
+    const errs = validateRegisterFields({ fullName, email, phone, password, confirmPassword })
+    setFieldErrors(errs)
+    if (Object.keys(errs).length) return
     setLoading(true)
     clearMessages()
     try {
-      await authService.register({ email, password, fullName, phone })
+      await authService.register({ email: email.trim(), password, fullName: fullName.trim(), phone: phone.trim() })
       setSuccess('Đăng ký thành công! Vui lòng nhập mã OTP đã được gửi đến email của bạn.')
       setTimeout(() => setMode('otp-verify'), 2000)
     } catch (err) {
@@ -270,27 +314,29 @@ const LoginPage = () => {
 
           {/* LOGIN */}
           {mode === 'login' && (
-            <form onSubmit={handleLogin} className="mt-6 space-y-4">
+            <form onSubmit={handleLogin} noValidate className="mt-6 space-y-4">
               <div>
                 <label className={labelCls}>Địa chỉ Email *</label>
                 <input type="email" placeholder="example@domain.com" value={email}
-                  onChange={(e) => { setEmail(e.target.value); eyeFollow(e); }}
+                  onChange={(e) => { setEmail(e.target.value); clearFieldErr('email'); eyeFollow(e); }}
                   onKeyUp={eyeFollow} onClick={eyeFollow} onSelect={eyeFollow}
                   onFocus={(e) => { setFocusField('email'); eyeFollow(e); }} onBlur={() => setFocusField(null)}
-                  required className={inputCls} />
+                  className={`${inputCls} ${fieldErrors.email ? '!border-red-500' : ''}`} />
+                <FieldErr msg={fieldErrors.email} />
               </div>
               <div>
                 <label className={labelCls}>Mật khẩu *</label>
                 <div className="relative">
                   <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); clearFieldErr('password'); }}
                     onFocus={() => setFocusField('password')} onBlur={() => setFocusField(null)}
-                    required className={`${inputCls} pr-11`} />
+                    className={`${inputCls} pr-11 ${fieldErrors.password ? '!border-red-500' : ''}`} />
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowPassword((s) => !s)} aria-label="Hiện/ẩn mật khẩu"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal/40 transition-colors hover:text-gold">
                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
+                <FieldErr msg={fieldErrors.password} />
               </div>
               <div className="flex justify-end">
                 <button type="button" className={linkCls} onClick={() => switchMode('forgot-password')}>Quên mật khẩu?</button>
@@ -309,27 +355,42 @@ const LoginPage = () => {
 
           {/* REGISTER */}
           {mode === 'register' && (
-            <form onSubmit={handleRegister} className="mt-6 space-y-4">
+            <form onSubmit={handleRegister} noValidate className="mt-6 space-y-4">
               <div>
                 <label className={labelCls}>Họ và tên *</label>
-                <input type="text" placeholder="Nguyễn Văn A" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputCls} />
+                <input type="text" placeholder="Nguyễn Văn A" value={fullName}
+                  onChange={(e) => { setFullName(e.target.value); clearFieldErr('fullName'); }}
+                  className={`${inputCls} ${fieldErrors.fullName ? '!border-red-500' : ''}`} />
+                <FieldErr msg={fieldErrors.fullName} />
               </div>
               <div>
                 <label className={labelCls}>Địa chỉ Email *</label>
-                <input type="email" placeholder="example@domain.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
+                <input type="email" placeholder="example@domain.com" value={email}
+                  onChange={(e) => { setEmail(e.target.value); clearFieldErr('email'); }}
+                  className={`${inputCls} ${fieldErrors.email ? '!border-red-500' : ''}`} />
+                <FieldErr msg={fieldErrors.email} />
               </div>
               <div>
                 <label className={labelCls}>Số điện thoại *</label>
-                <input type="tel" placeholder="0901234567" value={phone} onChange={(e) => setPhone(e.target.value)} required className={inputCls} />
+                <input type="tel" placeholder="0901234567" value={phone}
+                  onChange={(e) => { setPhone(e.target.value); clearFieldErr('phone'); }}
+                  className={`${inputCls} ${fieldErrors.phone ? '!border-red-500' : ''}`} />
+                <FieldErr msg={fieldErrors.phone} />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className={labelCls}>Mật khẩu *</label>
-                  <input type="password" placeholder="Tối thiểu 6 ký tự" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required className={inputCls} />
+                  <input type="password" placeholder="≥8 ký tự, gồm chữ và số" value={password}
+                    onChange={(e) => { setPassword(e.target.value); clearFieldErr('password'); }}
+                    className={`${inputCls} ${fieldErrors.password ? '!border-red-500' : ''}`} />
+                  <FieldErr msg={fieldErrors.password} />
                 </div>
                 <div>
                   <label className={labelCls}>Xác nhận *</label>
-                  <input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className={inputCls} />
+                  <input type="password" placeholder="••••••••" value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); clearFieldErr('confirmPassword'); }}
+                    className={`${inputCls} ${fieldErrors.confirmPassword ? '!border-red-500' : ''}`} />
+                  <FieldErr msg={fieldErrors.confirmPassword} />
                 </div>
               </div>
               <button type="submit" className={submitCls} disabled={loading}>{loading ? 'Đang đăng ký...' : 'Đăng ký'}</button>
