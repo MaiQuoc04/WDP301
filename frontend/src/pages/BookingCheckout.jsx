@@ -82,7 +82,9 @@ const BookingCheckout = () => {
     }
   }, [searchParams, fetchBooking]);
 
-  /* Socket: tự cập nhật khi PayOS webhook confirm thành công */
+  /* Socket: tự cập nhật khi PayOS webhook confirm thành công + khi admin khoá/mở chi nhánh của đơn */
+  const branchIdRef = useRef(null);
+  useEffect(() => { branchIdRef.current = booking?.branch?._id ? String(booking.branch._id) : null; }, [booking]);
   useEffect(() => {
     connectSocket();
     const onPaySuccess = (evt) => {
@@ -93,8 +95,11 @@ const BookingCheckout = () => {
         fetchBooking();
       }
     };
+    // Admin khoá/mở chi nhánh -> refetch để hiện/ẩn cảnh báo ngay (không cần reload).
+    const onBranch = (evt) => { if (evt?.branchId && branchIdRef.current && String(evt.branchId) === branchIdRef.current) fetchBooking(); };
     socket.on('payment_success', onPaySuccess);
-    return () => socket.off('payment_success', onPaySuccess);
+    socket.on('branch_updated', onBranch);
+    return () => { socket.off('payment_success', onPaySuccess); socket.off('branch_updated', onBranch); };
   }, [id, fetchBooking]);
 
   useEffect(() => {

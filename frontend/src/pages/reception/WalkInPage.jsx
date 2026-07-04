@@ -73,6 +73,16 @@ export default function WalkInPage() {
   const [chosen, setChosen] = useState({}) // serviceId -> qty
   useEffect(() => { bookingService.listServices().then(setServices).catch(() => {}) }, [])
 
+  const todayStr = new Date().toISOString().split('T')[0]
+  // Reactive (giống booking online): trả <= nhận (kể cả cùng ngày) -> cảnh báo NGAY, không đợi bấm Tìm phòng.
+  useEffect(() => {
+    if (form.checkIn && form.checkOut && new Date(form.checkOut) <= new Date(form.checkIn)) {
+      setErrors((e) => ({ ...e, checkOut: 'Ngày trả phải sau ngày nhận (tối thiểu 1 đêm)' }))
+    } else {
+      setErrors((e) => (e.checkOut ? { ...e, checkOut: undefined } : e))
+    }
+  }, [form.checkIn, form.checkOut])
+
   const search = async (e) => {
     e?.preventDefault(); setErr('')
     const errs = validate()
@@ -145,6 +155,8 @@ export default function WalkInPage() {
   const types = [...new Map(rooms.map((r) => [r.roomType._id, r.roomType])).values()]
   const shown = typeFilter.length ? rooms.filter((r) => typeFilter.includes(r.roomType._id)) : rooms
   const totalUnits = Number(form.adults) + Number(form.children) * 0.5
+  // Suất CẦN tính phí = floor(units): trẻ lẻ 0.5 quy về 0 (khớp backend + booking online). VD 2NL+1TE = 2.5 -> 2.
+  const neededUnits = Math.floor(totalUnits)
   const pickedCapacity = picked.reduce((s, r) => s + (r.roomType?.capacity || 0), 0)
 
   return (
@@ -176,11 +188,11 @@ export default function WalkInPage() {
             {errors.guestPhone && <span className="rc-field-err">{errors.guestPhone}</span>}
           </label>
           <label>Ngày nhận <span className="req">*</span> <small style={{ color: 'var(--rc-text-muted)', fontWeight: 500 }}>· nhận lúc 14:00</small>
-            <input className={errors.checkIn ? 'err' : ''} type="date" value={form.checkIn} onChange={(e) => set('checkIn', e.target.value)} />
+            <input className={errors.checkIn ? 'err' : ''} type="date" min={todayStr} value={form.checkIn} onChange={(e) => set('checkIn', e.target.value)} />
             {errors.checkIn && <span className="rc-field-err">{errors.checkIn}</span>}
           </label>
           <label>Ngày trả <span className="req">*</span> <small style={{ color: 'var(--rc-text-muted)', fontWeight: 500 }}>· trả lúc 12:00</small>
-            <input className={errors.checkOut ? 'err' : ''} type="date" value={form.checkOut} onChange={(e) => set('checkOut', e.target.value)} />
+            <input className={errors.checkOut ? 'err' : ''} type="date" min={form.checkIn || todayStr} value={form.checkOut} onChange={(e) => set('checkOut', e.target.value)} />
             {errors.checkOut && <span className="rc-field-err">{errors.checkOut}</span>}
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -239,8 +251,8 @@ export default function WalkInPage() {
 
           <div className="rc-sticky-foot">
             <span>
-              Đã chọn <b>{picked.length}</b> phòng · sức chứa <b>{pickedCapacity}</b> / cần <b>{totalUnits}</b> suất
-              {picked.length > 0 && pickedCapacity < totalUnits && <span className="rc-field-err"> · sẽ phát sinh giường phụ</span>}
+              Đã chọn <b>{picked.length}</b> phòng · sức chứa <b>{pickedCapacity}</b> / cần <b>{neededUnits}</b> suất
+              {picked.length > 0 && pickedCapacity < neededUnits && <span className="rc-field-err"> · sẽ phát sinh giường phụ</span>}
             </span>
             <button disabled={!picked.length} onClick={goAllocate}>Tiếp tục phân bổ khách →</button>
           </div>

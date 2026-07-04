@@ -39,7 +39,7 @@ exports.listRooms = async (accountId, { status } = {}) => {
 }
 
 // UC-27/43: danh sách + lọc theo NHÓM (mọi lần đặt = 1 nhóm). Mỗi dòng = 1 nhóm + rollup tiền/trạng thái.
-// view='active' (mặc định): BỎ đơn đã huỷ/no-show + đơn ONLINE đang chờ cọc (giữ chỗ tạm, khách tự trả).
+// view='active' (mặc định): mọi đơn TRỪ huỷ/no-show (gồm cả online lẫn walk-in chờ cọc).
 // view='archived': CHỈ đơn đã huỷ/no-show (tab riêng). Lọc thêm: status (rollup), date (ngày nhận), q (mã/tên/sđt).
 exports.listBookings = async (accountId, { status, date, q, view } = {}) => {
   const branches = await myBranchIds(accountId)
@@ -81,8 +81,8 @@ exports.listBookings = async (accountId, { status, date, q, view } = {}) => {
     rows = rows.filter((r) => TERMINAL.includes(r.status))
     if (status && TERMINAL.includes(status)) rows = rows.filter((r) => r.status === status)
   } else {
-    // active: bỏ huỷ/no-show + online chờ cọc (giữ chỗ tạm)
-    rows = rows.filter((r) => !TERMINAL.includes(r.status) && !(r.source === 'online' && r.status === 'pending'))
+    // active: chỉ bỏ huỷ/no-show (giữ mọi đơn chờ cọc — walk-in cần thu cọc, online chờ khách trả)
+    rows = rows.filter((r) => !TERMINAL.includes(r.status))
     if (status) rows = rows.filter((r) => r.status === status)
   }
   return rows
@@ -172,6 +172,24 @@ exports.getGroup = async (accountId, groupId) => {
 exports.confirmGroupDeposit = async (accountId, groupId, body = {}) => {
   await assertGroupInBranch(accountId, groupId)
   return bookingService.confirmGroupDeposit(groupId, { method: body.method, transactionCode: body.transactionCode, paidFull: !!body.paidFull, by: accountId })
+}
+
+// Thao tác hàng loạt cả nhóm: nhận / trả (tự phân HK + thu gom) / huỷ / no-show — áp cho các phòng đủ điều kiện.
+exports.checkInGroup = async (accountId, groupId) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.checkInGroup(groupId, { by: accountId })
+}
+exports.checkOutGroup = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.checkOutGroup(groupId, { by: accountId, method: body.method })
+}
+exports.cancelGroupAll = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.cancelGroupAll(groupId, { reason: body.reason, by: accountId })
+}
+exports.noShowGroup = async (accountId, groupId) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.noShowGroup(groupId, { by: accountId })
 }
 
 exports.confirmDeposit = async (accountId, bookingId, body = {}) => {

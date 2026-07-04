@@ -38,9 +38,28 @@ export default function GroupDetailPage() {
     finally { setLoading(false) }
   }
 
+  // Thao tác hàng loạt: áp cho các phòng đủ điều kiện; báo done + phòng bị bỏ qua (lý do).
+  const runGroupAction = async (label, fn, confirmText) => {
+    if (confirmText && !window.confirm(confirmText)) return
+    setErr(''); setMsg(''); setLoading(true)
+    try {
+      const res = await fn()
+      let m = `${label}: ${res.done} phòng`
+      if (res.collected) m += ` · thu ${vnd(res.collected)}`
+      if (res.skipped?.length) m += ` · bỏ qua ${res.skipped.length} phòng (${res.skipped.map((s) => s.message).join('; ')})`
+      setMsg(m)
+      await reload()
+    } catch (e) { setErr(e.response?.data?.message || `Lỗi: ${label}`) }
+    finally { setLoading(false) }
+  }
+
   if (!data) return <p>{err || 'Đang tải...'}</p>
   const { group, members, payments, rollup } = data
   const hasPending = members.some((m) => m.status === 'pending')
+  const canCheckIn = members.some((m) => m.status === 'confirmed')
+  const canCheckOut = members.some((m) => m.status === 'checked_in')
+  const canCancel = members.some((m) => ['pending', 'confirmed'].includes(m.status))
+  const canNoShow = members.some((m) => m.status === 'confirmed')
 
   return (
     <div className="rc-detail">
@@ -59,6 +78,36 @@ export default function GroupDetailPage() {
           <button disabled={loading} onClick={() => confirmDeposit(true)}>
             Thu toàn bộ {vnd(rollup.totalAmount)}
           </button>
+        </div>
+      )}
+
+      {/* Thao tác HÀNG LOẠT cả nhóm (áp cho các phòng đủ điều kiện) */}
+      {(canCheckIn || canCheckOut || canCancel || canNoShow) && (
+        <div className="rc-actions" style={{ marginTop: hasPending ? 8 : 0 }}>
+          {canCheckIn && (
+            <button disabled={loading} onClick={() => runGroupAction('Đã nhận', () => bookingService.checkInGroup(id))}>
+              🏨 Nhận tất cả
+            </button>
+          )}
+          {canCheckOut && (
+            <button disabled={loading} onClick={() => runGroupAction('Đã trả', () => bookingService.checkOutGroupAll(id, { method: 'cash' }),
+              `Trả phòng CẢ NHÓM (thu tiền mặt còn lại ${vnd(rollup.remainingAmount)}) và tự giao dọn phòng?`)}>
+              🧾 Trả tất cả
+            </button>
+          )}
+          {canNoShow && (
+            <button disabled={loading} onClick={() => runGroupAction('No-show', () => bookingService.noShowGroupAll(id),
+              'Đánh no-show CẢ NHÓM (giữ cọc)?')}>
+              🚫 No-show tất cả
+            </button>
+          )}
+          {canCancel && (
+            <button disabled={loading} style={{ background: '#dc2626', borderColor: '#dc2626' }}
+              onClick={() => runGroupAction('Đã huỷ', () => bookingService.cancelGroupAll(id, {}),
+                'Huỷ CẢ NHÓM (các phòng chưa nhận)? Cọc đã thu KHÔNG hoàn.')}>
+              ✖ Huỷ tất cả
+            </button>
+          )}
         </div>
       )}
 
@@ -103,7 +152,7 @@ export default function GroupDetailPage() {
             <tr className="tot"><td>Còn lại</td><td>{vnd(rollup.remainingAmount)}</td></tr>
           </tbody></table>
           <p className="rc-muted" style={{ marginTop: 8 }}>
-            Mỗi phòng check-in / trả phòng / dọn dẹp độc lập — mở từng phòng để thao tác. Có thể huỷ lẻ 1 phòng; tổng nhóm tự tính lại.
+            Dùng nút <b>“… tất cả”</b> ở trên để thao tác cả nhóm 1 lần (áp cho phòng đủ điều kiện; phòng chưa sẵn sàng sẽ được báo). Vẫn có thể <b>Mở →</b> từng phòng để thao tác lẻ (nhận sớm / trả muộn / đổi phòng / thêm dịch vụ…); tổng nhóm tự tính lại.
           </p>
         </section>
       </div>

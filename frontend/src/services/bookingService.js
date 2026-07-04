@@ -21,6 +21,11 @@ export const bookingService = {
   createGroup: (data) => post(`${base}/booking-groups`, data),
   getGroup: (id) => get(`${base}/booking-groups/${id}`),
   confirmGroupDeposit: (id, data) => post(`${base}/booking-groups/${id}/confirm-deposit`, data || {}),
+  // Thao tác hàng loạt cả nhóm
+  checkInGroup: (id) => post(`${base}/booking-groups/${id}/check-in`, {}),
+  checkOutGroupAll: (id, data) => post(`${base}/booking-groups/${id}/check-out`, data || {}),
+  cancelGroupAll: (id, data) => post(`${base}/booking-groups/${id}/cancel`, data || {}),
+  noShowGroupAll: (id) => post(`${base}/booking-groups/${id}/no-show`, {}),
   confirmDeposit: (id, data) => post(`${base}/bookings/${id}/confirm-deposit`, data || {}),
   createDepositQR: (id) => post(`${base}/bookings/${id}/deposit-qr`, {}),
   checkIn: (id, data) => post(`${base}/bookings/${id}/check-in`, data || {}),

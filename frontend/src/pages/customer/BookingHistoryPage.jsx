@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import Reveal from '../../components/common/Reveal';
 import { customerService } from '../../services';
+import { socket, connectSocket } from '../../services/socketService';
 
 const STATUS = {
   pending:     { label: 'Chờ thanh toán cọc', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -24,23 +25,30 @@ const BookingHistoryPage = () => {
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth || {});
 
-  useEffect(() => {
-    if (!token) {
-      navigate('/login', { state: { from: '/customer/booking-history' } });
-      return;
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await customerService.getBookingGroupHistory();
+      if (res.success) setBookings(res.data);
+    } catch (err) {
+      alert('Lỗi khi tải lịch sử đặt phòng: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
     }
-    const fetchHistory = async () => {
-      try {
-        const res = await customerService.getBookingGroupHistory();
-        if (res.success) setBookings(res.data);
-      } catch (err) {
-        alert('Lỗi khi tải lịch sử đặt phòng: ' + (err.response?.data?.message || err.message));
-      } finally {
-        setLoading(false);
-      }
-    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) { navigate('/login', { state: { from: '/customer/booking-history' } }); return; }
     fetchHistory();
-  }, [token, navigate]);
+  }, [token, navigate, fetchHistory]);
+
+  // Admin khoá/mở chi nhánh -> cập nhật nhãn "chi nhánh tạm ngừng" ngay (không cần reload).
+  useEffect(() => {
+    if (!token) return undefined;
+    connectSocket();
+    const onBranch = () => fetchHistory();
+    socket.on('branch_updated', onBranch);
+    return () => socket.off('branch_updated', onBranch);
+  }, [token, fetchHistory]);
 
   return (
     <div className="min-h-screen bg-off-white">

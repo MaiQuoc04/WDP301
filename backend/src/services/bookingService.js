@@ -768,6 +768,104 @@ exports.cancelGroup = async (groupId, { reason = 'Khách huỷ giữ chỗ', by 
   return { cancelled: members.length }
 }
 
+// ========== THAO TÁC HÀNG LOẠT CẢ NHÓM (lễ tân) — loop hàm lẻ nên GIỮ NGUYÊN business rule từng phòng ==========
+async function getGroupOr404(groupId) {
+  const g = await BookingGroup.findById(groupId)
+  if (!g) { const e = new Error('Nhóm đặt phòng không tồn tại'); e.status = 404; throw e }
+  return g
+}
+
+// Tự phân housekeeper cho danh sách phòng: ưu tiên gần tầng nhất -> tải thấp nhất, rải đều trong đợt. null nếu chi nhánh chưa có HK.
+async function autoAssignHousekeepers(branchId, rooms) {
+  const pool = await require('./housekeepingService').suggestHousekeepers(branchId, null)
+  if (!pool.length) return null
+  const load = {}; pool.forEach((h) => { load[String(h.accountId)] = 0 })
+  const assign = {}
+  for (const room of rooms) {
+    let best = null, bestScore = null
+    for (const h of pool) {
+      const floors = h.floors || []
+      const dist = floors.length && room.floor != null
+        ? (floors.includes(room.floor) ? 0 : Math.min(...floors.map((f) => Math.abs(f - room.floor))))
+        : (floors.length ? 0 : 999)
+      const score = [dist, h.activeTasks + load[String(h.accountId)]]
+      if (!best || score[0] < bestScore[0] || (score[0] === bestScore[0] && score[1] < bestScore[1])) { best = h; bestScore = score }
+    }
+    assign[String(room.bookingId)] = best.accountId
+    load[String(best.accountId)] += 1
+  }
+  return assign
+}
+
+// Áp 1 thao tác cho các phòng đủ điều kiện; phòng không hợp lệ -> bỏ qua + báo lý do (không chặn cả nhóm).
+async function applyToMembers(members, fn) {
+  const done = [], skipped = []
+  for (const b of members) {
+    try { await fn(b); done.push(String(b._id)) }
+    catch (e) { skipped.push({ booking: String(b._id), room: b.room ? String(b.room) : null, message: e.message }) }
+  }
+  return { done: done.length, skipped }
+}
+
+// Nhận TẤT CẢ phòng đã cọc (phòng chưa sẵn sàng sẽ bị bỏ qua + báo lý do).
+exports.checkInGroup = async (groupId, { by } = {}) => {
+  await getGroupOr404(groupId)
+  const members = await Booking.find({ group: groupId, status: 'confirmed' })
+  if (!members.length) throw new Error('Nhóm không có phòng nào ở trạng thái đã cọc để nhận')
+  return applyToMembers(members, (b) => exports.checkIn(b._id, { by }))
+}
+
+// Đánh no-show TẤT CẢ phòng đã cọc (đã tới ngày nhận).
+exports.noShowGroup = async (groupId, { by } = {}) => {
+  await getGroupOr404(groupId)
+  const members = await Booking.find({ group: groupId, status: 'confirmed' })
+  if (!members.length) throw new Error('Nhóm không có phòng nào đã cọc để đánh no-show')
+  return applyToMembers(members, (b) => exports.markNoShow(b._id, { by }))
+}
+
+// Huỷ TẤT CẢ phòng trước check-in (pending/confirmed). Cọc đã thu không hoàn.
+exports.cancelGroupAll = async (groupId, { reason, by } = {}) => {
+  await getGroupOr404(groupId)
+  const members = await Booking.find({ group: groupId, status: { $in: ['pending', 'confirmed'] } })
+  if (!members.length) throw new Error('Nhóm không có phòng nào huỷ được (chỉ huỷ trước check-in)')
+  return applyToMembers(members, (b) => exports.cancel(b._id, { reason: reason || 'Huỷ cả nhóm', by }))
+}
+
+// Trả phòng TẤT CẢ: tự phân housekeeper theo tầng+tải + thu tiền còn lại GOM 1 lần.
+// Tạo task dọn theo THỨ TỰ (tầng, số phòng) -> assignedAt tăng dần theo lộ trình -> housekeeper dọn có chủ đích (FIFO hợp lý).
+exports.checkOutGroup = async (groupId, { by, method = 'cash' } = {}) => {
+  const group = await getGroupOr404(groupId)
+  const members = await Booking.find({ group: groupId, status: 'checked_in' })
+  if (!members.length) throw new Error('Nhóm không có phòng nào đang ở để trả')
+
+  const withRoom = []
+  for (const b of members) {
+    const room = b.room ? await Room.findById(b.room).select('floor roomNumber') : null
+    withRoom.push({ booking: b, roomId: b.room, floor: room?.floor ?? 9999, roomNumber: room?.roomNumber || '' })
+  }
+  // Lộ trình dọn: tầng thấp -> cao, cùng tầng theo số phòng tăng dần.
+  withRoom.sort((a, x) => (a.floor - x.floor) || String(a.roomNumber).localeCompare(String(x.roomNumber), 'vi', { numeric: true }))
+
+  const assign = await autoAssignHousekeepers(group.branch, withRoom.map((w) => ({ bookingId: w.booking._id, roomId: w.roomId, floor: w.floor })))
+  if (!assign) throw new Error('Chi nhánh chưa có nhân viên buồng phòng để giao dọn phòng')
+
+  const hk = require('./housekeepingService')
+  let totalRemaining = 0
+  for (const w of withRoom) {                         // theo đúng thứ tự tầng/phòng đã sort
+    const b = w.booking
+    totalRemaining += Math.max(0, b.remainingAmount || 0)
+    b.paidAmount = b.totalAmount; b.remainingAmount = 0; b.paymentStatus = 'paid'
+    await exports.transition(b, 'checked_out', by, 'Trả phòng (cả nhóm)')
+    if (b.room) await Room.findByIdAndUpdate(b.room, { status: 'cleaning' })
+    try { await hk.createTurnover(b._id, b.room, assign[String(b._id)]) }
+    catch (e) { console.warn('[checkOutGroup] createTurnover lỗi:', e.message) }
+  }
+  if (totalRemaining > 0) {
+    await Payment.create({ booking: members[0]._id, group: group._id, type: 'remaining', method, amount: totalRemaining, status: 'paid', paidAt: new Date(), confirmedBy: by })
+  }
+  return { done: members.length, skipped: [], collected: totalRemaining }
+}
+
 // Gộp trạng thái nhóm từ các phòng (rollup, chỉ để hiển thị)
 function rollupGroupStatus(members) {
   const active = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))

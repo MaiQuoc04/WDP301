@@ -21,6 +21,10 @@ router.post('/booking-groups/quote', c.quoteGroup)                              
 router.post('/booking-groups', c.createGroup)                                            // tạo nhóm nhiều phòng
 router.get('/booking-groups/:id', validateObjectId('id'), c.getGroup)                    // chi tiết nhóm
 router.post('/booking-groups/:id/confirm-deposit', validateObjectId('id'), c.confirmGroupDeposit) // thu cọc gom
+router.post('/booking-groups/:id/check-in', validateObjectId('id'), c.checkInGroup)     // nhận cả nhóm
+router.post('/booking-groups/:id/check-out', validateObjectId('id'), c.checkOutGroup)   // trả cả nhóm (tự phân HK + thu gom)
+router.post('/booking-groups/:id/cancel', validateObjectId('id'), c.cancelGroupAll)     // huỷ cả nhóm
+router.post('/booking-groups/:id/no-show', validateObjectId('id'), c.noShowGroup)       // no-show cả nhóm
 
 // Giai đoạn 2 — vòng đời booking
 router.post('/bookings', c.walkIn)                                                      // UC-29 walk-in

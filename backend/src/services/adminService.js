@@ -42,6 +42,9 @@ exports.toggleBranchActive = async (id) => {
   if (!branch) throw { status: 404, message: 'Không tìm thấy chi nhánh' }
   branch.isActive = !branch.isActive
   await branch.save()
+  // Báo realtime cho KHÁCH đang đặt/xem đơn ở chi nhánh này -> hiện/ẩn cảnh báo ngay (không cần reload).
+  try { require('../config/socket').emitBranchUpdated(branch._id, branch.isActive) }
+  catch (e) { console.warn('[admin] emitBranchUpdated lỗi:', e.message) }
   // Khoá chi nhánh -> đá văng NGAY nhân viên đang online của chi nhánh (KHÔNG đụng cờ tài khoản của họ).
   // Mở lại chi nhánh: không cần làm gì; ai không bị khoá tài khoản sẽ đăng nhập lại bình thường.
   if (!branch.isActive) {

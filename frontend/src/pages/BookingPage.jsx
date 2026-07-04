@@ -42,6 +42,7 @@ const BookingPage = () => {
   const [qty, setQty] = useState({});
   const [quote, setQuote] = useState(null);      // báo giá nhóm từ backend
   const [quoting, setQuoting] = useState(false);
+  const [branchLocked, setBranchLocked] = useState(false); // chi nhánh đang chọn vừa bị admin khoá (realtime)
 
   // Modal xác nhận (nhập tên/SĐT)
   const [showConfirm, setShowConfirm] = useState(false);
@@ -110,9 +111,12 @@ const BookingPage = () => {
   useEffect(() => {
     connectSocket();
     const onNew = () => { if (searched) doSearch(); }; // có người vừa đặt -> làm mới phòng trống
+    // Admin khoá/mở chi nhánh đang chọn -> cảnh báo NGAY (realtime), không cần reload.
+    const onBranch = (evt) => { if (evt?.branchId && String(evt.branchId) === String(branch)) setBranchLocked(!evt.isActive); };
     socket.on('new_booking', onNew);
-    return () => { socket.off('new_booking', onNew); disconnectSocket(); };
-  }, [searched, doSearch]);
+    socket.on('branch_updated', onBranch);
+    return () => { socket.off('new_booking', onNew); socket.off('branch_updated', onBranch); disconnectSocket(); };
+  }, [searched, doSearch, branch]);
 
   // Sửa ngày -> validate NGAY: trả <= nhận (kể cả cùng ngày) thì cảnh báo + BỎ list phòng cũ (tránh kết quả ngày cũ gây hiểu nhầm).
   useEffect(() => {
@@ -181,7 +185,7 @@ const BookingPage = () => {
       navigate('/login', { state: { from: location.pathname + location.search } });
       return;
     }
-    if (selectedRooms < 1 || !enoughAdults) return;
+    if (selectedRooms < 1 || !enoughAdults || branchLocked) return;
     setFormErr({});
     setShowConfirm(true);
   };
@@ -250,7 +254,7 @@ const BookingPage = () => {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-12 md:items-end">
             <div className="col-span-2 md:col-span-3">
               <label className={labelCls}>Chi nhánh</label>
-              <select value={branch} onChange={(e) => setBranch(e.target.value)} className={`${fieldCls} ${searchErr.branch ? 'border-red-500' : 'border-black/10'}`}>
+              <select value={branch} onChange={(e) => { setBranch(e.target.value); setBranchLocked(false); }} className={`${fieldCls} ${searchErr.branch ? 'border-red-500' : 'border-black/10'}`}>
                 <option value="">-- Chọn chi nhánh --</option>
                 {branches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
               </select>
@@ -280,6 +284,11 @@ const BookingPage = () => {
           {searchErr.checkOut && (
             <div className="mt-3 rounded-sm bg-red-50 px-4 py-2.5 text-center font-body text-xs font-semibold text-red-600">
               {searchErr.checkOut}
+            </div>
+          )}
+          {branchLocked && (
+            <div className="mt-3 rounded-sm bg-red-50 px-4 py-2.5 text-center font-body text-xs font-semibold text-red-600">
+              ⚠ Chi nhánh này vừa tạm ngừng hoạt động — hiện không thể đặt phòng. Vui lòng chọn chi nhánh khác.
             </div>
           )}
           <div className="mt-3 font-body text-xs text-charcoal/50">Nhận phòng 14:00 · Trả phòng 12:00 · Giá tính theo đêm · Có thể chọn nhiều phòng trong 1 lần đặt</div>
@@ -384,7 +393,7 @@ const BookingPage = () => {
               </div>
               <button
                 onClick={openConfirm}
-                disabled={!enoughAdults || selectedRooms < 1}
+                disabled={!enoughAdults || selectedRooms < 1 || branchLocked}
                 className="rounded-sm bg-gold px-7 py-3 font-nav text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover disabled:opacity-50"
               >
                 Tiếp tục →

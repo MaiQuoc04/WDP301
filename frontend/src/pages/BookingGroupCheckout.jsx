@@ -111,12 +111,19 @@ const BookingGroupCheckout = () => {
 
   // Realtime: 1 phòng trong nhóm đổi (vd job tự huỷ khi quá hạn giữ chỗ) -> cập nhật trạng thái ngay.
   const memberIdsRef = useRef([]);
-  useEffect(() => { memberIdsRef.current = (data?.members || []).map((m) => String(m._id)); }, [data]);
+  const branchIdRef = useRef(null);
+  useEffect(() => {
+    memberIdsRef.current = (data?.members || []).map((m) => String(m._id));
+    branchIdRef.current = data?.group?.branch?._id ? String(data.group.branch._id) : null;
+  }, [data]);
   useEffect(() => {
     connectSocket();
     const onUpd = (evt) => { if (evt?.bookingId && memberIdsRef.current.includes(String(evt.bookingId))) fetchGroup(); };
+    // Admin khoá/mở chi nhánh của đơn này -> cập nhật ngay để hiện/ẩn cảnh báo (không cần reload).
+    const onBranch = (evt) => { if (evt?.branchId && branchIdRef.current && String(evt.branchId) === branchIdRef.current) fetchGroup(); };
     socket.on('booking_updated', onUpd);
-    return () => socket.off('booking_updated', onUpd);
+    socket.on('branch_updated', onBranch);
+    return () => { socket.off('booking_updated', onUpd); socket.off('branch_updated', onBranch); };
   }, [fetchGroup]);
 
   // Rời trang khi CHƯA cọc -> nhả giữ chỗ NGAY (không đợi timeout). Chỉ đúng khi còn phòng pending & chưa thanh toán.

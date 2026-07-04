@@ -52,3 +52,9 @@ exports.emitBookingUpdated = (bookingId) => {
   if (!io || !bookingId) return
   io.emit('booking_updated', { bookingId: String(bookingId) })
 }
+
+// Bắn realtime "chi nhánh khoá/mở" (broadcast) để khách đang đặt/xem đơn ở chi nhánh đó thấy cảnh báo NGAY. FE lọc theo branchId.
+exports.emitBranchUpdated = (branchId, isActive) => {
+  if (!io || !branchId) return
+  io.emit('branch_updated', { branchId: String(branchId), isActive: !!isActive })
+}

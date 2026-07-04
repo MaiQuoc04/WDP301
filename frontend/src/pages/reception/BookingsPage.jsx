@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDateTime, bookingStatusLabel } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
 
-// Tab "Đặt phòng": các trạng thái đang hoạt động. Bỏ "Chờ cọc" khỏi bộ lọc (online chờ cọc đã ẩn;
-// walk-in chờ cọc chỉ thoáng qua trước khi thu cọc nên lọc gần như không ra) — vẫn hiện ở "Tất cả".
-const ACTIVE_STATUSES = ['', 'confirmed', 'checked_in', 'checked_out', 'completed']
+// Tab "Đặt phòng": các trạng thái đang hoạt động (gồm cả chờ cọc; huỷ/no-show ở tab riêng).
+const ACTIVE_STATUSES = ['', 'pending', 'confirmed', 'checked_in', 'checked_out', 'completed']
 
 const tabBtn = (on) => ({
   padding: '8px 18px', borderRadius: 8, border: '1px solid ' + (on ? 'var(--rc-gold, #b08d57)' : '#e5e5e5'),
@@ -80,7 +79,14 @@ export default function BookingsPage() {
                 <td>{rooms.length ? <strong>{rooms.join(', ')}</strong> : <span style={{ color: '#aaa' }}>—</span>}</td>
                 <td>{fmtDateTime(g.checkIn)}</td>
                 <td>{fmtDateTime(g.checkOut)}</td>
-                <td><span className={'rc-badge s-' + g.status}>{bookingStatusLabel(g.status)}</span></td>
+                <td>
+                  <span className={'rc-badge s-' + g.status}>{bookingStatusLabel(g.status)}</span>
+                  {g.status === 'pending' && (
+                    <small style={{ display: 'block', marginTop: 3, fontSize: 11, color: '#b45309' }}>
+                      {g.source === 'online' ? 'chờ khách thanh toán' : 'cần thu cọc'}
+                    </small>
+                  )}
+                </td>
                 <td>{vnd(g.totalAmount)}</td>
                 <td><Link to={`/reception/booking-groups/${g._id}`}>Chi tiết</Link></td>
               </tr>

@@ -20,6 +20,11 @@ exports.quoteGroup = handle((req) => svc.quoteGroup(req.user.id, req.body))     
 exports.createGroup = handle((req) => svc.createGroup(req.user.id, req.body), 201)              // tạo nhóm nhiều phòng
 exports.getGroup = handle((req) => svc.getGroup(req.user.id, req.params.id))                    // chi tiết nhóm
 exports.confirmGroupDeposit = handle((req) => svc.confirmGroupDeposit(req.user.id, req.params.id, req.body)) // thu cọc gom nhóm
+// Thao tác hàng loạt cả nhóm
+exports.checkInGroup = handle((req) => svc.checkInGroup(req.user.id, req.params.id))
+exports.checkOutGroup = handle((req) => svc.checkOutGroup(req.user.id, req.params.id, req.body))
+exports.cancelGroupAll = handle((req) => svc.cancelGroupAll(req.user.id, req.params.id, req.body))
+exports.noShowGroup = handle((req) => svc.noShowGroup(req.user.id, req.params.id))
 exports.confirmDeposit = handle((req) => svc.confirmDeposit(req.user.id, req.params.id, req.body))
 exports.createDepositQR = handle((req) => svc.createDepositQR(req.user.id, req.params.id)) // Gen QR PayOS thu cọc
 exports.checkIn = handle((req) => svc.checkIn(req.user.id, req.params.id, req.body))  // UC-30
