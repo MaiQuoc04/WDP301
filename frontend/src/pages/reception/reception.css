@@ -163,6 +163,67 @@
 /* Đếm nhỏ cạnh tiêu đề (vd "· 24 phòng") — không được to bằng tiêu đề */
 .rc-count { font-family: var(--font-body); font-size: 14px; font-weight: 500; color: var(--rc-text-muted); }
 
+/* ---------- Breadcrumb ----------
+   Lễ tân vào phòng TỪ nhóm, nên phải có đường về nhóm ở đúng chỗ người ta tìm.
+   Trước đây nút thoát ghi "← Danh sách" và luôn ném về danh sách tổng, còn đường về
+   nhóm nằm lọt trong câu "Phòng này thuộc nhóm đặt phòng (1 mã, 1 cọc)" — chữ trong
+   câu văn không phải thành phần điều hướng, không ai nghĩ đó là nút bấm. */
+.rc-crumb {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.rc-crumb a { color: var(--rc-text-muted); font-weight: 500; text-decoration: none; }
+.rc-crumb a:hover { color: var(--rc-gold); text-decoration: underline; }
+.rc-crumb .sep { color: #CBD5E1; }
+.rc-crumb .cur { color: var(--rc-gold); font-weight: 700; } /* trang hiện tại: không bấm được */
+
+/* Nút dạng <Link> — thẻ <a> nên không dính rule button, phải tự dựng */
+.rc-btn-ghost {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  background: var(--rc-surface);
+  color: var(--rc-text-main) !important;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  transition: var(--rc-transition);
+}
+.rc-btn-ghost:hover { border-color: var(--rc-gold); color: var(--rc-gold) !important; text-decoration: none; }
+
+/* ---------- Chuyển nhanh giữa các phòng cùng nhóm ----------
+   Không có cái này thì muốn xem phòng khác phải: thoát ra nhóm -> dò lại dòng -> bấm "Mở →". */
+.rc-siblings { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.rc-siblings-lbl {
+  margin-right: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+.rc-detail a.rc-sib {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--rc-border);
+  border-radius: 999px;
+  background: var(--rc-surface);
+  color: var(--rc-text-main) !important;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+  transition: var(--rc-transition);
+}
+.rc-detail a.rc-sib:hover { border-color: var(--rc-gold); text-decoration: none; }
+.rc-detail a.rc-sib.on {
+  background: var(--rc-gold); border-color: var(--rc-gold);
+  color: #fff !important; cursor: default;
+}
+/* Chấm trạng thái: liếc phát biết phòng nào đang ở / chờ / đã xong, khỏi bấm vào từng cái */
+.rc-sib-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: #CBD5E1; }
+.rc-sib-dot.s-checked_in { background: #10B981; }
+.rc-sib-dot.s-confirmed { background: #0EA5E9; }
+.rc-sib-dot.s-pending { background: #F59E0B; }
+.rc-sib-dot.s-checked_out, .rc-sib-dot.s-completed { background: #94A3B8; }
+.rc-sib-dot.s-cancelled, .rc-sib-dot.s-no_show { background: #F43F5E; }
+.rc-detail a.rc-sib.on .rc-sib-dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); }
+
 /* ---------- Tabs (gạch chân) ----------
    Thay các nút bo tròn tự chế bằng inline style ở BookingsPage — tab trông như nút
    thì lễ tân tưởng bấm vào là chạy một hành động, chứ không phải đổi khung nhìn. */

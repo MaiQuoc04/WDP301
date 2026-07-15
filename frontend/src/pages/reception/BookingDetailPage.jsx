@@ -533,20 +533,56 @@ export default function BookingDetailPage() {
   // (React chỉ bỏ qua false/null/undefined, KHÔNG bỏ qua số 0).
   const showHk = st === 'checked_in' || !!hk?.inspections?.length || !!hk?.cleanings?.length
 
+  // Nhóm giờ được populate {_id, code} cho breadcrumb — tự thủ cả trường hợp còn là id trần.
+  const groupId = b.group?._id || b.group || null
+  const groupCode = b.group?.code || null
+  const siblings = d.siblings || []
+
   return (
     <div className="rc-detail">
+      {/* Breadcrumb: vào từ nhóm thì phải có đường về nhóm cho ra hồn. Trước đây nút thoát ghi
+          "← Danh sách" và luôn ném về danh sách tổng, còn đường về nhóm bị chôn trong một câu văn. */}
+      <nav className="rc-crumb">
+        <Link to="/reception/bookings">Đặt phòng</Link>
+        {groupId && <>
+          <span className="sep">/</span>
+          <Link to={`/reception/booking-groups/${groupId}`}>Nhóm {groupCode || ''}</Link>
+        </>}
+        <span className="sep">/</span>
+        <span className="cur">Phòng {b.room?.roomNumber || b.code}</span>
+      </nav>
+
       <div className="rc-bar">
-        <h2>{b.code} <span className={'rc-badge s-' + st}>{bookingStatusLabel(st)}</span></h2>
-        <Link to="/reception/bookings">← Danh sách</Link>
+        <div className="rc-bar-titles">
+          {/* Số phòng mới là thứ lễ tân tìm, mã booking chỉ để đối chiếu -> đổi chỗ hai cái */}
+          <h2>
+            {b.room?.roomNumber ? `Phòng ${b.room.roomNumber}` : b.code}
+            <span className={'rc-badge s-' + st} style={{ marginLeft: 10 }}>{bookingStatusLabel(st)}</span>
+          </h2>
+          <p className="rc-sub">{[b.roomType?.name, b.code].filter(Boolean).join(' · ')}</p>
+        </div>
+        <Link className="rc-btn-ghost" to={groupId ? `/reception/booking-groups/${groupId}` : '/reception/bookings'}>
+          ← {groupId ? 'Về nhóm' : 'Danh sách'}
+        </Link>
       </div>
+
+      {/* Chuyển nhanh sang phòng khác cùng nhóm — khỏi thoát ra rồi bấm "Mở →" lại từ đầu */}
+      {siblings.length > 1 && (
+        <div className="rc-siblings">
+          <span className="rc-siblings-lbl">Cùng nhóm · {siblings.length} phòng</span>
+          {siblings.map((s) => (
+            <Link key={s._id} to={`/reception/bookings/${s._id}`}
+              className={'rc-sib' + (String(s._id) === String(id) ? ' on' : '')}
+              title={bookingStatusLabel(s.status)}>
+              <i className={'rc-sib-dot s-' + s.status} />
+              {s.room?.roomNumber || '—'}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {err && <p className="rc-err">{err}</p>}
       {msg && <p className="rc-ok">{msg}</p>}
-
-      {b.group && (
-        <p className="rc-group-banner">
-          🏨 Phòng này thuộc <Link to={`/reception/booking-groups/${b.group}`}>nhóm đặt phòng (1 mã, 1 cọc)</Link>
-        </p>
-      )}
 
       {/* Phòng chưa sẵn sàng: báo TRƯỚC khi lễ tân bấm Check-in, kèm AI đang dọn để gọi giục.
           Task dọn này là của khách TRƯỚC (turnover), không phải của booking đang mở. */}
