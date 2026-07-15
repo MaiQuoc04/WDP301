@@ -556,6 +556,24 @@ export default function BookingDetailPage() {
         </p>
       )}
 
+      {/* Phòng chưa sẵn sàng: báo TRƯỚC khi lễ tân bấm Check-in, kèm AI đang dọn để gọi giục.
+          Task dọn này là của khách TRƯỚC (turnover), không phải của booking đang mở. */}
+      {st === 'confirmed' && b.room && b.room.status !== 'available' && (
+        <p className="rc-err" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span>
+            ⚠️ Phòng <b>{b.room.roomNumber}</b> {b.room.status === 'cleaning' ? 'đang được dọn' : b.awaitingRestock || b.room.awaitingRestock ? 'đang chờ bổ sung thiết bị' : `đang ở trạng thái "${b.room.status}"`} — <b>chưa check-in được</b>.
+            {d.roomCleaning ? (
+              <> Phụ trách: <b>{d.roomCleaning.housekeeper || 'chưa ai nhận việc'}</b>
+                {d.roomCleaning.status === 'in_progress' && d.roomCleaning.startedAt
+                  ? <> · đang dọn từ {fmtDateTime(d.roomCleaning.startedAt)}</>
+                  : d.roomCleaning.assignedAt ? <> · giao lúc {fmtDateTime(d.roomCleaning.assignedAt)}</> : null}
+                {d.roomCleaning.isUrgent && <> · <b>đã đánh dấu gấp</b></>}
+              </>
+            ) : <> Chưa có việc dọn nào đang mở cho phòng này — kiểm tra lại trạng thái phòng.</>}
+          </span>
+        </p>
+      )}
+
       <div className="rc-actions">
         {st === 'pending' && (
           <button

@@ -300,6 +300,8 @@
 .s-checked_out { background: #F1F5F9; color: #475569; }
 .s-completed { background: #DCFCE7; color: #15803D; }
 .s-cancelled, .s-no_show { background: #FEE2E2; color: #B91C1C; }
+/* Nhóm lệch pha: các phòng không cùng trạng thái. Màu riêng để không lẫn với bất kỳ pha nào. */
+.s-mixed { background: #EDE9FE; color: #6D28D9; }
 
 /* Nhãn nhỏ "N phòng" trong danh sách nhóm */
 .rc-pill {

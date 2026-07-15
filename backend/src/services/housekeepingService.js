@@ -383,6 +383,37 @@ exports.getHistory = async (accountId, query = {}) => {
 }
 
 // Gợi ý housekeeper để lễ tân giao việc: ưu tiên đúng tầng + đang rảnh; không ai đúng tầng -> tầng kề.
+// Ai đang dọn các phòng này, bắt đầu từ lúc nào. Dùng cho lễ tân: phòng chưa 'available' thì phải biết
+// ai đang dọn để gọi giục, thay vì bấm check-in rồi mới ăn lỗi "phòng đang cleaning".
+// LƯU Ý: task chặn check-in thuộc booking của khách TRƯỚC (turnover sau khi họ trả phòng),
+// không phải booking sắp nhận -> không thể lấy qua getBookingHousekeeping(bookingId) được.
+// Chỉ gọi từ tầng lễ tân — KHÔNG nhét vào searchAvailableRooms vì hàm đó dùng chung với API công khai (lộ tên nhân viên).
+exports.roomCleaningInfo = async (roomIds = []) => {
+  const ids = (roomIds || []).filter(Boolean)
+  if (!ids.length) return {}
+  const tasks = await HousekeepingTask.find({
+    room: { $in: ids }, status: { $in: ACTIVE_TASK_STATUSES },
+  }).populate('assignedTo', 'fullName email').sort('-assignedAt').lean()
+
+  const map = {}
+  for (const t of tasks) {
+    const k = String(t.room)
+    if (map[k]) continue // đã lấy task mới nhất của phòng này
+    map[k] = {
+      taskId: t._id,
+      type: t.type,
+      status: t.status,
+      isUrgent: !!t.isUrgent,
+      assignedAt: t.assignedAt,
+      startedAt: t.startedAt,
+      // null = đã tạo task nhưng CHƯA ai nhận -> lễ tân biết mà giao người
+      housekeeper: t.assignedTo ? (t.assignedTo.fullName || t.assignedTo.email) : null,
+      housekeeperId: t.assignedTo?._id || null,
+    }
+  }
+  return map
+}
+
 exports.suggestHousekeepers = async (branchId, roomFloor) => {
   const ras = await RoleAssignment.find({ branch: branchId, role: 'housekeeper', isActive: true })
     .populate('account', '_id email fullName isActive').lean()

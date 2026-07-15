@@ -969,13 +969,23 @@ function rollupGroupStatus(members) {
 exports.rollupGroupStatus = rollupGroupStatus
 
 // Rollup tiền + trạng thái của 1 nhóm từ các member booking (LIVE, dùng cho cả list & chi tiết).
+// mixed: các phòng còn hiệu lực KHÔNG cùng một trạng thái (VD 2 phòng đã nhận, 1 phòng còn chờ).
+// Vì sao không trả thẳng status = 'mixed': bộ lọc của lễ tân so trực tiếp với status này
+// (receptionService.listBookings), nên đổi status sẽ làm nhóm hỗn hợp BIẾN MẤT khỏi mọi bộ lọc.
+// Giữ status = pha chính (để lọc/sắp xếp vẫn chạy) + cờ mixed & breakdown để hiện nhãn cảnh báo.
 function groupRollup(members) {
   const active = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))
   const sum = (k) => active.reduce((s, b) => s + (b[k] || 0), 0)
   const totalAmount = sum('totalAmount'), paidAmount = sum('paidAmount'), remainingAmount = sum('remainingAmount')
   const paymentStatus = remainingAmount <= 0 && paidAmount > 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid'
+  // Đếm theo trạng thái, tính cả huỷ/no-show để lễ tân thấy đủ bức tranh khi nhóm bị lệch.
+  const counts = {}
+  members.forEach((b) => { counts[b.status] = (counts[b.status] || 0) + 1 })
+  const breakdown = Object.entries(counts).map(([status, count]) => ({ status, count }))
   return {
     status: rollupGroupStatus(members),
+    mixed: new Set(active.map((b) => b.status)).size > 1,
+    breakdown,
     roomCount: members.length, activeCount: active.length,
     totalAmount, paidAmount, remainingAmount, paymentStatus,
     depositAmount: sum('depositAmount'),

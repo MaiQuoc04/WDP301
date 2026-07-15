@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { bookingService, vnd, fmtDateTime, bookingStatusLabel } from '../../services'
+import { bookingService, vnd, fmtDateTime, bookingStatusLabel, mixedSummary } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
 
 // Tab "Đặt phòng": các trạng thái đang hoạt động (gồm cả chờ cọc; huỷ/no-show ở tab riêng).
@@ -81,7 +81,12 @@ export default function BookingsPage() {
                 <td>{fmtDateTime(g.checkOut)}</td>
                 <td>
                   <span className={'rc-badge s-' + g.status}>{bookingStatusLabel(g.status)}</span>
-                  {g.status === 'pending' && (
+                  {/* Nhóm lệch pha: status chỉ là pha CHÍNH -> phải nói rõ không phải phòng nào cũng vậy */}
+                  {g.mixed && <span className="rc-badge s-mixed" style={{ marginLeft: 4 }} title={mixedSummary(g)}>Hỗn hợp</span>}
+                  {g.mixed && (
+                    <small style={{ display: 'block', marginTop: 3, fontSize: 11, color: '#7c3aed' }}>{mixedSummary(g)}</small>
+                  )}
+                  {!g.mixed && g.status === 'pending' && (
                     <small style={{ display: 'block', marginTop: 3, fontSize: 11, color: '#b45309' }}>
                       {g.source === 'online' ? 'chờ khách thanh toán' : 'cần thu cọc'}
                     </small>

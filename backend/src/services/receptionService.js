@@ -93,13 +93,20 @@ exports.getBookingDetail = async (accountId, bookingId) => {
   const branches = await myBranchIds(accountId)
   const booking = await Booking.findOne({ _id: bookingId, branch: { $in: branches } })
     .populate('roomType', 'name basePrice')
-    .populate('room', 'roomNumber floor')
+    .populate('room', 'roomNumber floor status awaitingRestock')
     .populate({ path: 'customer', select: 'fullName phone idCard' })
     .lean()
   if (!booking) { const e = new Error('Không tìm thấy booking trong chi nhánh của bạn'); e.status = 404; throw e }
   const payments = await Payment.find({ booking: bookingId }).sort('createdAt').lean()
   const history = await BookingStatusHistory.find({ booking: bookingId }).sort('createdAt').lean()
-  return { booking, payments, history }
+  // Phòng chưa sẵn sàng thì cho lễ tân biết AI đang dọn ngay tại đây — để chủ động gọi giục,
+  // thay vì bấm Check-in rồi mới nhận lỗi "phòng đang cleaning". Task này thuộc khách TRƯỚC, không phải booking này.
+  let roomCleaning = null
+  if (booking.room && booking.room.status !== 'available') {
+    const map = await housekeepingService.roomCleaningInfo([booking.room._id])
+    roomCleaning = map[String(booking.room._id)] || null
+  }
+  return { booking, payments, history, roomCleaning }
 }
 
 // Đảm bảo booking thuộc chi nhánh của lễ tân trước khi thao tác (BR-30)
@@ -115,11 +122,30 @@ async function assertInBranch(accountId, bookingId) {
 exports.searchRooms = async (accountId, q = {}) => {
   const branches = await myBranchIds(accountId)
   if (!q.checkIn || !q.checkOut) throw new Error('Thiếu ngày nhận/trả')
-  return bookingService.searchAvailableRooms(
+  const rooms = await bookingService.searchAvailableRooms(
     branches[0], q.checkIn, q.checkOut,
     Number(q.adults) || 1, Number(q.children) || 0,
     { roomTypeId: q.roomTypeId || undefined }
   )
+  // searchAvailableRooms lọc theo LỊCH booking, không theo trạng thái vật lý -> phòng đang dọn vẫn hiện ra.
+  // Đặt cho tương lai thì không sao (dọn xong từ lâu), nhưng NHẬN NGAY HÔM NAY thì lễ tân phải biết trước
+  // phòng nào chưa sẵn sàng + ai đang dọn, thay vì chọn xong tới lúc check-in mới ăn lỗi.
+  // Chỉ gắn khi nhận trong hôm nay — đặt cho mai trở đi thì thông tin này là nhiễu.
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+  const endOfToday = new Date(startOfToday); endOfToday.setDate(endOfToday.getDate() + 1)
+  const ci = new Date(q.checkIn)
+  if (!(ci >= startOfToday && ci < endOfToday)) return rooms
+
+  const ids = rooms.map((r) => r.roomId)
+  const [live, cleaning] = await Promise.all([
+    Room.find({ _id: { $in: ids } }).select('status awaitingRestock').lean(),
+    housekeepingService.roomCleaningInfo(ids),
+  ])
+  const statusById = Object.fromEntries(live.map((r) => [String(r._id), r]))
+  return rooms.map((r) => {
+    const s = statusById[String(r.roomId)]
+    return { ...r, roomStatus: s?.status, awaitingRestock: !!s?.awaitingRestock, cleaning: cleaning[String(r.roomId)] || null }
+  })
 }
 
 // UC-29: walk-in — lễ tân chọn PHÒNG cụ thể + dịch vụ kèm.

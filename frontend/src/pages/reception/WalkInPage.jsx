@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { bookingService, vnd, fmtDate } from '../../services'
+import { bookingService, vnd, fmtDate, fmtDateTime } from '../../services'
 
 // Nhãn "vừa khít / dư / thiếu giường phụ" cho 1 phòng theo phân bổ khách
 const fitLabel = (r) => {
@@ -8,6 +8,26 @@ const fitLabel = (r) => {
   if (r.fit === 'short') return { text: `Cần ${r.extraBeds} giường phụ (+${vnd(r.surcharge)})`, cls: 'fit-short' }
   if (r.fit === 'surplus') return { text: 'Còn trống', cls: 'fit-surplus' }
   return { text: 'Vừa đủ', cls: 'fit-exact' }
+}
+
+// Tình trạng SẴN SÀNG THỰC TẾ của phòng — BE chỉ gắn khi nhận trong hôm nay (đặt cho mai thì vô nghĩa).
+// Phòng đang dọn vẫn đặt được (lát nữa dọn xong là nhận), nhưng lễ tân phải biết trước + biết gọi ai giục.
+const readyLabel = (r) => {
+  if (!r.roomStatus) return null                                   // không phải nhận hôm nay -> không hiện gì
+  if (r.roomStatus === 'available' && !r.awaitingRestock) return { text: 'Sẵn sàng', cls: 'fit-exact', ready: true }
+  const who = r.cleaning?.housekeeper
+  const st = r.cleaning?.status
+  if (r.roomStatus === 'cleaning' || st) {
+    const verb = st === 'in_progress' ? 'Đang dọn' : 'Chờ dọn'
+    const at = r.cleaning?.startedAt || r.cleaning?.assignedAt
+    return {
+      text: `${verb}${who ? ` — ${who}` : ' — chưa ai nhận'}${at ? ` (${fmtDateTime(at).split(' ')[0]})` : ''}`,
+      cls: 'fit-short', ready: false,
+    }
+  }
+  if (r.awaitingRestock) return { text: 'Chờ bổ sung thiết bị', cls: 'fit-short', ready: false }
+  if (r.roomStatus === 'occupied') return { text: 'Khách đang ở (trả trong hôm nay)', cls: 'fit-short', ready: false }
+  return { text: r.roomStatus, cls: 'fit-short', ready: false }
 }
 
 // KHÔNG chia khách ở FE: backend là nơi duy nhất chia (bookingService.autoAllocate — tối thiểu tổng tiền).
@@ -128,7 +148,14 @@ export default function WalkInPage() {
   }
 
   const types = [...new Map(rooms.map((r) => [r.roomType._id, r.roomType])).values()]
-  const shown = typeFilter.length ? rooms.filter((r) => typeFilter.includes(r.roomType._id)) : rooms
+  const filtered = typeFilter.length ? rooms.filter((r) => typeFilter.includes(r.roomType._id)) : rooms
+  // Phòng chưa sẵn sàng xuống cuối (vẫn chọn được — chỉ là ưu tiên phòng nhận được ngay).
+  const shown = [...filtered].sort((a, b) => {
+    const ra = readyLabel(a), rb = readyLabel(b)
+    if (!ra || !rb) return 0
+    return (ra.ready === rb.ready) ? 0 : (ra.ready ? -1 : 1)
+  })
+  const notReady = filtered.filter((r) => { const s = readyLabel(r); return s && !s.ready }).length
 
   return (
     <div style={{ maxWidth: 760 }}>
@@ -204,19 +231,30 @@ export default function WalkInPage() {
             <span>👥 {form.adults} người lớn + {form.children} trẻ em</span>
           </div>
 
+          {notReady > 0 && (
+            <p className="rc-muted" style={{ marginTop: 8 }}>
+              ℹ️ Có <b>{notReady}</b> phòng chưa sẵn sàng ngay (đang dọn / chờ bổ sung). <b>Vẫn đặt được</b> —
+              nhưng khách chỉ nhận được sau khi dọn xong. Cột <b>Tình trạng</b> cho biết ai đang dọn để gọi giục.
+            </p>
+          )}
+
           <table className="rc-table">
-            <thead><tr><th></th><th>Phòng</th><th>Loại</th><th>Sức chứa</th><th>Tiền phòng ({rooms[0]?.nights || 0} đêm)</th></tr></thead>
+            <thead><tr><th></th><th>Phòng</th><th>Loại</th><th>Sức chứa</th><th>Tiền phòng ({rooms[0]?.nights || 0} đêm)</th><th>Tình trạng</th></tr></thead>
             <tbody>
-              {shown.map((r) => (
-                <tr key={r.roomId} className={isPicked(r.roomId) ? 'rc-row-on' : ''} style={{ cursor: 'pointer' }} onClick={() => togglePick(r)}>
-                  <td><input type="checkbox" checked={isPicked(r.roomId)} readOnly /></td>
-                  <td><b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
-                  <td>{r.roomType.name}</td>
-                  <td>{r.roomType.capacity} người</td>
-                  <td>{vnd(r.roomCharge)}</td>
-                </tr>
-              ))}
-              {!shown.length && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#888' }}>Không có phòng</td></tr>}
+              {shown.map((r) => {
+                const rd = readyLabel(r)
+                return (
+                  <tr key={r.roomId} className={isPicked(r.roomId) ? 'rc-row-on' : ''} style={{ cursor: 'pointer' }} onClick={() => togglePick(r)}>
+                    <td><input type="checkbox" checked={isPicked(r.roomId)} readOnly /></td>
+                    <td><b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
+                    <td>{r.roomType.name}</td>
+                    <td>{r.roomType.capacity} người</td>
+                    <td>{vnd(r.roomCharge)}</td>
+                    <td>{rd ? <span className={'rc-fit ' + rd.cls}>{rd.text}</span> : <span className="rc-muted">—</span>}</td>
+                  </tr>
+                )
+              })}
+              {!shown.length && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#888' }}>Không có phòng</td></tr>}
             </tbody>
           </table>
 

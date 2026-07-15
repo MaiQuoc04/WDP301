@@ -82,6 +82,17 @@ export const BOOKING_STATUS_LABEL = {
 }
 export const bookingStatusLabel = (s) => BOOKING_STATUS_LABEL[s] || s
 
+// Nhóm "hỗn hợp": các phòng không cùng pha (VD 2 phòng đã nhận, 1 phòng còn chờ nhận).
+// Rollup vẫn giữ status = pha chính để bộ lọc chạy được; nhãn này chỉ cảnh báo là nhóm đang lệch.
+// Trả chuỗi tóm tắt từ breakdown, VD "2 đã nhận phòng · 1 đã cọc".
+export const mixedSummary = (rollup) => {
+  if (!rollup?.mixed || !rollup.breakdown?.length) return ''
+  return [...rollup.breakdown]
+    .sort((a, b) => b.count - a.count)
+    .map((x) => `${x.count} ${bookingStatusLabel(x.status).toLowerCase()}`)
+    .join(' · ')
+}
+
 // Nhãn trạng thái thanh toán
 export const PAYMENT_STATUS_LABEL = {
   unpaid: 'Chưa thanh toán',

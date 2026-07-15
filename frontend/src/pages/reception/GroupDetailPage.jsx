@@ -1,7 +1,7 @@
 // Owner: Quốc — chi tiết NHÓM đặt nhiều phòng (1 mã, 1 cọc). Mỗi phòng vẫn mở chi tiết riêng để vận hành.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { bookingService, vnd, fmtDate, fmtDateTime, bookingStatusLabel, paymentStatusLabel } from '../../services'
+import { bookingService, vnd, fmtDate, fmtDateTime, bookingStatusLabel, paymentStatusLabel, mixedSummary } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
 import PayOSQRCode from '../../components/PayOSQRCode'
 
@@ -187,7 +187,11 @@ export default function GroupDetailPage() {
   return (
     <div className="rc-detail">
       <div className="rc-bar">
-        <h2>Nhóm {group.code} <span className={'rc-badge s-' + rollup.status}>{bookingStatusLabel(rollup.status)}</span></h2>
+        <h2>
+          Nhóm {group.code} <span className={'rc-badge s-' + rollup.status}>{bookingStatusLabel(rollup.status)}</span>
+          {/* Trạng thái trên chỉ là pha CHÍNH — nhóm lệch pha thì phải nói rõ, đừng để lễ tân tưởng cả nhóm như nhau */}
+          {rollup.mixed && <span className="rc-badge s-mixed" style={{ marginLeft: 6 }}>Hỗn hợp</span>}
+        </h2>
         <Link to="/reception/bookings">← Danh sách</Link>
       </div>
       {err && <p className="rc-err">{err}</p>}
@@ -242,6 +246,7 @@ export default function GroupDetailPage() {
           <p>Khách: <b>{group.guestName}</b>{group.guestPhone && ` · ${group.guestPhone}`}</p>
           <p>Nhận {fmtDate(group.checkIn)} 14:00 → Trả {fmtDate(group.checkOut)} 12:00</p>
           <p>Số phòng: <b>{rollup.roomCount}</b>{rollup.activeCount !== rollup.roomCount && ` (còn ${rollup.activeCount} hiệu lực)`}</p>
+          {rollup.mixed && <p style={{ color: '#7c3aed' }}>Các phòng đang <b>lệch trạng thái</b>: {mixedSummary(rollup)} — xem bảng bên phải.</p>}
           <p>Tổng khách: {group.adultsTotal} người lớn + {group.childrenTotal} trẻ em</p>
           <p>Thanh toán: <b>{paymentStatusLabel(rollup.paymentStatus)}</b></p>
 
