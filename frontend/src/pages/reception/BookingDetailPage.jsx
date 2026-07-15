@@ -49,15 +49,35 @@ function HoursModal({ title, note, max, confirmLabel, onPick, onClose }) {
   )
 }
 
-/* ─── Payment Method Modal (Reception Checkout) ─────────────────── */
-function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, onError }) {
-  const [step, setStep] = useState('choose')       // 'choose' | 'qr' | 'cash'
+/* ─── Payment Method Modal (Reception Checkout) ───────────────────
+   Cùng ngôn ngữ với trả phòng CẢ NHÓM: người dọn hiện NGAY cạnh số tiền, chọn sẵn
+   người hệ thống gợi ý; xong mới tới phương thức. Trước đây phải chọn phương thức
+   trước mới thấy người dọn, mà đường QR thì tận khi khách trả tiền xong mới được chọn
+   -> hai màn cùng một việc lại hỏi theo hai thứ tự khác nhau. */
+function CheckoutPaymentModal({ bookingId, roomNumber, remainingAmount, onClose, onSuccess, onError }) {
+  const [step, setStep] = useState('choose')       // 'choose' | 'qr'
   const [qrData, setQrData] = useState(null)       // { qrCode, checkoutUrl, amount, orderCode }
   const [loading, setLoading] = useState(false)
   const [hkPick, setHkPick] = useState([])
-  const [hkLoading, setHkLoading] = useState(false)
+  const [hkLoading, setHkLoading] = useState(true)
+  const [hkId, setHkId] = useState('')             // người dọn đang chọn (mặc định = gợi ý tốt nhất)
   const [paymentDone, setPaymentDone] = useState(false)
   const expireAt = useRef(null)
+
+  // Nạp người dọn NGAY khi mở modal (không đợi chọn phương thức) + chọn sẵn người đầu danh sách.
+  // getHousekeepers đã sắp xếp đúng tầng -> ít việc nhất, nên [0] chính là gợi ý của hệ thống.
+  useEffect(() => {
+    let cancelled = false
+    bookingService.getHousekeepers(bookingId)
+      .then((list) => {
+        if (cancelled) return
+        setHkPick(list)
+        setHkId(list[0] ? String(list[0].accountId) : '')
+      })
+      .catch(() => { if (!cancelled) setHkPick([]) })
+      .finally(() => { if (!cancelled) setHkLoading(false) })
+    return () => { cancelled = true }
+  }, [bookingId])
 
   // Lắng nghe socket payment_success để tự cập nhật
   useEffect(() => {
@@ -97,20 +117,8 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
     }
   }
 
-  const handleChooseCash = async () => {
-    setStep('cash')
-    setHkLoading(true)
-    try {
-      const list = await bookingService.getHousekeepers(bookingId)
-      setHkPick(list)
-    } catch {
-      setHkPick([])
-    } finally {
-      setHkLoading(false)
-    }
-  }
-
-  const handleCashCheckout = async (hkId) => {
+  // Tiền mặt: người dọn đã chọn sẵn ở trên -> thu tiền & trả phòng luôn, không hỏi thêm bước nào.
+  const handleCashCheckout = async () => {
     setLoading(true)
     try {
       await bookingService.checkOutCash(bookingId, { housekeeperId: hkId })
@@ -122,25 +130,12 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
     }
   }
 
+  // QR đã thanh toán -> chuyển status với người dọn đã chọn từ đầu.
+  // Không còn bước 'qr-done-hk': bắt lễ tân chọn người SAU khi khách trả tiền là lúc
+  // khách đã đứng dậy đi rồi, và khác hẳn thứ tự của màn trả phòng cả nhóm.
   const handleQRCheckoutDone = async () => {
-    // Sau khi QR đã quét, lễ tân bấm "Hoàn tất check-out" để chuyển status
     setLoading(true)
     try {
-      const list = await bookingService.getHousekeepers(bookingId)
-      setHkPick(list)
-      setStep('qr-done-hk') // chọn housekeeper để dọn phòng
-    } catch {
-      setHkPick([])
-      setStep('qr-done-hk')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleQRCheckoutWithHK = async (hkId) => {
-    setLoading(true)
-    try {
-      // Booking đã được cập nhật payment qua webhook, chỉ cần chuyển status checked_out
       await bookingService.checkOut(bookingId, { method: 'online_qr', housekeeperId: hkId })
       onSuccess('Check-out thành công (QR đã thanh toán)')
       onClose()
@@ -150,6 +145,36 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
     }
   }
 
+  // Đã trả đủ tiền từ trước -> chỉ cần chốt trả phòng.
+  const handleCheckoutPaid = async () => {
+    setLoading(true)
+    try {
+      await bookingService.checkOut(bookingId, { method: 'cash', housekeeperId: hkId })
+      onSuccess('Check-out thành công')
+      onClose()
+    } catch (e) {
+      onError(e.response?.data?.message || 'Lỗi check-out')
+      setLoading(false)
+    }
+  }
+
+  // Khối chọn người dọn — dùng chung cho mọi nhánh, luôn nằm TRƯỚC phương thức.
+  const hkBlock = (
+    <div style={{ marginBottom: 18 }}>
+      <p className="payos-section-label">Người được giao dọn phòng {roomNumber || ''}</p>
+      {hkLoading ? <p className="rc-muted">Đang tải danh sách…</p> : hkPick.length ? (
+        <select className="rc-hk-pick" value={hkId} onChange={(e) => setHkId(e.target.value)}>
+          {hkPick.map((h) => (
+            <option key={h.accountId} value={String(h.accountId)}>
+              {h.fullName || h.email} · {h.activeTasks} việc{h.onFloor ? ' · đúng tầng' : ''}
+            </option>
+          ))}
+        </select>
+      ) : <p className="rc-err">Chi nhánh chưa có nhân viên buồng phòng — không trả phòng được.</p>}
+    </div>
+  )
+  const canGo = !!hkId && !loading
+
   return (
     <div className="rc-modal-overlay" onClick={onClose}>
       <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
@@ -157,28 +182,30 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
         {/* ── Bước 1: Chọn phương thức ── */}
         {step === 'choose' && (
           <>
-            <h3 style={{ color: 'var(--rc-text-main)' }}>Thanh toán Check-out</h3>
+            <h3 style={{ color: 'var(--rc-text-main)' }}>Trả phòng {roomNumber || ''} — Thanh toán</h3>
             <div className="payos-amount-box">
               <span className="lbl">Số tiền còn lại</span>
               <span className="val">{vnd(remainingAmount)}</span>
             </div>
+
+            {/* Người dọn TRƯỚC phương thức — cùng thứ tự với màn trả phòng cả nhóm */}
+            {hkBlock}
+
             {remainingAmount <= 0 ? (
               <>
-                <div className="payos-paid-banner">✅ Đã thanh toán đủ — có thể check-out</div>
-                <button className="payos-opt cash" style={{ marginTop: 12 }} onClick={() => setStep('qr-done-hk')}>
-                  <span className="payos-opt-icon">🏨</span>
-                  <span className="payos-opt-text">
-                    <b>Tiếp tục check-out</b>
-                    <small>Chọn nhân viên buồng phòng dọn phòng</small>
-                  </span>
-                  <span className="payos-opt-arrow">›</span>
-                </button>
+                <div className="payos-paid-banner">✅ Đã thanh toán đủ — có thể trả phòng</div>
+                <div className="rc-modal-actions">
+                  <button className="link" onClick={onClose}>Huỷ</button>
+                  <button className="primary" disabled={!canGo} onClick={handleCheckoutPaid}>
+                    {loading ? 'Đang xử lý…' : 'Trả phòng →'}
+                  </button>
+                </div>
               </>
             ) : (
               <>
                 <p className="payos-section-label">Chọn phương thức</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <button className="payos-opt qr" onClick={handleChooseQR} disabled={loading}>
+                  <button className="payos-opt qr" onClick={handleChooseQR} disabled={!canGo}>
                     <span className="payos-opt-icon">📱</span>
                     <span className="payos-opt-text">
                       <b>Thanh toán QR</b>
@@ -186,20 +213,20 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
                     </span>
                     <span className="payos-opt-arrow">›</span>
                   </button>
-                  <button className="payos-opt cash" onClick={handleChooseCash} disabled={loading}>
+                  <button className="payos-opt cash" onClick={handleCashCheckout} disabled={!canGo}>
                     <span className="payos-opt-icon">💵</span>
                     <span className="payos-opt-text">
                       <b>Tiền mặt</b>
-                      <small>Thu trực tiếp tại quầy</small>
+                      <small>Trả phòng &amp; thu tiền mặt tại quầy</small>
                     </span>
                     <span className="payos-opt-arrow">›</span>
                   </button>
                 </div>
+                <div className="rc-modal-actions">
+                  <button className="link" onClick={onClose}>Huỷ</button>
+                </div>
               </>
             )}
-            <div className="rc-modal-actions">
-              <button className="link" onClick={onClose}>Huỷ</button>
-            </div>
           </>
         )}
 
@@ -244,101 +271,26 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
               )}
             </div>
 
+            {/* Người dọn đã chốt ở bước trước -> chỉ còn 1 nút, không hỏi lại lần nữa */}
+            {paymentDone && (
+              <p className="rc-muted" style={{ textAlign: 'center', margin: '4px 0 0' }}>
+                Sẽ giao dọn cho <b>{hkPick.find((h) => String(h.accountId) === String(hkId))?.fullName
+                  || hkPick.find((h) => String(h.accountId) === String(hkId))?.email || '—'}</b>
+              </p>
+            )}
             <div className="rc-modal-actions" style={{ justifyContent: 'space-between' }}>
               <button className="link" onClick={onClose}>Đóng</button>
-              {paymentDone && (
-                <button className="btn-primary" onClick={handleQRCheckoutDone} disabled={loading}>
-                  {loading ? 'Đang xử lý...' : 'Hoàn tất check-out →'}
+              {paymentDone ? (
+                <button className="primary" onClick={handleQRCheckoutDone} disabled={loading}>
+                  {loading ? 'Đang xử lý…' : 'Hoàn tất check-out →'}
                 </button>
-              )}
-              {!paymentDone && (
-                <button className="link" style={{ color: '#6b7280' }} onClick={() => setStep('choose')}>← Quay lại</button>
+              ) : (
+                <button className="link" onClick={() => setStep('choose')}>← Quay lại</button>
               )}
             </div>
           </>
         )}
 
-        {/* ── Bước 2B: Chọn housekeeper (cash) ── */}
-        {step === 'cash' && (
-          <>
-            <h3>Check-out — Tiền mặt</h3>
-            <p className="rc-modal-hint">Tự phân cho người phù hợp nhất (đúng tầng, ít việc), hoặc chọn người khác bên dưới.</p>
-            {hkLoading ? <p>Đang tải...</p> : (
-              <>
-                {hkPick.length > 0 && (
-                  <button className="btn-primary" style={{ width: '100%', marginBottom: 10 }} disabled={loading}
-                    onClick={() => handleCashCheckout(hkPick[0].accountId)}>
-                    ⚡ Tự phân: {hkPick[0].fullName || hkPick[0].email}{hkPick[0].onFloor ? ' · đúng tầng' : ''}{hkPick[0].busy ? '' : ' · rảnh'} — Check-out
-                  </button>
-                )}
-                {hkPick.length > 1 && <p className="rc-muted" style={{ margin: '4px 0' }}>hoặc chọn người khác:</p>}
-                <ul className="hk-pick-list">
-                  {hkPick.map((h) => (
-                    <li key={h.accountId}>
-                      <div className="hk-pick-info">
-                        <b>{h.fullName || h.email}</b>
-                        <small>
-                          {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
-                          {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
-                        </small>
-                      </div>
-                      <button onClick={() => handleCashCheckout(h.accountId)} disabled={loading}>
-                        {loading ? '...' : 'Giao'}
-                      </button>
-                    </li>
-                  ))}
-                  {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
-                </ul>
-              </>
-            )}
-            <div className="rc-modal-actions">
-              <button className="link" onClick={() => setStep('choose')}>← Quay lại</button>
-              <button className="link" onClick={onClose}>Huỷ</button>
-            </div>
-          </>
-        )}
-
-        {/* ── Bước 2C: Chọn housekeeper sau QR thành công ── */}
-        {step === 'qr-done-hk' && (
-          <>
-            <h3>Check-out — Giao dọn phòng</h3>
-            <div className="payos-success-banner" style={{ marginBottom: 16 }}>
-              ✅ Đã thanh toán qua QR — chọn housekeeper để hoàn tất
-            </div>
-            <p className="rc-modal-hint">Tự phân cho người phù hợp nhất, hoặc chọn người khác bên dưới.</p>
-            {hkLoading ? <p>Đang tải...</p> : (
-              <>
-                {hkPick.length > 0 && (
-                  <button className="btn-primary" style={{ width: '100%', marginBottom: 10 }} disabled={loading}
-                    onClick={() => handleQRCheckoutWithHK(hkPick[0].accountId)}>
-                    ⚡ Tự phân: {hkPick[0].fullName || hkPick[0].email}{hkPick[0].onFloor ? ' · đúng tầng' : ''}{hkPick[0].busy ? '' : ' · rảnh'} — Hoàn tất
-                  </button>
-                )}
-                {hkPick.length > 1 && <p className="rc-muted" style={{ margin: '4px 0' }}>hoặc chọn người khác:</p>}
-                <ul className="hk-pick-list">
-                  {hkPick.map((h) => (
-                    <li key={h.accountId}>
-                      <div className="hk-pick-info">
-                        <b>{h.fullName || h.email}</b>
-                        <small>
-                          {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
-                          {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
-                        </small>
-                      </div>
-                      <button onClick={() => handleQRCheckoutWithHK(h.accountId)} disabled={loading}>
-                        {loading ? '...' : 'Giao'}
-                      </button>
-                    </li>
-                  ))}
-                  {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
-                </ul>
-              </>
-            )}
-            <div className="rc-modal-actions">
-              <button className="link" onClick={onClose}>Đóng</button>
-            </div>
-          </>
-        )}
       </div>
     </div>
   )
@@ -801,6 +753,7 @@ export default function BookingDetailPage() {
       {showCheckoutModal && (
         <CheckoutPaymentModal
           bookingId={id}
+          roomNumber={b.room?.roomNumber}
           remainingAmount={bill?.remainingAmount ?? b.remainingAmount}
           onClose={() => { setShowCheckoutModal(false); reload() }}
           onSuccess={(m) => { setMsg(m); setShowCheckoutModal(false); reload() }}
