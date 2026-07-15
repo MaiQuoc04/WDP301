@@ -3,8 +3,14 @@ const router = require('express').Router()
 const { protect } = require('../middlewares/authMiddleware')
 
 const customerController = require('../controllers/customerController')
+const reviewController = require('../controllers/reviewController')
 const { validateObjectId } = require('../middlewares/validateMiddleware')
 
+
+// Đánh giá chi nhánh (UC-22→25) — chỉ khách online đã ở xong, trong 14 ngày, mỗi lần ở 1 lần
+router.get('/reviews/reviewable', protect, reviewController.listReviewable) // lần ở nào đang được đánh giá
+router.get('/reviews/mine', protect, reviewController.listMine)
+router.post('/reviews', protect, reviewController.create)
 
 // Đặt nhiều phòng online (nhóm) — 1 mã, 1 QR cọc gom
 router.get('/booking-groups', protect, customerController.getBookingGroupHistory)                          // lịch sử theo nhóm
