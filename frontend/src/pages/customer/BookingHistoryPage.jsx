@@ -6,6 +6,7 @@ import Footer from '../../components/Footer';
 import Reveal from '../../components/common/Reveal';
 import { customerService } from '../../services';
 import { socket, connectSocket } from '../../services/socketService';
+import { fmtDate } from '../../utils/date';
 
 const STATUS = {
   pending:     { label: 'Chờ thanh toán cọc', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -109,11 +110,11 @@ const BookingHistoryPage = () => {
                       </div>
                       <div>
                         <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Nhận phòng</div>
-                        <div className="font-medium text-charcoal">{new Date(b.checkIn).toLocaleDateString('vi-VN')}</div>
+                        <div className="font-medium text-charcoal">{fmtDate(b.checkIn)}</div>
                       </div>
                       <div>
                         <div className="font-nav text-[10px] uppercase tracking-wide text-charcoal/45">Trả phòng</div>
-                        <div className="font-medium text-charcoal">{new Date(b.checkOut).toLocaleDateString('vi-VN')}</div>
+                        <div className="font-medium text-charcoal">{fmtDate(b.checkOut)}</div>
                       </div>
                     </div>
 

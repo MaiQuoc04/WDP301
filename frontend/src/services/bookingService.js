@@ -24,6 +24,8 @@ export const bookingService = {
   // Thao tác hàng loạt cả nhóm
   checkInGroup: (id) => post(`${base}/booking-groups/${id}/check-in`, {}),
   checkOutGroupAll: (id, data) => post(`${base}/booking-groups/${id}/check-out`, data || {}),
+  // Xem trước khi trả cả nhóm: phòng nào, ai sẽ được giao dọn, thu bao nhiêu
+  previewCheckOutGroup: (id) => get(`${base}/booking-groups/${id}/check-out/preview`),
   cancelGroupAll: (id, data) => post(`${base}/booking-groups/${id}/cancel`, data || {}),
   noShowGroupAll: (id) => post(`${base}/booking-groups/${id}/no-show`, {}),
   // PayOS QR gom cho nhóm: type = 'deposit' | 'full' | 'remaining'
@@ -67,8 +69,9 @@ export const bookingService = {
 }
 
 export const vnd = (n) => (n || 0).toLocaleString('vi-VN') + 'đ'
-export const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('vi-VN') : '')
-export const fmtDateTime = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '')
+// Ngày tháng dùng chung toàn dự án — xem utils/date.js. Re-export để các trang lễ tân đang
+// `import { fmtDate } from '../../services'` không phải sửa hết import.
+export { fmtDate, fmtDateTime, fmtTime } from '../utils/date'
 
 // Nhãn trạng thái booking (DB enum -> tiếng Việt dễ hiểu cho lễ tân)
 export const BOOKING_STATUS_LABEL = {

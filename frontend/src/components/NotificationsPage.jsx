@@ -3,9 +3,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { notificationService } from '../services/notificationService'
 import { socket, connectSocket } from '../services/socketService'
+import { fmtDateTime } from '../utils/date'
 import './notifications.css'
 
-const fmt = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '')
+const fmt = (d) => fmtDateTime(d)
 const ICON = { task_new: '🆕', task_claimed: '🙋', inspection_done: '✅', general: '🔔' }
 
 export default function NotificationsPage({ basePath }) {

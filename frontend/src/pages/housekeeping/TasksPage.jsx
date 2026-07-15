@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Alert, Button, Select, Space, Table, Tag, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
+import { fmtDateTime } from '../../utils/date'
 
 const statusColor = {
   pending: 'default',
@@ -23,7 +24,7 @@ const statusLabel = {
 const typeLabel = { inspection: 'Kiểm tra', turnover: 'Dọn (trả phòng)', mid_stay: 'Dọn (yêu cầu)' }
 const typeColor = { inspection: 'purple', turnover: 'volcano', mid_stay: 'cyan' }
 
-const formatDateTime = (date) => date ? new Date(date).toLocaleString('vi-VN') : '-'
+const formatDateTime = (date) => fmtDateTime(date) || '-'
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([])

@@ -5,13 +5,18 @@ import { notification } from 'antd';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import Reveal from '../components/common/Reveal';
+import DateField from '../components/common/DateField';
 import { customerService } from '../services';
+import { fmtDate } from '../utils/date';
 import { socket, connectSocket, disconnectSocket } from '../services/socketService';
 
 // Đặt phòng DATE-FIRST: chọn chi nhánh + ngày + số khách -> tìm phòng TRỐNG (gộp theo loại phòng)
 // -> chọn SỐ LƯỢNG từng loại (giỏ) -> đặt 1 nhóm (1 mã, 1 cọc gom). Hệ thống tự chia khách + báo phụ phí.
 const fieldCls =
   'w-full rounded-sm border bg-white px-3.5 py-2.5 font-body text-sm text-charcoal outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold/40';
+// Bản cho DatePicker: ô nhập thật nằm BÊN TRONG antd picker nên :focus không khớp lớp bọc -> focus-within.
+const dateCls =
+  'w-full rounded-sm border bg-white px-2 py-1 font-body text-sm text-charcoal transition-colors focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/40';
 const labelCls = 'mb-1.5 block font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/55';
 
 const BookingPage = () => {
@@ -256,11 +261,13 @@ const BookingPage = () => {
             </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Nhận phòng</label>
-              <input type="date" value={checkIn} min={todayStr} onChange={(e) => setCheckIn(e.target.value)} className={`${fieldCls} ${searchErr.checkIn ? 'border-red-500' : 'border-black/10'}`} title="Ngày nhận (14:00)" />
+              <DateField value={checkIn} onChange={setCheckIn} min={todayStr} variant="borderless"
+                className={`${dateCls} ${searchErr.checkIn ? 'border-red-500' : 'border-black/10'}`} title="Ngày nhận (14:00)" />
             </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Trả phòng</label>
-              <input type="date" value={checkOut} min={checkIn || todayStr} onChange={(e) => setCheckOut(e.target.value)} className={`${fieldCls} ${searchErr.checkOut ? 'border-red-500' : 'border-black/10'}`} title="Ngày trả (12:00)" />
+              <DateField value={checkOut} onChange={setCheckOut} min={checkIn || todayStr} variant="borderless"
+                className={`${dateCls} ${searchErr.checkOut ? 'border-red-500' : 'border-black/10'}`} title="Ngày trả (12:00)" />
             </div>
             <div className="md:col-span-2">
               <label className={labelCls}>Người lớn</label>
@@ -413,7 +420,7 @@ const BookingPage = () => {
               <div className="rounded-md bg-cream p-6">
                 <div className="font-body text-sm text-charcoal/75">
                   <div className="mb-1"><span className="text-charcoal/45">Chi nhánh:</span> <b>{branchName}</b></div>
-                  <div className="mb-1"><span className="text-charcoal/45">Thời gian:</span> {new Date(checkIn).toLocaleDateString('vi-VN')} → {new Date(checkOut).toLocaleDateString('vi-VN')} ({quote?.nights || ''} đêm)</div>
+                  <div className="mb-1"><span className="text-charcoal/45">Thời gian:</span> {fmtDate(checkIn)} → {fmtDate(checkOut)} ({quote?.nights || ''} đêm)</div>
                   <div className="mb-3"><span className="text-charcoal/45">Khách:</span> {displayAdults} người lớn{displayChildren ? ` + ${displayChildren} trẻ em` : ''}</div>
                   <div className="space-y-1 border-t border-gold/25 pt-3">
                     {displayRooms.filter((rt) => qtyOf(rt._id) > 0).map((rt) => (

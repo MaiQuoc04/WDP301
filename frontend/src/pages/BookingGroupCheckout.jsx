@@ -5,6 +5,7 @@ import Footer from '../components/Footer';
 import PayOSQRCode from '../components/PayOSQRCode';
 import { customerService } from '../services';
 import { socket, connectSocket } from '../services/socketService';
+import { fmtDate } from '../utils/date';
 
 /* ── Countdown timer cho QR ─────────────────────────────────────── */
 function QRCountdown({ expireMs }) {
@@ -264,12 +265,12 @@ const BookingGroupCheckout = () => {
             <div className="mt-5 grid grid-cols-2 gap-4 border-t border-black/5 pt-5">
               <div>
                 <div className="font-nav text-[10px] font-semibold uppercase tracking-wide text-charcoal/45">Ngày nhận phòng</div>
-                <div className="mt-1 font-body text-sm font-medium text-charcoal">{new Date(group.checkIn).toLocaleDateString('vi-VN')}</div>
+                <div className="mt-1 font-body text-sm font-medium text-charcoal">{fmtDate(group.checkIn)}</div>
                 <div className="font-body text-xs text-charcoal/50">14:00</div>
               </div>
               <div>
                 <div className="font-nav text-[10px] font-semibold uppercase tracking-wide text-charcoal/45">Ngày trả phòng</div>
-                <div className="mt-1 font-body text-sm font-medium text-charcoal">{new Date(group.checkOut).toLocaleDateString('vi-VN')}</div>
+                <div className="mt-1 font-body text-sm font-medium text-charcoal">{fmtDate(group.checkOut)}</div>
                 <div className="font-body text-xs text-charcoal/50">12:00</div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert, Select, Table, Tag } from 'antd'
 import { taskService } from '../../services/taskService'
+import { fmtDateTime } from '../../utils/date'
 
 const statusColor = {
   completed: 'success',
@@ -55,7 +56,7 @@ export default function HistoryPage() {
     {
       title: 'Hoàn tất lúc',
       dataIndex: 'completedAt',
-      render: (date, task) => new Date(date || task.updatedAt).toLocaleString('vi-VN'),
+      render: (date, task) => fmtDateTime(date || task.updatedAt),
     },
     {
       title: 'Chi tiết',

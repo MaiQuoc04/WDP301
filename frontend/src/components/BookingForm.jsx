@@ -2,10 +2,15 @@ import { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { customerService } from '../services'
+import DateField from './common/DateField'
 
 // Thanh tìm phòng trên Hero (date-first): chi nhánh + ngày + số khách -> /booking xem phòng trống.
 const fieldBase =
   'w-full rounded-sm border border-black/10 bg-white px-3.5 py-3 font-body text-sm text-charcoal outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold/40'
+// Bản cho DatePicker: ô nhập thật nằm BÊN TRONG antd picker nên :focus không bao giờ khớp lớp bọc
+// -> dùng focus-within. py nhỏ hơn vì antd đã có padding dọc riêng.
+const fieldDate =
+  'w-full rounded-sm border border-black/10 bg-white px-2 py-1.5 font-body text-sm text-charcoal transition-colors focus-within:border-gold focus-within:ring-1 focus-within:ring-gold/40'
 const labelBase = 'mb-1.5 block font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/60'
 
 const BookingForm = () => {
@@ -63,13 +68,13 @@ const BookingForm = () => {
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelBase} htmlFor="checkin">Nhận phòng *</label>
-          <input type="date" id="checkin" className={fieldBase} value={checkIn} min={today} onChange={(e) => setCheckIn(e.target.value)} />
+          <label className={labelBase}>Nhận phòng *</label>
+          <DateField value={checkIn} onChange={setCheckIn} min={today} variant="borderless" className={fieldDate} />
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelBase} htmlFor="checkout">Trả phòng *</label>
-          <input type="date" id="checkout" className={fieldBase} value={checkOut} min={checkIn || today} onChange={(e) => setCheckOut(e.target.value)} />
+          <label className={labelBase}>Trả phòng *</label>
+          <DateField value={checkOut} onChange={setCheckOut} min={checkIn || today} variant="borderless" className={fieldDate} />
         </div>
 
         <div className="md:col-span-2">

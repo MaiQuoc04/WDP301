@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Spin, Button, Alert } from 'antd'
 import { roomService } from '../../services/roomService'
+import { fmtDateTime } from '../../utils/date'
 import {
   HomeOutlined,
   CheckCircleOutlined,
@@ -230,7 +231,7 @@ export default function DashboardOverview() {
                     <td><span className="ov-room-chip">{it.room?.roomNumber || '—'}</span></td>
                     <td>{it.description}</td>
                     <td><span className={`ov-pill ${sev.cls}`}>{sev.label}</span></td>
-                    <td>{new Date(it.createdAt).toLocaleString('vi-VN')}</td>
+                    <td>{fmtDateTime(it.createdAt)}</td>
                   </tr>
                 )
               })}
