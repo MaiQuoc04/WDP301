@@ -45,7 +45,11 @@ const Testimonials = ({ reviews = [] }) => {
                 </span>
                 <div>
                   <p className="font-nav text-sm font-semibold text-charcoal">{review.customer?.fullName || 'Khách hàng'}</p>
-                  <p className="font-body text-xs text-charcoal/50">Khách lưu trú</p>
+                  {/* Đánh giá là đánh giá CHI NHÁNH -> phải nói rõ chi nhánh nào, không thì
+                      khách đọc lời khen mà chẳng biết đang khen nơi nào. */}
+                  <p className="font-body text-xs text-charcoal/50">
+                    {review.branch?.name ? `Khách lưu trú · ${review.branch.name}` : 'Khách lưu trú'}
+                  </p>
                 </div>
               </figcaption>
             </Reveal>
