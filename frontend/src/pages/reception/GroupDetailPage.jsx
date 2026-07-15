@@ -130,11 +130,28 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
   )
 }
 
+// Phòng đã sẵn sàng để nhận chưa + ai đang dọn. BE chỉ gắn cho lễ tân (khách không thấy).
+const readyOf = (m) => {
+  if (!m.room) return null
+  if (!m.room.status || m.room.status === 'available') return m.room.awaitingRestock
+    ? { text: 'Chờ bổ sung thiết bị', cls: 'fit-short', ready: false }
+    : { text: 'Sẵn sàng', cls: 'fit-exact', ready: true }
+  if (m.room.status === 'cleaning') {
+    const who = m.cleaning?.housekeeper
+    const verb = m.cleaning?.status === 'in_progress' ? 'Đang dọn' : 'Chờ dọn'
+    return { text: `${verb}${who ? ` — ${who}` : ' — chưa ai nhận'}`, cls: 'fit-short', ready: false }
+  }
+  if (m.room.status === 'occupied') return { text: 'Đang có khách', cls: 'fit-exact', ready: true }
+  return { text: m.room.status, cls: 'fit-short', ready: false }
+}
+
 export default function GroupDetailPage() {
   const { id } = useParams()
   const [data, setData] = useState(null) // { group, members, payments, rollup }
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
+  // Tông của thông báo kết quả: 'ok' = làm hết, 'warn' = làm được một phần (còn việc), 'bad' = không làm được gì.
+  const [msgTone, setMsgTone] = useState('ok')
   const [loading, setLoading] = useState(false)
   const [payModal, setPayModal] = useState(null) // { type, amount, title }
 
@@ -158,13 +175,15 @@ export default function GroupDetailPage() {
   // Thao tác hàng loạt: áp cho các phòng đủ điều kiện; báo done + phòng bị bỏ qua (lý do).
   const runGroupAction = async (label, fn, confirmText) => {
     if (confirmText && !window.confirm(confirmText)) return
-    setErr(''); setMsg(''); setLoading(true)
+    setErr(''); setMsg(''); setMsgTone('ok'); setLoading(true)
     try {
       const res = await fn()
       let m = `${label}: ${res.done} phòng`
       if (res.collected) m += ` · thu ${vnd(res.collected)}`
       if (res.skipped?.length) m += ` · bỏ qua ${res.skipped.length} phòng (${res.skipped.map((s) => s.message).join('; ')})`
       setMsg(m)
+      // Xanh chỉ khi làm hết. Còn phòng bị bỏ qua = vẫn còn việc -> không được xanh.
+      setMsgTone(res.done === 0 ? 'bad' : res.skipped?.length ? 'warn' : 'ok')
       await reload()
     } catch (e) { setErr(e.response?.data?.message || `Lỗi: ${label}`) }
     finally { setLoading(false) }
@@ -177,6 +196,13 @@ export default function GroupDetailPage() {
   const canCheckOut = members.some((m) => m.status === 'checked_in')
   const canCancel = members.some((m) => ['pending', 'confirmed'].includes(m.status))
   const canNoShow = members.some((m) => m.status === 'confirmed')
+  // Phòng đã cọc, đang chờ nhận — cái nào chưa sẵn sàng thì "Nhận tất cả" sẽ bỏ qua.
+  const waiting = members.filter((m) => m.status === 'confirmed')
+  const blockers = waiting.filter((m) => { const r = readyOf(m); return r && !r.ready })
+  const readyToCheckIn = waiting.length - blockers.length
+  // Trả phòng: phòng chưa nhận thì không có gì để trả -> nói trước, đừng để trả xong mới thấy nhóm còn treo.
+  const inHouse = members.filter((m) => m.status === 'checked_in')
+  const notCheckedIn = members.filter((m) => ['pending', 'confirmed'].includes(m.status))
 
   // Số tiền CHÍNH XÁC theo phòng đủ điều kiện (QR/tiền mặt sẽ thu đúng con số này)
   const pendingMembers = members.filter((m) => m.status === 'pending')
@@ -195,7 +221,25 @@ export default function GroupDetailPage() {
         <Link to="/reception/bookings">← Danh sách</Link>
       </div>
       {err && <p className="rc-err">{err}</p>}
-      {msg && <p className="rc-ok">{msg}</p>}
+      {msg && <p className={msgTone === 'bad' ? 'rc-err' : msgTone === 'warn' ? 'rc-warn' : 'rc-ok'}>{msg}</p>}
+
+      {/* Cảnh báo TRƯỚC khi bấm "Nhận tất cả" — thay vì bấm xong mới báo "bỏ qua N phòng" */}
+      {canCheckIn && blockers.length > 0 && (
+        <p className="rc-err">
+          ⚠️ {blockers.length === waiting.length ? 'Chưa nhận được phòng nào' : `${blockers.length}/${waiting.length} phòng chưa nhận được`}:
+          {' '}{blockers.map((m) => `${m.room?.roomNumber} (${readyOf(m).text})`).join(' · ')}
+          {' — '}gọi nhân viên buồng phòng để dọn xong rồi nhận.
+        </p>
+      )}
+
+      {/* Trả phòng mà nhóm còn phòng chưa ai nhận: trả xong nhóm VẪN treo -> nói trước, không để lễ tân tưởng xong việc */}
+      {canCheckOut && notCheckedIn.length > 0 && (
+        <p className="rc-warn">
+          ⚠️ Nhóm còn <b>{notCheckedIn.length} phòng khách chưa nhận</b> ({notCheckedIn.map((m) => m.room?.roomNumber || '—').join(', ')}).
+          {' '}Trả phòng sẽ <b>không đụng tới</b> các phòng này — trả xong nhóm vẫn chưa kết thúc.
+          {' '}Mở từng phòng để quyết <b>no-show</b> (giữ cọc) hoặc <b>huỷ</b>.
+        </p>
+      )}
 
       {hasPending && (
         <div className="rc-actions">
@@ -213,15 +257,26 @@ export default function GroupDetailPage() {
       {/* Thao tác HÀNG LOẠT cả nhóm (áp cho các phòng đủ điều kiện) */}
       {(canCheckIn || canCheckOut || canCancel || canNoShow) && (
         <div className="rc-actions" style={{ marginTop: hasPending ? 8 : 0 }}>
+          {/* Nút phải NÓI ĐÚNG việc nó sắp làm: ghi "tất cả" mà chỉ nhận được một phần là nói dối lễ tân.
+              Không phòng nào sẵn sàng -> khoá luôn, đừng để bấm rồi mới báo "0 phòng". */}
           {canCheckIn && (
-            <button disabled={loading} onClick={() => runGroupAction('Đã nhận', () => bookingService.checkInGroup(id))}>
-              🏨 Nhận tất cả
+            <button disabled={loading || readyToCheckIn === 0}
+              title={readyToCheckIn === 0 ? 'Chưa phòng nào sẵn sàng để nhận' : undefined}
+              onClick={() => runGroupAction('Đã nhận', () => bookingService.checkInGroup(id))}>
+              {readyToCheckIn === 0
+                ? '🏨 Chưa nhận được phòng nào'
+                : blockers.length === 0
+                  ? `🏨 Nhận tất cả (${waiting.length} phòng)`
+                  : `🏨 Nhận ${readyToCheckIn}/${waiting.length} phòng sẵn sàng`}
             </button>
           )}
           {canCheckOut && (
             <button className="btn-payos" disabled={loading}
               onClick={() => setPayModal({ type: 'remaining', amount: checkinRemaining, title: 'Trả phòng cả nhóm' })}>
-              🧾 Trả tất cả {checkinRemaining > 0 ? `(còn ${vnd(checkinRemaining)})` : ''}
+              🧾 {notCheckedIn.length > 0
+                ? `Trả ${inHouse.length}/${rollup.activeCount} phòng đang ở`
+                : `Trả tất cả (${inHouse.length} phòng)`}
+              {checkinRemaining > 0 ? ` · còn ${vnd(checkinRemaining)}` : ''}
             </button>
           )}
           {canNoShow && (
@@ -261,17 +316,24 @@ export default function GroupDetailPage() {
         <section>
           <h3>Các phòng trong nhóm</h3>
           <table className="rc-table">
-            <thead><tr><th>Phòng</th><th>Khách</th><th>Trạng thái</th><th>Tiền</th><th></th></tr></thead>
+            <thead><tr><th>Phòng</th><th>Khách</th><th>Trạng thái</th><th>Tình trạng phòng</th><th>Tiền</th><th></th></tr></thead>
             <tbody>
-              {members.map((m) => (
-                <tr key={m._id}>
-                  <td><b>{m.room?.roomNumber || '—'}</b> <small>· {m.roomType?.name}</small></td>
-                  <td>{m.adults}NL{m.children > 0 ? ` + ${m.children}TE` : ''}</td>
-                  <td><span className={'rc-badge s-' + m.status}>{bookingStatusLabel(m.status)}</span></td>
-                  <td>{vnd(m.totalAmount)}</td>
-                  <td><Link className="link" to={`/reception/bookings/${m._id}`}>Mở →</Link></td>
-                </tr>
-              ))}
+              {members.map((m) => {
+                const rd = readyOf(m)
+                return (
+                  <tr key={m._id}>
+                    <td><b>{m.room?.roomNumber || '—'}</b> <small>· {m.roomType?.name}</small></td>
+                    <td>{m.adults}NL{m.children > 0 ? ` + ${m.children}TE` : ''}</td>
+                    <td><span className={'rc-badge s-' + m.status}>{bookingStatusLabel(m.status)}</span></td>
+                    {/* Chỉ có nghĩa khi đang chờ nhận; phòng đã trả/huỷ thì trạng thái vật lý không liên quan */}
+                    <td>{m.status === 'confirmed' && rd
+                      ? <span className={'rc-fit ' + rd.cls}>{rd.text}</span>
+                      : <span className="rc-muted">—</span>}</td>
+                    <td>{vnd(m.totalAmount)}</td>
+                    <td><Link className="link" to={`/reception/bookings/${m._id}`}>Mở →</Link></td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
 

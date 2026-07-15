@@ -26,22 +26,6 @@ export const customerService = {
     const response = await axiosInstance.get('/public/rooms/available', { params })
     return response.data // { success, data: rooms }
   },
-  createBooking: async (data) => {
-    const response = await axiosInstance.post('/customer/bookings', data)
-    return response.data
-  },
-  getBookingDetail: async (id) => {
-    const response = await axiosInstance.get(`/customer/bookings/${id}`)
-    return response.data
-  },
-  createPaymentLink: async (id, type) => {
-    const response = await axiosInstance.post(`/customer/bookings/${id}/payos-link`, { type })
-    return response.data
-  },
-  getBookingHistory: async () => {
-    const response = await axiosInstance.get('/customer/bookings')
-    return response.data
-  },
   // ── Đặt nhiều phòng online (nhóm) ──
   quoteBookingGroup: async (data) => {
     const response = await axiosInstance.post('/customer/booking-groups/quote', data)

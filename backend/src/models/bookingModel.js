@@ -1,6 +1,7 @@
 // Owner: Quốc — booking lifecycle (UC-17/29 create, UC-30→43 vận hành)
 // ⚠️ HỢP ĐỒNG LIÊN-MODULE: enum BOOKING_STATUS dưới đây là nguồn sự thật cho cả nhóm.
-//    Khánh tạo booking online qua bookingService.create(); Tú ghi vào `missingAmenities`.
+//    Mọi lần đặt (online lẫn walk-in) đều đi qua BookingGroup: createGroupOnline / createGroup.
+//    Không còn đường tạo booking lẻ — Tú ghi vào `missingAmenities`.
 const mongoose = require('mongoose')
 
 const BOOKING_STATUS = [

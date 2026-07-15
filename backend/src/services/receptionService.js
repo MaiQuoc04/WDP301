@@ -191,7 +191,28 @@ exports.createGroup = async (accountId, body = {}) => {
 // Chi tiết nhóm (các phòng + 1 hoá đơn gom)
 exports.getGroup = async (accountId, groupId) => {
   await assertGroupInBranch(accountId, groupId)
-  return bookingService.getGroupDetail(groupId)
+  const detail = await bookingService.getGroupDetail(groupId)
+  // Gắn tình trạng dọn cho từng phòng để lễ tân thấy TRƯỚC khi bấm "Nhận tất cả",
+  // thay vì bấm xong mới nhận báo "bỏ qua 1 phòng (đang cleaning)".
+  // Bọc ở đây chứ KHÔNG nhét vào getGroupDetail: hàm đó customerController cũng gọi
+  // -> khách sẽ thấy tên + lịch làm việc của nhân viên.
+  const roomIds = detail.members.map((m) => m.room?._id).filter(Boolean)
+  if (!roomIds.length) return detail
+  const [live, cleaning] = await Promise.all([
+    Room.find({ _id: { $in: roomIds } }).select('status awaitingRestock').lean(),
+    housekeepingService.roomCleaningInfo(roomIds),
+  ])
+  const byId = Object.fromEntries(live.map((r) => [String(r._id), r]))
+  detail.members = detail.members.map((m) => {
+    if (!m.room) return m
+    const s = byId[String(m.room._id)]
+    return {
+      ...m,
+      room: { ...m.room, status: s?.status, awaitingRestock: !!s?.awaitingRestock },
+      cleaning: cleaning[String(m.room._id)] || null,
+    }
+  })
+  return detail
 }
 
 // Thu cọc gom cho cả nhóm -> mọi phòng pending chuyển confirmed

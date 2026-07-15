@@ -466,6 +466,8 @@
 /* ---------- Messages ---------- */
 .rc-err { color: #B91C1C; background: #FEF2F2; padding: 12px 16px; border-radius: var(--rc-radius-md); font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #FECACA; }
 .rc-ok { color: #15803D; background: #F0FDF4; padding: 12px 16px; border-radius: var(--rc-radius-md); font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #BBF7D0; }
+/* Làm được một phần, còn phòng bị bỏ qua -> không phải xanh (dễ tưởng xong việc), cũng không phải đỏ. */
+.rc-warn { color: #B45309; background: #FFFBEB; padding: 12px 16px; border-radius: var(--rc-radius-md); font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #FDE68A; }
 
 @media (max-width: 768px) {
   .rc-top { gap: 16px; padding: 0 20px; overflow-x: auto; height: 64px; }
