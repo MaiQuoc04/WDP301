@@ -20,6 +20,12 @@ const MapPin = ({ className = 'h-4 w-4' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
 );
 
+// Sao đặc cho điểm đánh giá cạnh nút lọc chi nhánh. fill="currentColor" để đổi màu
+// theo nút (vàng khi nút trắng, trắng khi nút đang chọn nền vàng).
+const Star = ({ className = 'h-3 w-3' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 5.9 6.6.95-4.75 4.63 1.12 6.52L12 17.4l-5.87 3.1 1.12-6.52L2.5 9.35l6.6-.95L12 2.5z" /></svg>
+);
+
 /* ---- Icons ---- */
 const IconArea = () => (
   <svg className="h-4 w-4 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg>
@@ -136,6 +142,18 @@ const RoomList = () => {
               >
                 <MapPin className="h-4 w-4" />
                 Chi nhánh {shortBranch(b)}
+                {/* Điểm đánh giá ngay trên nút lọc — khách đang phải chọn giữa các chi nhánh
+                    mà trước đây không có căn cứ gì. Chưa ai đánh giá thì không hiện gì
+                    (hiện "0.0 ★ (0)" trông như chi nhánh bị chê). */}
+                {b.rating?.count > 0 && (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${
+                    selectedBranch === b._id ? 'bg-white/20 text-white' : 'bg-gold/10 text-gold'
+                  }`}>
+                    <Star />
+                    {b.rating.average.toFixed(1)}
+                    <span className="font-normal opacity-70">({b.rating.count})</span>
+                  </span>
+                )}
               </button>
             ))}
           </div>

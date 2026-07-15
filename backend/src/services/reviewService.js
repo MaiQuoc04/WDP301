@@ -113,6 +113,19 @@ exports.listByBranch = async (branchId, { limit = 20 } = {}) => {
     .sort('-createdAt').limit(Math.min(Number(limit) || 20, 50)).lean()
 }
 
+// Điểm của TẤT CẢ chi nhánh trong 1 lần -> { branchId: {average, count} }.
+// Dùng cho danh sách chi nhánh: gọi ratingSummary từng cái là N+1 query, mà FE cũng
+// phải bắn N request chỉ để hiện mấy con số cạnh nút lọc.
+exports.ratingByBranch = async () => {
+  const rows = await Review.aggregate([
+    { $match: { status: 'active' } },
+    { $group: { _id: '$branch', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+  ])
+  return Object.fromEntries(rows.map((r) => [
+    String(r._id), { average: Math.round(r.avg * 10) / 10, count: r.count },
+  ]))
+}
+
 // Điểm trung bình + số lượt của 1 chi nhánh (hoặc tất cả nếu không truyền).
 exports.ratingSummary = async (branchId) => {
   const match = { status: 'active' }

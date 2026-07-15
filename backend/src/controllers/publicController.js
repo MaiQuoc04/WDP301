@@ -10,7 +10,13 @@ exports.getBranches = async (req, res) => {
   try {
     const Branch = mongoose.models.Branch || require('../models/branchModel')
     const branches = await Branch.find({ isActive: true }).select('name location hotline').lean()
-    res.json({ success: true, data: branches })
+    // Kèm điểm đánh giá để khách có căn cứ khi chọn chi nhánh. Lấy 1 lần cho tất cả
+    // (không gọi từng chi nhánh -> tránh N+1), chi nhánh chưa ai đánh giá -> count 0.
+    const byBranch = await require('../services/reviewService').ratingByBranch()
+    res.json({
+      success: true,
+      data: branches.map((b) => ({ ...b, rating: byBranch[String(b._id)] || { average: 0, count: 0 } })),
+    })
   } catch (err) {
     res.status(500).json({ success: false, message: err.message })
   }
@@ -90,10 +96,13 @@ exports.getHomeData = async (req, res) => {
   try {
     const featuredRooms = await RoomType.find({ status: 'active' }).sort({ basePrice: -1 }).limit(3)
     const dining = await Service.find({ status: 'active', category: 'dining' })
+    // populate branch: review là đánh giá CHI NHÁNH, không nói của chi nhánh nào thì
+    // khách đọc "phòng sạch, nhân viên nhiệt tình" mà không biết đang khen nơi nào.
     const reviews = await Review.find({ status: 'active' })
       .populate('customer', 'fullName')
+      .populate('branch', 'name')
       .sort({ createdAt: -1 })
-      .limit(5)
+      .limit(6) // Testimonials hiện tối đa 6 thẻ (reviews.slice(0, 6)) — lấy 5 là tự bớt mất 1
 
     res.json({
       success: true,
