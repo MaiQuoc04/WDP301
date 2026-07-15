@@ -7,6 +7,8 @@ import Reveal from '../../components/common/Reveal';
 import { customerService } from '../../services';
 import { socket, connectSocket } from '../../services/socketService';
 import { fmtDate } from '../../utils/date';
+import StarRating from '../../components/common/StarRating';
+import ReviewModal from '../../components/common/ReviewModal';
 
 const STATUS = {
   pending:     { label: 'Chờ thanh toán cọc', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -20,22 +22,41 @@ const STATUS = {
 
 const formatPrice = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
+const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 86400000));
+
 const BookingHistoryPage = () => {
   const [bookings, setBookings] = useState([]); // mỗi phần tử = 1 NHÓM đặt phòng
+  const [reviewable, setReviewable] = useState({}); // groupId -> lần ở được đánh giá
+  const [myReviews, setMyReviews] = useState({});   // groupId -> review đã gửi
+  const [reviewing, setReviewing] = useState(null); // lần ở đang mở modal
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth || {});
+
+  // Ai được đánh giá là do BACKEND quyết (online + đã ở xong + trong 14 ngày + chưa đánh giá).
+  // FE chỉ hỏi rồi hiện nút — nhân bản luật ra client là kiểu gì cũng lệch.
+  const fetchReviews = useCallback(async () => {
+    try {
+      const [able, mine] = await Promise.all([
+        customerService.getReviewableStays(),
+        customerService.getMyReviews(),
+      ]);
+      if (able.success) setReviewable(Object.fromEntries(able.data.map((s) => [String(s.groupId), s])));
+      if (mine.success) setMyReviews(Object.fromEntries(mine.data.map((r) => [String(r.group?._id || r.group), r])));
+    } catch { /* không có đánh giá thì thôi, đừng chặn cả trang lịch sử */ }
+  }, []);
 
   const fetchHistory = useCallback(async () => {
     try {
       const res = await customerService.getBookingGroupHistory();
       if (res.success) setBookings(res.data);
+      await fetchReviews();
     } catch (err) {
       alert('Lỗi khi tải lịch sử đặt phòng: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchReviews]);
 
   useEffect(() => {
     if (!token) { navigate('/login', { state: { from: '/customer/booking-history' } }); return; }
@@ -74,6 +95,8 @@ const BookingHistoryPage = () => {
           <div className="space-y-6">
             {bookings.map((b, i) => {
               const st = STATUS[b.status] || { label: b.status, cls: 'bg-gray-100 text-gray-600 border-gray-200' };
+              const canReview = reviewable[String(b._id)];   // backend nói được -> hiện nút
+              const myReview = myReviews[String(b._id)];     // đã gửi rồi -> hiện lại sao mình chấm
               return (
                 <Reveal as="article" key={b._id} delay={(i % 4) * 90} className="grid overflow-hidden rounded-lg bg-white shadow-raised transition-shadow duration-300 hover:shadow-elevated sm:grid-cols-[200px_1fr]">
                   <div className="h-44 overflow-hidden sm:h-auto">
@@ -118,17 +141,39 @@ const BookingHistoryPage = () => {
                       </div>
                     </div>
 
+                    {/* Đánh giá đã gửi -> hiện lại cho khách xem chính lời mình viết */}
+                    {myReview && (
+                      <div className="mt-4 rounded-sm bg-cream px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <StarRating value={myReview.rating} size="h-4 w-4" />
+                          <span className="font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/45">Bạn đã đánh giá</span>
+                        </div>
+                        {myReview.comment && <p className="mt-1.5 font-body text-sm italic text-charcoal/65">“{myReview.comment}”</p>}
+                      </div>
+                    )}
+
                     <div className="mt-auto flex flex-col gap-3 border-t border-black/5 pt-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="font-body text-sm text-charcoal/60">
                         Tổng tiền: <span className="font-display text-lg font-semibold text-gold">{formatPrice(b.totalAmount)}</span>
                       </div>
-                      <div className="flex gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Hạn 14 ngày -> nói rõ còn mấy ngày, đừng để khách quay lại thì nút biến mất không hiểu vì sao */}
+                        {canReview && (
+                          <span className="font-body text-xs text-charcoal/45">
+                            Còn {daysLeft(canReview.expiresAt)} ngày để đánh giá
+                          </span>
+                        )}
                         <button onClick={() => navigate(`/checkout/group/${b._id}`)} className="rounded-sm border border-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-gold transition-colors hover:bg-gold hover:text-white">
                           Xem chi tiết
                         </button>
                         {b.status === 'pending' && (
                           <button onClick={() => navigate(`/checkout/group/${b._id}`)} className="rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
                             Thanh toán tiếp
+                          </button>
+                        )}
+                        {canReview && (
+                          <button onClick={() => setReviewing(canReview)} className="rounded-sm bg-gold px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-gold-hover">
+                            Đánh giá
                           </button>
                         )}
                       </div>
@@ -140,6 +185,14 @@ const BookingHistoryPage = () => {
           </div>
         )}
       </div>
+
+      {reviewing && (
+        <ReviewModal
+          stay={reviewing}
+          onClose={() => setReviewing(null)}
+          onDone={() => { setReviewing(null); fetchReviews() }} // nạp lại -> nút rụng, hiện phần "Bạn đã đánh giá"
+        />
+      )}
 
       <Footer />
     </div>
