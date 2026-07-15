@@ -51,5 +51,29 @@ export const customerService = {
     const response = await axiosInstance.post(`/customer/booking-groups/${id}/cancel`)
     return response.data
   },
-  // TODO(Khánh): searchRooms, getRoomDetail, getBill, review ...
+
+  // ----- Đánh giá chi nhánh (UC-22) -----
+  // Backend quyết ai được đánh giá (online + đã ở xong + trong 14 ngày + chưa đánh giá),
+  // FE chỉ hỏi "lần ở nào được phép" rồi hiện nút — không tự suy luật ở client.
+  getReviewableStays: async () => {
+    const response = await axiosInstance.get('/customer/reviews/reviewable')
+    return response.data // { success, data: [{ groupId, code, branch, checkOut, roomCount, expiresAt }] }
+  },
+  getMyReviews: async () => {
+    const response = await axiosInstance.get('/customer/reviews/mine')
+    return response.data
+  },
+  createReview: async (data) => {
+    const response = await axiosInstance.post('/customer/reviews', data) // { groupId, rating, comment }
+    return response.data
+  },
+  getBranchReviews: async (branchId) => {
+    const response = await axiosInstance.get(`/public/branches/${branchId}/reviews`)
+    return response.data
+  },
+  getBranchRating: async (branchId) => {
+    const response = await axiosInstance.get(`/public/branches/${branchId}/rating`)
+    return response.data // { success, data: { average, count } }
+  },
+  // TODO(Khánh): searchRooms, getRoomDetail, getBill ...
 }
