@@ -38,6 +38,11 @@ const housekeepingTaskSchema = new mongoose.Schema({
 
   startedAt:   { type: Date },
   completedAt: { type: Date },
+
+  // Đã bắn cảnh báo "quá hạn bắt đầu dọn" lúc nào (null = chưa bắn).
+  // Bắt buộc phải lưu: job chạy mỗi 60s, không có cờ này thì mỗi phút lại bắn lại
+  // cùng một cảnh báo cho HK lẫn quản lý -> ai cũng học cách bơ thông báo.
+  overdueNotifiedAt: { type: Date },
 }, { timestamps: true })
 
 housekeepingTaskSchema.statics.TASK_STATUS = TASK_STATUS

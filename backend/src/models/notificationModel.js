@@ -2,7 +2,7 @@
 const mongoose = require('mongoose')
 
 // type: gợi ý nguồn sự kiện để FE chọn icon/màu. refType+refId để deep-link khi bấm.
-const NOTI_TYPE = ['task_new', 'task_claimed', 'inspection_done', 'general']
+const NOTI_TYPE = ['task_new', 'task_claimed', 'task_overdue', 'inspection_done', 'general']
 
 const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
