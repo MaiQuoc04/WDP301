@@ -778,9 +778,17 @@ exports.previewCheckOutGroup = async (groupId) => {
   return {
     canAssign: !!assign, // false = chi nhánh chưa có nhân viên buồng phòng -> trả phòng sẽ bị chặn
     totalRemaining,
+    // Cả danh sách HK của chi nhánh để lễ tân đổi người nếu muốn. Kèm activeTasks:
+    // autoAssign ưu tiên TẦNG trước tải việc nên hay dồn cả nhóm cho 1 người —
+    // lễ tân phải thấy ai đang quá tải mới quyết được có nên san bớt hay không.
+    housekeepers: pool.map((h) => ({
+      accountId: h.accountId, name: h.fullName || h.email, floors: h.floors,
+      activeTasks: h.activeTasks, onFloor: h.onFloor,
+    })),
     rooms: withRoom.map((w) => ({
       bookingId: w.booking._id, roomNumber: w.roomNumber, floor: w.floor,
       remaining: Math.max(0, w.booking.remainingAmount || 0),
+      housekeeperId: assign ? (assign[String(w.booking._id)] || null) : null, // để FE điền sẵn dropdown
       housekeeper: assign ? (nameById[String(assign[String(w.booking._id)])] || null) : null,
     })),
   }
@@ -823,7 +831,9 @@ exports.cancelGroupAll = async (groupId, { reason, by } = {}) => {
 // Trả phòng TẤT CẢ: tự phân housekeeper theo tầng+tải + thu tiền còn lại GOM 1 lần.
 // Tạo task dọn theo THỨ TỰ (tầng, số phòng) -> assignedAt tăng dần theo lộ trình -> housekeeper dọn có chủ đích (FIFO hợp lý).
 // skipPayment=true khi tiền còn lại đã thu qua PayOS QR (Payment 'remaining' đã tạo) — không tạo lại giao dịch tiền mặt.
-exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = false } = {}) => {
+// assignees: { [bookingId]: housekeeperAccountId } — lễ tân ghi đè người dọn cho vài phòng.
+// Phòng không có trong map thì vẫn dùng người auto chọn -> không đụng gì là nhanh như cũ.
+exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = false, assignees = {} } = {}) => {
   const group = await getGroupOr404(groupId)
   const members = await Booking.find({ group: groupId, status: 'checked_in' })
   if (!members.length) throw new Error('Nhóm không có phòng nào đang ở để trả')
@@ -843,6 +853,19 @@ exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = fal
   if (!assign) throw new Error('Chi nhánh chưa có nhân viên buồng phòng để giao dọn phòng')
 
   const hk = require('./housekeepingService')
+  // Ghi đè người dọn: ưu tiên tham số truyền vào (luồng tiền mặt, gọi thẳng từ màn hình);
+  // không có thì lấy bản đã cất trên nhóm lúc tạo QR (luồng QR — webhook gọi, không có tham số).
+  const saved = group.cleaningAssignees ? Object.fromEntries(group.cleaningAssignees) : {}
+  const overrides = Object.keys(assignees || {}).length ? assignees : saved
+  // Validate TRƯỚC vòng lặp: người không thuộc chi nhánh thì phải hỏng ngay,
+  // đừng để trả xong nửa nhóm mới lăn ra lỗi rồi bỏ dở giữa chừng.
+  for (const [bookingId, hkId] of Object.entries(overrides)) {
+    if (!hkId) continue
+    if (!withRoom.some((w) => String(w.booking._id) === String(bookingId))) continue // không thuộc nhóm -> bỏ
+    await hk.assertHousekeeperInBranch(hkId, group.branch)
+    assign[String(bookingId)] = hkId
+  }
+
   let totalRemaining = 0
   for (const w of withRoom) {                         // theo đúng thứ tự tầng/phòng đã sort
     const b = w.booking

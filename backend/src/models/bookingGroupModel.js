@@ -20,6 +20,10 @@ const bookingGroupSchema = new mongoose.Schema({
   totalAmount:   { type: Number, default: 0 },
   depositAmount: { type: Number, default: 0 },
   expiresAt:     { type: Date },     // hạn thanh toán cọc (online); quá hạn -> job huỷ cả nhóm
+  // Lễ tân đổi người dọn cho vài phòng trước khi trả nhóm: { bookingId -> accountId của housekeeper }.
+  // Phải LƯU LẠI vì luồng QR trả phòng do webhook PayOS gọi checkOutGroup — webhook không biết gì
+  // về lựa chọn trên màn hình, không lưu thì lễ tân đổi người xong khách quét QR là ghi đè mất sạch.
+  cleaningAssignees: { type: Map, of: mongoose.Schema.Types.ObjectId, default: undefined },
   notes:     { type: String, trim: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân
 }, { timestamps: true })
