@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, Select, Tag, message } from 'antd'
 import { PlusOutlined, CheckOutlined, CloseOutlined, SyncOutlined, EyeOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+import { fmtDateTime } from '../../utils/date'
 
 const STATUS_LABEL = { open: 'Chờ duyệt', maintaining: 'Đang bảo trì', fix_requested: 'Chờ xác nhận sửa', resolved: 'Đã khắc phục', cancelled: 'Đã hủy' }
 const SEV_LABEL = { high: 'Nghiêm trọng', medium: 'Trung bình', low: 'Thấp' }
-const fmtDT = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '-')
+const fmtDT = (d) => fmtDateTime(d) || '-'
 const NoteBox = ({ children }) => (
   <div style={{ whiteSpace: 'pre-wrap', background: '#f7f7f9', border: '1px solid #eee', borderRadius: 6, padding: '8px 12px', marginTop: 4 }}>{children}</div>
 )

@@ -34,9 +34,12 @@ export default function ServiceBoardPage() {
   return (
     <div className="rc-svcboard">
       <div className="rc-bar">
-        <h2>Triển khai dịch vụ
-          {totalPending > 0 && <span className="rc-badge s-pending" style={{ marginLeft: 8 }}>{totalPending} chờ giao</span>}
-        </h2>
+        <div className="rc-bar-titles">
+          <h2>Triển khai dịch vụ
+            {totalPending > 0 && <span className="rc-badge s-pending" style={{ marginLeft: 8 }}>{totalPending} chờ giao</span>}
+          </h2>
+          <p className="rc-sub">Dịch vụ khách đã mua ở các phòng đang có người — tick khi đã giao tới phòng.</p>
+        </div>
         <div className="rc-filters" style={{ margin: 0 }}>
           <label className="rc-check" style={{ margin: 0 }}>
             <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />

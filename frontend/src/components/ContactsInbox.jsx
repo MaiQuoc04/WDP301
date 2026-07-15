@@ -1,7 +1,6 @@
 // Owner: Quốc — hộp thư tin nhắn liên hệ (dùng chung lễ tân & QL). Phản hồi thủ công qua email (mailto).
 import { useEffect, useState, useCallback } from 'react'
-
-const fmt = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '')
+import { fmtDateTime as fmt } from '../utils/date'
 
 const S = {
   wrap: { maxWidth: 900 },

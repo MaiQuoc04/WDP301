@@ -2,11 +2,13 @@
    Reception UI — Premium Modern Design System
    ============================================================ */
 :root {
-  --rc-bg: #F4F7F9;
+  /* Nền kem ấm — đồng bộ manager/admin (#faf6f0), KHÔNG dùng xám xanh #F4F7F9 lạc tông nữa */
+  --rc-bg: #faf6f0;
   --rc-surface: #FFFFFF;
   --rc-gold: #A18348;
   --rc-gold-light: #C6A258;
   --rc-gold-glow: rgba(161, 131, 72, 0.25);
+  --rc-cream: #FAF6F0;          /* nền nhấn: header bảng, khối tổng tiền */
   --rc-text-main: #1A1D20;
   --rc-text-muted: #64748B;
   --rc-border: #E2E8F0;
@@ -16,6 +18,13 @@
   --rc-radius-lg: 16px;
   --rc-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Số tiền / số liệu: chữ số đều bề ngang -> các cột tiền thẳng hàng khi đọc lướt */
+.rc-num, .rc-table td.rc-num, .rc-bill td:last-child {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+.rc-table td.rc-num, .rc-table th.rc-num { text-align: right; }
 
 .rc {
   min-height: 100vh;
@@ -108,6 +117,7 @@
   padding: 32px 40px;
   flex: 1;
   min-width: 0;          /* cho phép giãn đầy trong flex container, không co theo nội dung */
+  background: var(--rc-bg);
   animation: fadeUp 0.5s ease-out forwards;
 }
 /* Chỉ fade opacity, KHÔNG dùng transform — vì transform trên .rc-main sẽ làm position:fixed
@@ -146,12 +156,55 @@
   gap: 16px;
   margin-bottom: 24px;
 }
+/* Tiêu đề + phụ đề: phụ đề nói trang này để làm gì, đỡ phải đoán */
+.rc-bar h2 { margin-bottom: 0; }
+.rc-sub { margin: 6px 0 0; font-size: 14px; color: var(--rc-text-muted); }
+.rc-bar-titles { min-width: 0; }
+/* Đếm nhỏ cạnh tiêu đề (vd "· 24 phòng") — không được to bằng tiêu đề */
+.rc-count { font-family: var(--font-body); font-size: 14px; font-weight: 500; color: var(--rc-text-muted); }
+
+/* ---------- Tabs (gạch chân) ----------
+   Thay các nút bo tròn tự chế bằng inline style ở BookingsPage — tab trông như nút
+   thì lễ tân tưởng bấm vào là chạy một hành động, chứ không phải đổi khung nhìn. */
+.rc-tabs {
+  display: flex;
+  gap: 28px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--rc-border);
+}
+.rc-main .rc-tabs button.rc-tab {
+  border: none;
+  background: none;
+  padding: 0 0 12px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rc-text-muted);
+  box-shadow: none;
+}
+.rc-main .rc-tabs button.rc-tab:hover { color: var(--rc-text-main); background: none; transform: none; }
+.rc-main .rc-tabs button.rc-tab.on { color: var(--rc-gold); border-bottom-color: var(--rc-gold); }
+.rc-tab-n { font-weight: 500; opacity: 0.7; }
+
 .rc-filters {
   display: flex;
   gap: 12px;
   margin: 0 0 24px;
   flex-wrap: wrap;
+  align-items: center;
 }
+/* Thanh lọc trong thẻ trắng — tách khỏi bảng, đỡ trôi lơ lửng trên nền kem */
+.rc-filters.card {
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-lg);
+  padding: 14px 18px;
+  box-shadow: var(--rc-shadow-soft);
+}
+.rc-filters-label { font-size: 13px; font-weight: 600; color: var(--rc-text-muted); }
+.rc-filters input[type="text"] { min-width: 260px; }
 
 /* ---------- Inputs ---------- */
 .rc-filters select, .rc-filters input,
@@ -173,41 +226,71 @@
   border-color: var(--rc-gold);
   box-shadow: 0 0 0 3px var(--rc-gold-glow);
 }
+/* Checkbox theo tông vàng — mặc định trình duyệt là xanh dương, lạc hẳn khỏi bảng màu */
+.rc-main input[type="checkbox"] { accent-color: var(--rc-gold); cursor: pointer; }
 
 /* ---------- Buttons ---------- */
-/* :not(.ant-btn) để KHÔNG đè lên nút Ant Design ở trang Dashboard lễ tân */
-.rc-main button:not(.link):not(.rc-chip):not(.ant-btn), .rc-btn {
+/* PHÂN CẤP: mặc định = nút PHỤ (viền mảnh, nền trắng). Chỉ nút .primary mới vàng đặc.
+   Trước đây mọi <button> đều vàng gradient -> "Check-in / Nhận sớm / No-show / Huỷ" trông
+   ngang hàng nhau, lễ tân không đọc ra đâu là việc chính. Mỗi màn chỉ được MỘT nút vàng.
+   :not(.ant-btn) để KHÔNG đè lên nút Ant Design ở trang Dashboard lễ tân. */
+/* Danh sách loại trừ bọc trong :where() -> specificity = 0, nên cả selector chỉ (0,1,1).
+   KHÔNG dùng chuỗi :not(.a):not(.b)… : mỗi :not() cộng specificity, chuỗi dài biến rule
+   "mặc định" này thành rule mạnh nhất file và đè chết mọi biến thể nút (tab, segment, svc-toggle). */
+.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .ant-btn)), .rc-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  border: none;
+  border: 1px solid var(--rc-border);
   border-radius: var(--rc-radius-md);
-  background: linear-gradient(135deg, var(--rc-gold), var(--rc-gold-light));
-  color: #fff;
+  background: var(--rc-surface);
+  color: var(--rc-text-main);
+  font-family: inherit;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition: var(--rc-transition);
+}
+.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .ant-btn)):hover {
+  border-color: var(--rc-gold);
+  background: #FDFBF8;
+  color: var(--rc-gold);
+}
+
+/* Nút CHÍNH — việc chính của màn hình. Dùng ĐÚNG 1 nút mỗi khu thao tác. */
+.rc-main button.primary, .rc-btn {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--rc-gold), var(--rc-gold-light));
+  color: #fff;
   box-shadow: 0 4px 12px rgba(161, 131, 72, 0.2);
 }
-.rc-main button:not(.link):not(.rc-chip):not(.ant-btn):hover, .rc-btn:hover {
+.rc-main button.primary:hover, .rc-btn:hover {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--rc-gold-hover, #8B6F3F), var(--rc-gold));
+  color: #fff;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(161, 131, 72, 0.3);
 }
-.rc-main button:not(.link):not(.rc-chip):not(.ant-btn):active {
-  transform: translateY(0);
+.rc-main button.primary:active { transform: translateY(0); }
+
+/* Nút NGUY HIỂM — chữ đỏ viền đỏ nhạt, KHÔNG nền đỏ đặc (đừng tranh chú ý với nút chính) */
+.rc-main button.danger {
+  border-color: #FECACA;
+  background: var(--rc-surface);
+  color: #DC2626;
 }
-.rc-actions button.danger {
-  background: linear-gradient(135deg, #e11d48, #fb7185);
-  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2);
+.rc-main button.danger:hover {
+  border-color: #DC2626;
+  background: #FEF2F2;
+  color: #B91C1C;
 }
-.rc-actions button.danger:hover {
-  box-shadow: 0 6px 16px rgba(225, 29, 72, 0.3);
-}
-.rc-main button:not(.ant-btn):disabled {
-  background: #cbd5e1;
-  color: #fff;
+
+.rc-main button:not(:where(.ant-btn)):disabled,
+.rc-main button.primary:disabled {
+  border-color: var(--rc-border);
+  background: #F1F5F9;
+  color: #94A3B8;
   cursor: not-allowed;
   box-shadow: none;
   transform: none;
@@ -227,10 +310,14 @@
 }
 .rc-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
   margin: 0 0 24px;
   flex-wrap: wrap;
 }
+/* Việc phá huỷ (Huỷ / No-show) đẩy hẳn sang phải, tách khỏi cụm việc thường
+   -> không bấm nhầm khi đang thao tác nhanh trong ca trực. */
+.rc-actions button.danger { margin-left: auto; }
 
 /* Links */
 .rc-table a, .rc-detail a {
@@ -255,20 +342,25 @@
   box-shadow: var(--rc-shadow-soft);
 }
 .rc-table th {
-  background: #F8FAFC;
+  background: var(--rc-cream);
   color: var(--rc-text-muted);
   text-align: left;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 16px 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 13px 20px;
   border-bottom: 1px solid var(--rc-border);
+  white-space: nowrap;
 }
 .rc-table td {
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-bottom: 1px solid #F1F5F9;
   font-size: 14px;
   vertical-align: middle;
 }
+/* Mã phòng không được ngắt dòng ("STA-101" bị bẻ thành "STA-" / "101" là đọc nhầm số phòng) */
+.rc-table td > b { white-space: nowrap; }
 .rc-table tbody tr {
   transition: var(--rc-transition);
 }
@@ -291,9 +383,11 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: capitalize;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
+/* KHÔNG text-transform: capitalize — nhãn tiếng Việt đã viết hoa đúng chỗ rồi,
+   capitalize biến "Hoàn thành" thành "Hoàn Thành", "Đang ở" thành "Đang Ở". */
 .s-pending { background: #FEF3C7; color: #B45309; }
 .s-confirmed { background: #E0F2FE; color: #0369A1; }
 .s-checked_in { background: #DCFCE7; color: #15803D; }
@@ -303,38 +397,60 @@
 /* Nhóm lệch pha: các phòng không cùng trạng thái. Màu riêng để không lẫn với bất kỳ pha nào. */
 .s-mixed { background: #EDE9FE; color: #6D28D9; }
 
-/* Nhãn nhỏ "N phòng" trong danh sách nhóm */
+/* Nhãn nhỏ "N phòng" trong danh sách nhóm — viền vàng chữ vàng, KHÔNG nền vàng đặc:
+   nền đặc làm nó nặng ngang mã booking, trong khi nó chỉ là chú thích của mã. */
 .rc-pill {
   display: inline-block;
-  margin-left: 6px;
+  margin-top: 4px;
   padding: 1px 8px;
+  border: 1px solid var(--rc-gold);
   border-radius: 20px;
-  background: var(--rc-gold, #b08d57);
-  color: #fff;
+  background: transparent;
+  color: var(--rc-gold);
   font-size: 11px;
   font-weight: 600;
 }
+
+/* Chú thích dưới badge trạng thái (vd "cần thu cọc", "2 đang ở · 1 đã trả") */
+.rc-badge-note { display: block; margin-top: 4px; font-size: 11px; line-height: 1.4; }
+.rc-badge-note.mixed { color: #7C3AED; }
+.rc-badge-note.warn { color: #B45309; }
+
+/* Số phòng trong bảng — vàng đậm, là thứ lễ tân dò tìm nhiều nhất */
+.rc-rooms-cell { color: var(--rc-gold); font-weight: 700; }
+
+/* Trạng thái giao dịch (trang Giao dịch) */
+.tx-paid { background: #DCFCE7; color: #15803D; }
+.tx-pending { background: #FEF3C7; color: #B45309; }
+.tx-expired, .tx-failed { background: #FEE2E2; color: #B91C1C; }
 
 .st-available { background: #DCFCE7; color: #15803D; }
 .st-occupied { background: #FEE2E2; color: #B91C1C; }
 .st-cleaning { background: #FEF3C7; color: #B45309; }
 .st-maintenance, .st-locked { background: #F1F5F9; color: #475569; }
 
-/* ---------- Detail: 2 columns ---------- */
+/* ---------- Detail: 2 columns ----------
+   Cột trái = nhãn/giá trị (chữ ngắn), cột phải = BẢNG + hoá đơn (cần chỗ).
+   Chia 50/50 bằng flex:1 làm bảng 6 cột bên phải tràn ra ngoài mép thẻ.
+   minmax(0, 1fr) là bắt buộc: 1fr mặc định = minmax(auto, 1fr) -> không co dưới bề rộng nội dung. */
 .rc-cols {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   gap: 24px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: start;
 }
 .rc-cols section {
-  flex: 1;
-  min-width: 320px;
+  min-width: 0;
   background: var(--rc-surface);
   border-radius: var(--rc-radius-lg);
   padding: 28px;
   box-shadow: var(--rc-shadow-soft);
 }
+@media (max-width: 1100px) { .rc-cols { grid-template-columns: 1fr; } }
+
+/* Bảng rộng trong thẻ hẹp: cuộn ngang TRONG thẻ, không đẩy cả trang trôi ngang */
+.rc-table-wrap { overflow-x: auto; margin-bottom: 4px; }
+.rc-table-wrap .rc-table { margin-bottom: 0; }
 .rc-cols section p {
   margin: 0 0 10px;
   font-size: 14px;
@@ -345,12 +461,58 @@
   font-weight: 600;
 }
 
-/* ---------- Bill ---------- */
+/* ---------- Bill ----------
+   Hoá đơn chia NHÓM (tiền phòng / dịch vụ / thiết bị / phát sinh giờ) rồi mới tới tổng kết.
+   Trước đây "Tổng" và "Còn lại" dùng chung class .tot -> hai dòng đều đậm + gạch trên, tranh
+   nhau, trong khi con số lễ tân cần nhất là CÒN LẠI. Giờ chỉ .due được nổi. */
 .rc-bill { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.rc-bill td { padding: 12px 0; border-bottom: 1px dashed var(--rc-border); font-size: 14px; }
-.rc-bill td:last-child { text-align: right; font-weight: 500; }
-.rc-bill tr.tot td { font-weight: 700; border-bottom: none; border-top: 2px solid var(--rc-text-main); padding-top: 16px; margin-top: 8px;}
-.rc-bill tr.tot:last-child td { color: var(--rc-gold); font-size: 18px; }
+.rc-bill td { padding: 11px 0; border-bottom: 1px solid #F1F5F9; font-size: 14px; }
+.rc-bill td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+
+/* Tiêu đề nhóm dòng. text-align: left BẮT BUỘC — ô này colSpan=2 nên cũng khớp
+   td:last-child ở trên và bị đẩy sang phải nếu không ghi đè. */
+.rc-bill tr.grp td {
+  text-align: left;
+  padding: 18px 0 6px;
+  border-bottom: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+.rc-bill tr.grp:first-child td { padding-top: 4px; }
+/* Khoản phát sinh ngoài dự kiến (giờ, thiết bị thiếu) -> đỏ, khách sẽ hỏi tới */
+.rc-bill td.extra { color: #DC2626; }
+
+/* Tổng: đậm, gạch trên mảnh — là mốc cộng, không phải con số cần hành động */
+.rc-bill tr.tot td {
+  font-weight: 700;
+  border-bottom: none;
+  border-top: 1px solid var(--rc-text-main);
+  padding-top: 14px;
+}
+/* Đã trả: mờ đi, chỉ là thông tin đối chiếu */
+.rc-bill tr.paid td { color: var(--rc-text-muted); border-bottom: none; font-weight: 500; }
+
+/* CÒN LẠI — con số lễ tân đọc để thu tiền. Khối kem, số to serif vàng. */
+.rc-bill tr.due td {
+  border-bottom: none;
+  border-top: 2px solid var(--rc-text-main);
+  background: var(--rc-cream);
+  padding: 16px 14px;
+}
+.rc-bill tr.due td:first-child {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+  border-radius: var(--rc-radius-md) 0 0 var(--rc-radius-md);
+}
+.rc-bill tr.due td:last-child {
+  font-family: var(--font-display, serif);
+  font-size: 30px; font-weight: 700; line-height: 1.1;
+  color: var(--rc-gold);
+  border-radius: 0 var(--rc-radius-md) var(--rc-radius-md) 0;
+}
 
 .rc-lines { list-style: none; padding: 0; margin: 12px 0; }
 .rc-lines li { padding: 8px 0; font-size: 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f8fafc; }
@@ -366,9 +528,87 @@
   padding: 32px;
   box-shadow: var(--rc-shadow-soft);
 }
-.rc-form label { display: block; margin: 16px 0 8px; font-size: 14px; font-weight: 600; color: var(--rc-text-main); }
-.rc-form input, .rc-form select { display: block; width: 100%; box-sizing: border-box; }
-.rc-form > button { margin-top: 24px; width: 100%; justify-content: center; padding: 12px; font-size: 15px;}
+.rc-form label { display: block; margin: 0; font-size: 14px; font-weight: 600; color: var(--rc-text-main); }
+.rc-form label > input, .rc-form label > select { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; }
+
+/* Bước 1: form (co giãn) + thẻ gợi ý cố định bên phải — lấp khoảng trống nửa màn */
+.rc-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1000px) { .rc-form-grid { grid-template-columns: 1fr; } }
+
+/* Nhóm trường: tiêu đề chữ hoa nhỏ + kẻ mảnh kéo hết hàng -> chia form dài thành từng cụm đọc được */
+.rc-fs { border: none; padding: 0; margin: 0 0 26px; }
+.rc-fs:last-of-type { margin-bottom: 20px; }
+.rc-fs > legend {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 0; margin-bottom: 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+.rc-fs > legend::after { content: ''; flex: 1; height: 1px; background: var(--rc-border); }
+/* 2 trường 1 hàng: form 6 trường xếp dọc 1 cột dài lê thê, đọc mãi không hết */
+.rc-fs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 640px) { .rc-fs-row { grid-template-columns: 1fr; } }
+
+/* Chú thích dưới ô nhập (giờ nhận/trả, cách tính số khách) */
+.rc-hint { display: block; margin-top: 6px; font-size: 12px; font-weight: 500; color: var(--rc-text-muted); font-style: italic; }
+/* Nhãn "N đêm" tự tính — xác nhận ngay lễ tân chọn đúng khoảng ngày */
+.rc-nights {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 14px; padding: 5px 12px;
+  border-radius: 999px;
+  background: #FBEFD3; color: #7A5C1E;
+  font-size: 13px; font-weight: 700;
+}
+
+/* Ô số có nút −/+ : bấm nhanh hơn gõ, và không nhập được số vô lý */
+.rc-stepper-num { display: flex; margin-top: 8px; }
+.rc-stepper-num input[type="number"] {
+  flex: 1; min-width: 0; text-align: center; font-weight: 600;
+  border-radius: 0; border-left: none; border-right: none;
+  -moz-appearance: textfield;
+}
+.rc-stepper-num input[type="number"]::-webkit-outer-spin-button,
+.rc-stepper-num input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.rc-main .rc-stepper-num button {
+  flex-shrink: 0; width: 40px; justify-content: center;
+  padding: 10px 0; font-size: 17px; font-weight: 700;
+  background: var(--rc-cream);
+  border: 1px solid var(--rc-border);
+}
+.rc-main .rc-stepper-num button:first-child { border-radius: var(--rc-radius-md) 0 0 var(--rc-radius-md); }
+.rc-main .rc-stepper-num button:last-child { border-radius: 0 var(--rc-radius-md) var(--rc-radius-md) 0; }
+
+/* Nút gom về góc phải — nút chính kéo dài hết chiều ngang trông như thanh chặn, không như nút */
+.rc-form-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 16px;
+  padding-top: 20px; border-top: 1px solid var(--rc-border);
+}
+
+/* Thẻ gợi ý nghiệp vụ — vừa lấp cột phải, vừa nhắc luật hay bị hỏi lại */
+.rc-tips {
+  background: var(--rc-cream);
+  border: 1px solid #F0E6D8;
+  border-radius: var(--rc-radius-lg);
+  padding: 20px;
+}
+.rc-tips h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 15px; }
+.rc-tips-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 8px; background: #FBEFD3; font-size: 15px;
+}
+.rc-tips ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rc-tips li {
+  position: relative; padding-left: 16px;
+  font-size: 13px; line-height: 1.6; color: var(--rc-text-muted);
+}
+.rc-tips li::before { content: ''; position: absolute; left: 0; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--rc-gold); }
+.rc-tips li b { color: var(--rc-text-main); }
 
 /* ---------- Walk-in stepper ---------- */
 .rc-stepper { display: flex; align-items: center; margin: 0 0 32px; flex-wrap: wrap; }
@@ -407,21 +647,79 @@
 .fit-short { background: #FEE2E2; color: #B91C1C; }
 
 /* ---------- Đặt nhiều phòng (nhóm) ---------- */
-.rc-row-on { background: var(--rc-gold-soft, #FEF3C7); }
+/* Dòng đang chọn: kem + vạch vàng trái. KHÔNG dùng nền hổ phách #FEF3C7 nữa —
+   trùng màu "cảnh báo/chờ dọn" ở cột bên cạnh, đọc ra thành phòng đang có vấn đề. */
+.rc-table tbody tr.rc-row-on { background: #FDFAF4; box-shadow: inset 3px 0 0 var(--rc-gold); }
+.rc-table tbody tr.rc-row-on:hover { background: #FBF6EC; }
+/* Phòng chưa nhận được ngay: mờ đi nhưng vẫn chọn được (lát dọn xong là nhận) */
+.rc-table tbody tr.rc-row-dim td:not(:last-child) { opacity: 0.55; }
 .rc-sticky-foot {
   position: sticky;            /* dính đáy màn hình khi cuộn (giống thanh tóm tắt booking online) */
   bottom: 14px;
   z-index: 30;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  margin-top: 16px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 20px;
+  margin-top: 16px; padding: 14px 18px;
   background: var(--rc-surface); border: 1px solid var(--rc-border);
   border-radius: var(--rc-radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
 }
 .rc-sticky-foot button { white-space: nowrap; }
-.rc-alloc-check { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; font-size: 13px; font-weight: 600; }
-.rc-alloc-check .ok { color: #15803D; }
-.rc-alloc-check .bad { color: #B91C1C; }
+/* Phần chữ trạng thái co giãn, đẩy tạm tính + nút sang phải */
+.rc-foot-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.rc-foot-info .main { font-weight: 600; color: var(--rc-text-main); }
+.rc-foot-info .sub { font-size: 13px; color: var(--rc-text-muted); }
+/* Tạm tính ngay cạnh nút bấm — lễ tân biết đang chốt bao nhiêu tiền trước khi bấm */
+.rc-foot-total { text-align: right; flex-shrink: 0; }
+.rc-foot-total .lbl {
+  display: block;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+.rc-foot-total .val {
+  font-family: var(--font-display, serif);
+  font-size: 24px; font-weight: 700; line-height: 1.2;
+  color: var(--rc-gold);
+  font-variant-numeric: tabular-nums;
+}
+.rc-ok-text { color: #059669; font-weight: 600; }
+
+/* ---------- Walk-in bước 3: bảng phân bổ + cột tóm tắt ---------- */
+.rc-alloc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+.rc-alloc-side {
+  position: sticky; top: 16px;
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-lg);
+  padding: 20px;
+  box-shadow: var(--rc-shadow-soft);
+}
+.rc-alloc-side > h3 { margin: 0 0 14px; font-size: 16px; }
+/* Khối tiền cọc — con số lễ tân thu ngay tại quầy, phải nổi nhất trong cả trang */
+.rc-deposit-box {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: var(--rc-radius-md);
+  background: linear-gradient(135deg, #EBD9AF, #D9BE86);
+  color: #4A3A1A;
+}
+.rc-deposit-box .lbl {
+  display: block;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  opacity: 0.75;
+}
+.rc-deposit-box .val {
+  display: block;
+  font-family: var(--font-display, serif);
+  font-size: 30px; font-weight: 700; line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.rc-deposit-box .hint { font-size: 12px; opacity: 0.8; }
+@media (max-width: 1100px) { .rc-alloc-grid { grid-template-columns: 1fr; } .rc-alloc-side { position: static; } }
 .rc-group-banner {
   margin: 12px 0; padding: 10px 14px; font-size: 14px;
   background: var(--rc-gold-soft, #FEF3C7); border: 1px solid var(--rc-border);
@@ -429,41 +727,22 @@
 }
 .rc-group-banner a { font-weight: 600; }
 
-/* ---------- Rooms grid ---------- */
-.rc-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
-.rc-room {
-  background: var(--rc-surface);
-  border: 1px solid var(--rc-border);
-  border-radius: var(--rc-radius-md);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: var(--rc-shadow-soft);
-  transition: var(--rc-transition);
-  position: relative;
-  overflow: hidden;
-}
-.rc-room::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0; width: 4px;
-  background: var(--rc-border);
-}
-.rc-room:hover { transform: translateY(-3px); box-shadow: var(--rc-shadow-hover); }
-.rc-room b { font-family: var(--font-display, serif); font-size: 22px; color: var(--rc-text-main); line-height: 1;}
-.rc-room small { color: var(--rc-text-muted); font-size: 13px; }
-.rc-room span { font-size: 12px; text-transform: capitalize; font-weight: 600; padding: 2px 8px; border-radius: 12px; display: inline-block; width: max-content;}
-.rc-room.st-available::before { background: #10B981; }
-.rc-room.st-available span { background: #DCFCE7; color: #15803D; }
-.rc-room.st-occupied::before { background: #F43F5E; }
-.rc-room.st-occupied span { background: #FEE2E2; color: #BE123C; }
-.rc-room.st-cleaning::before { background: #F59E0B; }
-.rc-room.st-cleaning span { background: #FEF3C7; color: #B45309; }
-.rc-room.st-maintenance::before, .rc-room.st-locked::before { background: #64748B; }
-.rc-room.st-maintenance span, .rc-room.st-locked span { background: #F1F5F9; color: #475569; }
+/* Lưới phòng của trang Phòng dùng .rooms-grid/.room-card-box trong manager.css
+   (không phải .rc-rooms/.rc-room — bộ đó đã bỏ vì không còn nơi nào dùng). */
 
 /* ---------- Messages ---------- */
+/* Ghi chú giải thích nghiệp vụ (không phải lỗi, không phải cảnh báo) — nền kem trung tính */
+.rc-note {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: var(--rc-cream);
+  border: 1px solid #F0E6D8;
+  border-left: 3px solid var(--rc-gold);
+  border-radius: var(--rc-radius-md);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--rc-text-main);
+}
 .rc-err { color: #B91C1C; background: #FEF2F2; padding: 12px 16px; border-radius: var(--rc-radius-md); font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #FECACA; }
 .rc-ok { color: #15803D; background: #F0FDF4; padding: 12px 16px; border-radius: var(--rc-radius-md); font-size: 14px; display: flex; align-items: center; gap: 8px; border: 1px solid #BBF7D0; }
 /* Làm được một phần, còn phòng bị bỏ qua -> không phải xanh (dễ tưởng xong việc), cũng không phải đỏ. */
@@ -522,6 +801,51 @@
 .gantt-legend { display: flex; gap: 20px; margin-top: 16px; font-size: 13px; flex-wrap: wrap; color: var(--rc-text-muted); font-weight: 500; }
 .gantt-legend span { display: inline-flex; align-items: center; }
 .gantt-legend i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-right: 8px; }
+/* Dùng chung gradient với .gantt-bar để chú giải luôn khớp thanh trên biểu đồ */
+.gantt-legend i.s-pending { background: linear-gradient(135deg, #F59E0B, #D97706); }
+.gantt-legend i.s-confirmed { background: linear-gradient(135deg, #0EA5E9, #0284C7); }
+.gantt-legend i.s-checked_in { background: linear-gradient(135deg, #10B981, #059669); }
+.gantt-legend i.s-checked_out { background: linear-gradient(135deg, #94A3B8, #64748B); }
+.gantt-legend i.s-completed { background: linear-gradient(135deg, #475569, #334155); }
+
+/* ---------- Lưới phòng (dùng .rooms-grid/.room-card-box của manager.css) ----------
+   Ghi đè CHỈ trong .rc-main -> trang Phòng của Manager giữ nguyên.
+   Bỏ nền nhuộm kín theo trạng thái: 44/45 thẻ xanh lá thì màu không còn báo được gì,
+   phòng cần để ý (bảo trì/đang dọn) chìm mất. Nền trắng + vạch trạng thái trái + badge màu
+   -> mắt bắt ngay đúng vài thẻ khác thường. */
+.rc-main .rooms-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+.rc-main .room-card-box {
+  background: var(--rc-surface);
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  box-shadow: var(--rc-shadow-soft);
+  gap: 6px;
+}
+.rc-main .room-card-box:hover { box-shadow: var(--rc-shadow-hover); }
+/* Mã phòng: serif cho khớp tông, và KHÔNG ngắt dòng ("DEL-101" bị bẻ thành "DEL-"/"101") */
+.rc-main .room-box-number {
+  font-family: var(--font-display, serif);
+  font-size: 21px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.rc-main .room-box-header { gap: 8px; align-items: flex-start; }
+.rc-main .room-box-badge { border-radius: 20px; padding: 3px 8px; text-transform: none; font-size: 11px; white-space: nowrap; }
+.rc-main .room-box-type { font-size: 12px; color: var(--rc-text-muted); }
+/* Trạng thái nhận diện bằng vạch trái + badge, không phải cả thẻ */
+.rc-main .room-card-box.st-available { border-left: 4px solid #10B981; }
+.rc-main .room-card-box.st-occupied { border-left: 4px solid #F43F5E; }
+.rc-main .room-card-box.st-cleaning { border-left: 4px solid #F59E0B; }
+.rc-main .room-card-box.st-maintenance { border-left: 4px solid #64748B; }
+.rc-main .room-card-box.st-locked { border-left: 4px solid #1A1D20; }
+.rc-main .room-card-box.st-available .room-box-badge { background: #DCFCE7; color: #15803D; }
+.rc-main .room-card-box.st-occupied .room-box-badge { background: #FEE2E2; color: #BE123C; }
+.rc-main .room-card-box.st-cleaning .room-box-badge { background: #FEF3C7; color: #B45309; }
+.rc-main .room-card-box.st-maintenance .room-box-badge { background: #F1F5F9; color: #475569; }
+.rc-main .room-card-box.st-locked .room-box-badge { background: #E2E8F0; color: #1A1D20; }
+
+/* Cảnh báo nhỏ trên thẻ phòng (chờ bổ sung đồ) */
+.room-box-warn { font-size: 11px; color: #D97706; margin-top: 4px; font-weight: 600; }
 
 /* ---------- Service board (triển khai dịch vụ theo phòng) ---------- */
 .rc-empty { color: var(--rc-text-muted); padding: 40px 8px; text-align: center; font-size: 15px; }
@@ -621,20 +945,35 @@
 .rc-type-chip input { accent-color: var(--rc-gold); cursor: pointer; }
 .rc-type-chip small { color: var(--rc-text-muted); }
 
-/* ---------- Tóm tắt thông tin tìm phòng (walk-in bước 2) ---------- */
+/* ---------- Tóm tắt thông tin tìm phòng (walk-in bước 2) ----------
+   Nhãn nhỏ chữ hoa nằm trên, giá trị nằm dưới — đọc lướt ra ngay "cái gì / bao nhiêu",
+   thay vì một dòng chữ chạy dài trộn emoji. */
 .rc-search-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
-  padding: 12px 18px;
-  margin-bottom: 14px;
-  background: #FAF8F3;
-  border: 1px solid var(--rc-border);
+  align-items: center;
+  gap: 8px 0;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  background: var(--rc-cream);
+  border: 1px solid #F0E6D8;
   border-radius: var(--rc-radius-md);
-  font-size: 14px;
-  color: var(--rc-text-main);
 }
-.rc-search-summary b { color: var(--rc-gold); }
+.rc-sum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 28px;
+  border-left: 1px solid #E7DCCB;
+  min-width: 0;
+}
+.rc-sum-item:first-child { padding-left: 0; border-left: none; }
+.rc-sum-item .lbl {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+}
+.rc-sum-item .val { font-size: 14px; font-weight: 600; color: var(--rc-text-main); }
+.rc-search-summary .rc-sum-edit { margin-left: auto; padding-left: 20px; }
 
 /* ---------- Dọn dẹp & kiểm tra phòng (booking detail) ---------- */
 .rc-hk {
@@ -695,6 +1034,23 @@
 }
 .rc-main .rc-modal button.rc-modal-danger:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
 
+/* Chọn số giờ nhận sớm / trả muộn — bấm 1 phát, không gõ tay được số vô lý */
+.rc-hours { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 4px; }
+.rc-main .rc-hours button.rc-hour {
+  flex: 1; min-width: 72px; justify-content: center;
+  padding: 12px 8px;
+  border: 1px solid var(--rc-border);
+  border-radius: var(--rc-radius-md);
+  background: var(--rc-surface);
+  font-weight: 600;
+}
+.rc-main .rc-hours button.rc-hour.on {
+  border-color: var(--rc-gold);
+  background: #FAF8F3;
+  color: var(--rc-gold);
+  box-shadow: 0 0 0 2px var(--rc-gold-glow);
+}
+
 /* Picker chọn housekeeper để giao việc */
 .hk-pick-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .hk-pick-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--rc-border); border-radius: var(--rc-radius-md); }
@@ -707,27 +1063,6 @@
 /* ══════════════════════════════════════════════════════════
    PayOS Payment Modal — Lễ tân (Reception)
    ══════════════════════════════════════════════════════════ */
-
-/* Nút mở modal thanh toán PayOS */
-.rc-main button.btn-payos {
-  background: linear-gradient(135deg, #1a56db, #3b82f6);
-  color: #fff;
-  border: none;
-  border-radius: var(--rc-radius-md);
-  padding: 10px 22px;
-  font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 14px rgba(26, 86, 219, 0.3);
-  transition: var(--rc-transition);
-}
-.rc-main button.btn-payos:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(26, 86, 219, 0.4);
-}
 
 /* Nút confirm primary trong PayOS modal */
 .rc-main button.btn-primary {
@@ -754,54 +1089,95 @@
   margin-bottom: 4px;
 }
 
-/* Lưới 2 nút chọn phương thức */
-.payos-method-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 16px 0;
-}
-
-.payos-method-btn {
+/* Segmented control (Cọc / Toàn bộ) — hai lựa chọn loại trừ nhau, dính liền thành 1 khối
+   để đọc ra là "chọn 1 trong 2", không phải 2 nút bấm rời chạy 2 hành động khác nhau. */
+.rc-seg {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  border-radius: 14px;
-  border: 2px solid var(--rc-border);
-  cursor: pointer;
-  background: #fafbfc;
-  font-family: inherit;
-  transition: var(--rc-transition);
+  padding: 4px;
+  margin: 14px 0;
+  background: #F1F5F9;
+  border-radius: var(--rc-radius-md);
+  gap: 4px;
+}
+.rc-main .rc-seg button.rc-seg-btn {
+  flex: 1;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--rc-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+.rc-main .rc-seg button.rc-seg-btn:hover { background: rgba(255, 255, 255, 0.6); color: var(--rc-text-main); }
+.rc-main .rc-seg button.rc-seg-btn.on {
+  background: var(--rc-surface);
+  color: var(--rc-gold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Khối số tiền cần thu — đọc trước khi chọn cách thu. Nền kem, số to serif vàng. */
+.payos-amount-box {
+  background: var(--rc-cream);
+  border: 1px solid #F0E6D8;
+  border-radius: var(--rc-radius-md);
+  padding: 16px;
   text-align: center;
+  margin-bottom: 18px;
 }
-.payos-method-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+.payos-amount-box .lbl {
+  display: block;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--rc-text-muted);
+  margin-bottom: 6px;
 }
-.payos-method-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.payos-method-btn.qr {
-  border-color: #3b82f6;
-  background: #eff6ff;
-}
-.payos-method-btn.qr:hover:not(:disabled) {
-  background: #dbeafe;
-  box-shadow: 0 8px 24px rgba(59,130,246,0.2);
-}
-.payos-method-btn.cash {
-  border-color: #10b981;
-  background: #ecfdf5;
-}
-.payos-method-btn.cash:hover:not(:disabled) {
-  background: #d1fae5;
-  box-shadow: 0 8px 24px rgba(16,185,129,0.2);
+.payos-amount-box .val {
+  font-family: var(--font-display, serif);
+  font-size: 32px; font-weight: 700; line-height: 1.1;
+  color: var(--rc-gold);
 }
 
-.payos-method-icon { font-size: 32px; line-height: 1; }
-.payos-method-label { font-weight: 700; font-size: 15px; color: var(--rc-text-main); }
-.payos-method-sub { font-size: 12px; color: var(--rc-text-muted); }
+/* Nhãn nhóm trong modal (vd "Chọn phương thức", "Chi tiết phòng") */
+.payos-section-label {
+  font-size: 13px; font-weight: 600; color: var(--rc-text-main);
+  margin: 0 0 8px;
+}
+
+/* Hàng lựa chọn thanh toán — gọn hơn ô vuông to, đọc nhanh hơn theo hàng */
+.rc-main .payos-opt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--rc-radius-md);
+  border: 1px solid var(--rc-border);
+  background: var(--rc-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--rc-transition);
+}
+.rc-main .payos-opt:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--rc-shadow-hover); }
+.rc-main .payos-opt:disabled { opacity: 0.55; cursor: not-allowed; }
+.payos-opt-icon {
+  flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 10px;
+  display: grid; place-items: center;
+  font-size: 20px;
+}
+.payos-opt-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.payos-opt-text b { font-size: 15px; font-weight: 700; color: var(--rc-text-main); }
+.payos-opt-text small { font-size: 12px; color: var(--rc-text-muted); }
+.payos-opt-arrow { flex-shrink: 0; color: var(--rc-text-muted); font-size: 16px; }
+.rc-main .payos-opt.qr { border-color: #BFDBFE; background: #F8FBFF; }
+.rc-main .payos-opt.qr:hover:not(:disabled) { border-color: #3B82F6; color: var(--rc-text-main); }
+.payos-opt.qr .payos-opt-icon { background: #DBEAFE; }
+.rc-main .payos-opt.cash { border-color: #A7F3D0; background: #F7FEFB; }
+.rc-main .payos-opt.cash:hover:not(:disabled) { border-color: #10B981; color: var(--rc-text-main); }
+.payos-opt.cash .payos-opt-icon { background: #D1FAE5; }
 
 /* Banner đã thanh toán đủ */
 .payos-paid-banner {

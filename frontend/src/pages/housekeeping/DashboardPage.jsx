@@ -6,13 +6,14 @@ import {
   CheckSquareOutlined, ToolOutlined, HistoryOutlined, RightOutlined,
 } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
+import { fmtDateTime } from '../../utils/date'
 import '../manager/dashboard-overview.css'
 
 const typeLabel = { inspection: 'Kiểm tra', turnover: 'Dọn (trả phòng)', mid_stay: 'Dọn (yêu cầu)' }
 const TYPE_PILL = { inspection: 'gold', turnover: 'medium', mid_stay: 'low' }
 const statusLabel = { pending: 'Chờ làm', in_progress: 'Đang làm', urgent: 'Khẩn' }
 const STATUS_PILL = { pending: 'neutral', in_progress: 'medium', urgent: 'high' }
-const fmtTime = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '-')
+const fmtTime = (d) => fmtDateTime(d) || '-'
 
 export default function DashboardPage() {
   const nav = useNavigate()

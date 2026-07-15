@@ -1,5 +1,12 @@
 import { ConfigProvider } from 'antd'
+import viVN from 'antd/locale/vi_VN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/vi'
 import AppRoutes from './routes/AppRoutes'
+
+// Ngày tháng toàn hệ thống theo tiếng Việt: lịch hiện "Tháng 7", "T2..CN", tuần bắt đầu Thứ 2.
+// Phải set cả HAI: `locale` của antd (chữ trong UI) và dayjs.locale (tên tháng/thứ mà picker render).
+dayjs.locale('vi')
 
 // Theme antd toàn cục — đồng bộ tông gold "Oriental Elegance" cho mọi dashboard nội bộ + component antd
 const antdTheme = {
@@ -24,7 +31,7 @@ const antdTheme = {
 
 function App() {
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider theme={antdTheme} locale={viVN}>
       <AppRoutes />
     </ConfigProvider>
   )

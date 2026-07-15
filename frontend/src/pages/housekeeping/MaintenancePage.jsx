@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { Table, Tag, Button, Modal, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
+import { fmtDateTime } from '../../utils/date'
 
 const statusLabel = { maintaining: 'Đang bảo trì', fix_requested: 'Đã báo sửa — chờ xác nhận' }
-const fmt = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '-')
+const fmt = (d) => fmtDateTime(d) || '-'
 
 export default function MaintenancePage() {
   const [rows, setRows] = useState([])
