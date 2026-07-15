@@ -26,6 +26,7 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [preview, setPreview] = useState(null) // trả phòng: phòng nào + ai sẽ được giao dọn
+  const [picked, setPicked] = useState({})     // ghi đè của lễ tân: bookingId -> housekeeperId
   const expireAt = useRef(null)
 
   // Trả phòng -> hệ thống TỰ PHÂN người dọn. Lễ tân phải thấy TRƯỚC ai sẽ nhận việc,
@@ -34,10 +35,32 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
     if (type !== 'remaining') return
     let cancelled = false
     bookingService.previewCheckOutGroup(groupId)
-      .then((p) => { if (!cancelled) setPreview(p) })
+      .then((p) => {
+        if (cancelled) return
+        setPreview(p)
+        // Điền sẵn người auto chọn -> không đụng gì thì hành vi y hệt trước.
+        setPicked(Object.fromEntries((p.rooms || []).map((r) => [String(r.bookingId), r.housekeeperId ? String(r.housekeeperId) : ''])))
+      })
       .catch(() => { if (!cancelled) setPreview(null) })
     return () => { cancelled = true }
   }, [type, groupId])
+
+  // Chỉ gửi lên những dòng lễ tân ĐỔI so với gợi ý auto — gửi cả bản gốc cũng không sai,
+  // nhưng gửi đúng phần đổi thì log/nghiệp vụ đọc ra ngay là con người đã can thiệp chỗ nào.
+  const overrides = () => {
+    const out = {}
+    for (const r of preview?.rooms || []) {
+      const cur = picked[String(r.bookingId)]
+      if (cur && cur !== String(r.housekeeperId || '')) out[String(r.bookingId)] = cur
+    }
+    return out
+  }
+  // Số việc đang ôm SAU khi tính cả các phòng sắp giao trong nhóm này -> thấy ngay ai bị dồn.
+  const loadOf = (hkId) => {
+    const base = (preview?.housekeepers || []).find((h) => String(h.accountId) === String(hkId))?.activeTasks || 0
+    const inThisGroup = Object.values(picked).filter((v) => String(v) === String(hkId)).length
+    return base + inThisGroup
+  }
 
   // Realtime: PayOS báo đã thu (webhook -> socket) cho đúng nhóm này
   useEffect(() => {
@@ -58,7 +81,12 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
 
   const genQR = async () => {
     setLoading(true)
-    try { const d = await bookingService.createGroupQR(groupId, type); setQr(d); expireAt.current = new Date(d.expiresAt).getTime() } // mốc backend kẹp (<= hạn giữ chỗ)
+    try {
+      // Trả phòng bằng QR: checkout sẽ do webhook PayOS gọi, không qua màn hình này nữa
+      // -> phải gửi kèm người dọn NGAY LÚC TẠO QR để backend cất lại, không thì ghi đè mất.
+      const d = await bookingService.createGroupQR(groupId, type, type === 'remaining' ? overrides() : undefined)
+      setQr(d); expireAt.current = new Date(d.expiresAt).getTime() // mốc backend kẹp (<= hạn giữ chỗ)
+    }
     catch (e) { onError(e.response?.data?.message || 'Không tạo được QR') }
     finally { setLoading(false) }
   }
@@ -69,7 +97,7 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
       if (type === 'remaining') {
         // Không hỏi window.confirm nữa: bảng xem trước ngay trên màn hình đã nói rõ trả phòng nào,
         // thu bao nhiêu, ai được giao dọn. Hỏi lại bằng hộp thoại trống không chỉ là nghi thức thừa.
-        const res = await bookingService.checkOutGroupAll(groupId, { method: 'cash' })
+        const res = await bookingService.checkOutGroupAll(groupId, { method: 'cash', assignees: overrides() })
         let m = `Đã trả ${res.done} phòng`
         if (res.collected) m += ` · thu ${vnd(res.collected)}`
         if (res.skipped?.length) m += ` · bỏ qua ${res.skipped.length} phòng`
@@ -89,7 +117,8 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
 
   return (
     <div className="rc-modal-overlay" onClick={onClose}>
-      <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
+      {/* 'remaining' có thêm bảng xem trước + dropdown chọn người dọn -> cần rộng hơn */}
+      <div className={'rc-modal payos-modal' + (type === 'remaining' ? ' wide' : '')} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ color: 'var(--rc-text-main)' }}>{title} — Thanh toán</h3>
 
         <div className="payos-amount-box">
@@ -107,22 +136,50 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
             {preview && preview.rooms?.length > 0 && (
               <>
                 <p className="payos-section-label">
-                  Sẽ trả <b>{preview.rooms.length} phòng</b> và <b>tự giao dọn</b> theo lộ trình (tầng thấp → cao):
+                  Sẽ trả <b>{preview.rooms.length} phòng</b>, <b>tự giao dọn</b> theo lộ trình (tầng thấp → cao).
+                  Đổi người ở cột bên phải nếu cần.
                 </p>
                 <table className="rc-table" style={{ marginBottom: 0 }}>
                   <thead><tr><th>Phòng</th><th className="rc-num">Còn lại</th><th>Người được giao dọn</th></tr></thead>
                   <tbody>
-                    {preview.rooms.map((r, i) => (
-                      <tr key={r.bookingId}>
-                        <td><small className="rc-muted">{i + 1}.</small> <b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
-                        <td className="rc-num">{r.remaining > 0 ? vnd(r.remaining) : <span className="rc-muted">—</span>}</td>
-                        <td>{r.housekeeper
-                          ? <span className="rc-fit fit-exact">{r.housekeeper}</span>
-                          : <span className="rc-field-err">chưa xác định</span>}</td>
-                      </tr>
-                    ))}
+                    {preview.rooms.map((r, i) => {
+                      const cur = picked[String(r.bookingId)] || ''
+                      const changed = cur !== String(r.housekeeperId || '')
+                      return (
+                        <tr key={r.bookingId}>
+                          <td><small className="rc-muted">{i + 1}.</small> <b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
+                          <td className="rc-num">{r.remaining > 0 ? vnd(r.remaining) : <span className="rc-muted">—</span>}</td>
+                          <td>
+                            <select className={'rc-hk-pick' + (changed ? ' changed' : '')} value={cur}
+                              onChange={(e) => setPicked((p) => ({ ...p, [String(r.bookingId)]: e.target.value }))}>
+                              {!r.housekeeperId && <option value="">— chưa xác định —</option>}
+                              {(preview.housekeepers || []).map((h) => (
+                                <option key={h.accountId} value={String(h.accountId)}>
+                                  {h.name} · {loadOf(h.accountId)} việc{h.floors?.length ? ` · T${h.floors.join(',')}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
+                {/* autoAssign ưu tiên TẦNG trước tải việc -> hay dồn cả nhóm cho 1 người, mà FIFO
+                    bắt dọn tuần tự nên phòng cuối chờ rất lâu. Nói thẳng ra để lễ tân biết mà san. */}
+                {(() => {
+                  const counts = {}
+                  Object.values(picked).forEach((v) => { if (v) counts[v] = (counts[v] || 0) + 1 })
+                  const piled = Object.entries(counts).filter(([, n]) => n >= 3)
+                  if (!piled.length) return null
+                  const names = piled.map(([id, n]) => {
+                    const h = (preview.housekeepers || []).find((x) => String(x.accountId) === String(id))
+                    return `${h?.name || '?'} (${n} phòng)`
+                  }).join(', ')
+                  return <p className="rc-warn" style={{ marginTop: 10 }}>
+                    Đang dồn nhiều phòng cho {names}. Các phòng này sẽ được dọn <b>lần lượt</b>, phòng cuối phải chờ lâu — cân nhắc san bớt cho người khác.
+                  </p>
+                })()}
               </>
             )}
           </div>

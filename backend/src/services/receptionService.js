@@ -228,7 +228,8 @@ exports.checkInGroup = async (accountId, groupId) => {
 }
 exports.checkOutGroup = async (accountId, groupId, body = {}) => {
   await assertGroupInBranch(accountId, groupId)
-  return bookingService.checkOutGroup(groupId, { by: accountId, method: body.method })
+  // assignees: lễ tân đổi người dọn cho vài phòng; phòng không gửi lên thì giữ người auto chọn.
+  return bookingService.checkOutGroup(groupId, { by: accountId, method: body.method, assignees: body.assignees })
 }
 // Xem trước khi trả cả nhóm: phòng nào, AI sẽ được giao dọn, thu bao nhiêu — để lễ tân biết trước khi bấm.
 exports.previewCheckOutGroup = async (accountId, groupId) => {
@@ -250,6 +251,16 @@ exports.createGroupQR = async (accountId, groupId, body = {}) => {
   const group = await BookingGroup.findById(groupId)
   if (!group) { const e = new Error('Không tìm thấy nhóm'); e.status = 404; throw e }
   const type = ['deposit', 'full', 'remaining'].includes(body.type) ? body.type : 'deposit'
+  // Trả phòng bằng QR: checkOutGroup sẽ do WEBHOOK PayOS gọi, không đi qua màn hình nữa
+  // -> phải cất người dọn lễ tân vừa chọn vào nhóm ngay bây giờ, lát webhook đọc lại.
+  if (type === 'remaining' && body.assignees && Object.keys(body.assignees).length) {
+    const hk = require('./housekeepingService')
+    for (const [, hkId] of Object.entries(body.assignees)) {
+      if (hkId) await hk.assertHousekeeperInBranch(hkId, group.branch) // sai người thì hỏng NGAY, đừng để webhook mới lỗi
+    }
+    group.cleaningAssignees = body.assignees
+    await group.save()
+  }
   return require('./payosService').createGroupQR(group, type, accountId)
 }
 // Polling PayOS cho nhóm (fallback khi webhook không tới localhost)

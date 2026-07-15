@@ -1051,6 +1051,23 @@
   box-shadow: 0 0 0 2px var(--rc-gold-glow);
 }
 
+/* Dropdown chọn người dọn trong bảng xem trước trả nhóm.
+   Điền sẵn người hệ thống auto chọn; dòng nào lễ tân ĐỔI thì viền vàng + đậm
+   -> nhìn phát biết mình đã can thiệp chỗ nào, tránh đổi nhầm rồi không nhớ. */
+.rc-main select.rc-hk-pick {
+  width: 100%;
+  min-width: 190px;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.rc-main select.rc-hk-pick.changed {
+  border-color: var(--rc-gold);
+  background: #FDFAF4;
+  font-weight: 700;
+  color: var(--rc-gold);
+}
+
 /* Picker chọn housekeeper để giao việc */
 .hk-pick-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
 .hk-pick-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--rc-border); border-radius: var(--rc-radius-md); }
@@ -1084,6 +1101,9 @@
 .rc-modal.payos-modal {
   max-width: 500px;
 }
+/* Trả phòng nhóm: có thêm bảng xem trước + dropdown chọn người dọn -> 500px làm tên
+   nhân viên bị cắt cụt ("housekeeper2@hbms.com · 3 việ…"), đọc không ra chọn ai. */
+.rc-modal.payos-modal.wide { max-width: 660px; }
 .rc-modal.payos-modal h3 {
   color: var(--rc-text-main);
   margin-bottom: 4px;
