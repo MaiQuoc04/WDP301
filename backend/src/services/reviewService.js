@@ -107,10 +107,18 @@ exports.listMine = async (accountId) => {
 }
 
 // ----- Công khai -----
-exports.listByBranch = async (branchId, { limit = 20 } = {}) => {
-  return Review.find({ branch: branchId, status: 'active' })
-    .populate('customer', 'fullName')
-    .sort('-createdAt').limit(Math.min(Number(limit) || 20, 50)).lean()
+// star: lọc đúng mức sao (1-5). skip/limit: xem thêm.
+exports.listByBranch = async (branchId, { star, limit = 10, skip = 0 } = {}) => {
+  const q = { branch: branchId, status: 'active' }
+  const s = Number(star)
+  if (s >= 1 && s <= 5) q.rating = s
+  const take = Math.min(Number(limit) || 10, 50)
+  const from = Math.max(0, Number(skip) || 0)
+  const [items, total] = await Promise.all([
+    Review.find(q).populate('customer', 'fullName').sort('-createdAt').skip(from).limit(take).lean(),
+    Review.countDocuments(q),
+  ])
+  return { items, total, hasMore: from + items.length < total }
 }
 
 // Điểm của TẤT CẢ chi nhánh trong 1 lần -> { branchId: {average, count} }.
@@ -126,15 +134,27 @@ exports.ratingByBranch = async () => {
   ]))
 }
 
-// Điểm trung bình + số lượt của 1 chi nhánh (hoặc tất cả nếu không truyền).
+// Điểm trung bình + số lượt + PHÂN BỐ theo mức sao của 1 chi nhánh (hoặc tất cả nếu không truyền).
+// breakdown luôn có đủ khoá 1..5 (kể cả 0 lượt) -> FE vẽ đủ 5 thanh, không phải tự bù khoá thiếu.
 exports.ratingSummary = async (branchId) => {
   const match = { status: 'active' }
   if (branchId) match.branch = new (require('mongoose').Types.ObjectId)(String(branchId))
-  const [agg] = await Review.aggregate([
+  const rows = await Review.aggregate([
     { $match: match },
-    { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+    { $group: { _id: '$rating', count: { $sum: 1 } } },
   ])
-  return { average: agg ? Math.round(agg.avg * 10) / 10 : 0, count: agg ? agg.count : 0 }
+  const breakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  let total = 0, sum = 0
+  for (const r of rows) {
+    breakdown[r._id] = r.count
+    total += r.count
+    sum += r._id * r.count
+  }
+  return {
+    average: total ? Math.round((sum / total) * 10) / 10 : 0,
+    count: total,
+    breakdown,
+  }
 }
 
 exports.REVIEW_WINDOW_DAYS = REVIEW_WINDOW_DAYS
