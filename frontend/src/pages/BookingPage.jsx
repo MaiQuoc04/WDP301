@@ -14,8 +14,6 @@ const fieldCls =
   'w-full rounded-sm border bg-white px-3.5 py-2.5 font-body text-sm text-charcoal outline-none transition-colors focus:border-gold focus:ring-1 focus:ring-gold/40';
 const labelCls = 'mb-1.5 block font-nav text-[11px] font-semibold uppercase tracking-wide text-charcoal/55';
 
-const CHILD_UNIT = 0.5;
-
 const BookingPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -152,15 +150,11 @@ const BookingPage = () => {
   const dec = (id) => setQty((q) => ({ ...q, [id]: Math.max((q[id] || 0) - 1, 0) }));
 
   const selectedRooms = displayRooms.reduce((s, rt) => s + qtyOf(rt._id), 0);
-  const capacityTotal = displayRooms.reduce((s, rt) => s + qtyOf(rt._id) * (rt.capacity || 2), 0);
-  const partyUnits = displayAdults + displayChildren * CHILD_UNIT;
-  // Suất CẦN tính phí = floor(partyUnits): trẻ lẻ 0.5 quy về 0 (khớp backend floor). VD 2NL+1TE = 2.5 -> 2.
-  const requiredUnits = Math.floor(partyUnits);
   const enoughAdults = selectedRooms <= displayAdults;       // mỗi phòng cần ≥1 người lớn
-  // Ưu tiên phụ phí THỰC từ báo giá backend; chưa có báo giá thì so sức chứa với suất cần (đã floor).
-  const enoughCapacity = quote
-    ? (quote.totalSurcharge || 0) === 0
-    : capacityTotal >= requiredUnits;
+  // Đủ chỗ = KHÔNG phát sinh giường phụ, và CHỈ backend biết (nó chia khách tối ưu rồi floor TỪNG phòng).
+  // FE không được tự suy ra: so tổng sức chứa với tổng suất là SAI (floor áp từng phòng, không áp cho tổng)
+  // -> 4NL+2TE vào 2 phòng cap 2 bị báo nhầm "thiếu chỗ" dù thực tế miễn phí. Chưa có báo giá = chưa biết.
+  const enoughCapacity = quote ? (quote.totalSurcharge || 0) === 0 : null;
 
   // Báo giá nhóm (debounce) — chỉ gọi khi đã chọn ≥1 phòng và đủ người lớn
   useEffect(() => {
@@ -217,6 +211,7 @@ const BookingPage = () => {
   const summary = (() => {
     if (selectedRooms === 0) return { tone: 'muted', text: 'Chọn số lượng phòng để tiếp tục' };
     if (!enoughAdults) return { tone: 'bad', text: `${displayAdults} người lớn không đủ cho ${selectedRooms} phòng — mỗi phòng cần ít nhất 1 người lớn` };
+    if (enoughCapacity === null) return { tone: 'muted', text: 'Đang tính giá…' };
     if (!enoughCapacity) {
       const sc = quote?.totalSurcharge || 0;
       return { tone: 'warn', text: `Thiếu chỗ cho ${displayAdults + displayChildren} khách${sc ? ` → phụ phí giường phụ +${formatPrice(sc)}` : ''} · 💡 thêm phòng để khỏi phụ phí` };
@@ -380,7 +375,8 @@ const BookingPage = () => {
                 {summary.tone === 'ok' && '✓ '}{(summary.tone === 'warn' || summary.tone === 'bad') && '⚠ '}{summary.text}
               </div>
               <div className="mt-0.5 font-body text-xs text-charcoal/55">
-                Đã chọn <b>{selectedRooms}</b> phòng · sức chứa <b>{capacityTotal}</b> / cần <b>{requiredUnits}</b> suất
+                {/* Không hiện "sức chứa X / cần Y suất": phép so tổng đó không phải luật tính phí -> gây hiểu nhầm */}
+                Đã chọn <b>{selectedRooms}</b> phòng · <b>{displayAdults}</b> người lớn{displayChildren > 0 && <> + <b>{displayChildren}</b> trẻ em</>}
               </div>
             </div>
             <div className="flex items-center gap-5">

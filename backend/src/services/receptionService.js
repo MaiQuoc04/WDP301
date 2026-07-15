@@ -143,11 +143,11 @@ async function assertGroupInBranch(accountId, groupId) {
   if (!ok) { const e = new Error('Không tìm thấy nhóm trong chi nhánh của bạn'); e.status = 404; throw e }
 }
 
-// Báo giá nhóm realtime theo phân bổ khách từng phòng (form walk-in bước "phân bổ")
+// Báo giá nhóm realtime cho các phòng đã chọn — hệ thống tự chia khách (lễ tân không chia tay).
 exports.quoteGroup = async (accountId, body = {}) => {
   const branches = await myBranchIds(accountId)
   if (!body.checkIn || !body.checkOut) throw new Error('Thiếu ngày nhận/trả')
-  return bookingService.quoteGroup(branches[0], body.checkIn, body.checkOut, body.items || [])
+  return bookingService.quoteGroup(branches[0], body.checkIn, body.checkOut, body.items || [], body.adultsTotal, body.childrenTotal)
 }
 
 // Tạo nhóm nhiều phòng (mỗi phòng 1 booking, gom 1 mã + 1 cọc)
@@ -192,19 +192,33 @@ exports.noShowGroup = async (accountId, groupId) => {
   return bookingService.noShowGroup(groupId, { by: accountId })
 }
 
-exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
-  await assertInBranch(accountId, bookingId)
-  return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, by: accountId })
+// Gen QR PayOS GOM cho cả nhóm: deposit (cọc) | full (toàn bộ) | remaining (tiền còn lại khi trả phòng)
+exports.createGroupQR = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  const group = await BookingGroup.findById(groupId)
+  if (!group) { const e = new Error('Không tìm thấy nhóm'); e.status = 404; throw e }
+  const type = ['deposit', 'full', 'remaining'].includes(body.type) ? body.type : 'deposit'
+  return require('./payosService').createGroupQR(group, type, accountId)
+}
+// Polling PayOS cho nhóm (fallback khi webhook không tới localhost)
+exports.syncGroupPayments = async (accountId, groupId) => {
+  await assertGroupInBranch(accountId, groupId)
+  return require('./payosService').syncGroupPayments(groupId)
 }
 
-// Gen QR PayOS để thu cọc (lễ tân dùng cho booking pending)
-exports.createDepositQR = async (accountId, bookingId) => {
+exports.confirmDeposit = async (accountId, bookingId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.confirmDeposit(bookingId, { method: body.method, transactionCode: body.transactionCode, paidFull: !!body.paidFull, by: accountId })
+}
+
+// Gen QR PayOS cho booking pending: 'deposit' (cọc) hoặc 'full' (thu toàn bộ 1 lần)
+exports.createDepositQR = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   const booking = await Booking.findById(bookingId)
   if (!booking) { const e = new Error('Không tìm thấy booking'); e.status = 404; throw e }
   if (booking.status !== 'pending') throw new Error('Chỉ tạo QR cọc khi booking đang chờ (pending)')
   const payosService = require('./payosService')
-  return payosService.createQR(booking, 'deposit', accountId)
+  return payosService.createQR(booking, body.type === 'full' ? 'full' : 'deposit', accountId)
 }
 exports.checkIn = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)

@@ -20,6 +20,35 @@ function genOrderCode() {
   return Number(ts + rand)
 }
 
+const QR_TTL_MS = 15 * 60 * 1000       // chỉ dùng khi KHÔNG có hạn giữ chỗ (walk-in / thu tiền còn lại)
+const MIN_PAY_WINDOW_MS = 30 * 1000    // dưới mức này QR sinh ra cũng chết yểu -> báo rõ thay vì để PayOS ném lỗi khó hiểu
+
+// MỘT ĐỒNG HỒ DUY NHẤT: hạn QR = ĐÚNG hạn giữ chỗ, KHÔNG cộng thêm từ thời điểm bấm.
+// Vì mốc này suy ra từ booking.expiresAt (cố định lúc tạo) nên bấm "Thanh toán" lúc nào cũng ra cùng một mốc
+// -> không gia hạn, không cộng dồn, spam bấm vô hại. Và "trả tiền sau khi mất phòng" là bất khả thi:
+// còn quét được QR nghĩa là phòng vẫn đang giữ cho khách.
+// holdUntil = null khi không có hạn giữ chỗ (walk-in, hoặc thu tiền còn lại lúc khách đang ở).
+function payWindowEnd(holdUntil) {
+  const now = Date.now()
+  if (!holdUntil) return now + QR_TTL_MS
+  const until = new Date(holdUntil).getTime()
+  if (!Number.isFinite(until)) return now + QR_TTL_MS
+  const left = until - now
+  if (left <= MIN_PAY_WINDOW_MS)
+    throw new Error(`Chỗ giữ phòng chỉ còn ${Math.max(0, Math.round(left / 1000))} giây — không đủ để thanh toán. Vui lòng đặt lại phòng.`)
+  return until
+}
+
+// Trả về QR ĐANG SỐNG của booking/nhóm (nếu có) thay vì đẻ đơn PayOS mới mỗi lần bấm.
+async function reuseLiveQR(filter, amount) {
+  const p = await Payment.findOne({
+    ...filter, method: 'online_qr', status: 'pending', amount,
+    qrCode: { $ne: null }, expiredAt: { $gt: new Date() },
+  }).sort('-createdAt')
+  if (!p) return null
+  return { qrCode: p.qrCode, checkoutUrl: p.checkoutUrl, amount: p.amount, orderCode: Number(p.transactionRef), paymentId: p._id, expiresAt: p.expiredAt.toISOString() }
+}
+
 // Thanh toán cho 1 NHÓM (cọc gom): đánh dấu Payment paid + xác nhận cả nhóm pending -> confirmed.
 async function applyPaidGroupPayment(payment, transactionCode) {
   const group = await BookingGroup.findById(payment.group)
@@ -42,6 +71,14 @@ async function applyPaidGroupPayment(payment, transactionCode) {
         changed = true
       } catch (e) { console.warn('[PayOS] confirmGroupDeposit lỗi:', e.message) }
     }
+    // Không còn phòng pending (đơn đã huỷ do quá ân hạn, hoặc đã thu rồi): không xử lý gì thêm.
+    // Ca khách chuyển tiền sau ân hạn -> mất chỗ, hoàn tiền thủ công qua liên hệ lễ tân (chốt nghiệp vụ).
+  } else if (payment.type === 'remaining') {
+    // Tiền còn lại đã thu qua QR -> trả phòng cả nhóm (tự phân HK + hoàn tất), KHÔNG tạo lại giao dịch.
+    try {
+      await bookingService.checkOutGroup(group._id, { by: payment.confirmedBy, method: 'online_qr', skipPayment: true })
+      changed = true
+    } catch (e) { console.warn('[PayOS] checkOutGroup (remaining) lỗi:', e.message) }
   }
 
   if (changed) {
@@ -86,37 +123,9 @@ async function applyPaidPayment(payment, transactionCode) {
       } catch (e) {
         console.warn('[PayOS] confirmDeposit lỗi:', e.message)
       }
-    } else if (booking.status === 'cancelled' && booking.cancelReason === 'payment_timeout') {
-      const conflict = await Booking.exists({
-        _id: { $ne: booking._id },
-        room: booking.room,
-        status: { $in: ['pending', 'confirmed', 'checked_in'] },
-        checkIn: { $lt: booking.checkOut },
-        checkOut: { $gt: booking.checkIn },
-      })
-
-      if (conflict) {
-        console.warn(`[PayOS] Booking ${booking.code} đã thanh toán nhưng phòng đã bị chiếm, cần xử lý thủ công`)
-        return { ok: false, message: 'Phòng đã bị chiếm, cần xử lý thủ công' }
-      }
-
-      const fromStatus = booking.status
-      booking.status = 'confirmed'
-      booking.cancelReason = undefined
-      booking.expiresAt = undefined
-      booking.paidAmount = paidFull ? booking.totalAmount : booking.depositAmount
-      booking.remainingAmount = booking.totalAmount - booking.paidAmount
-      booking.paymentStatus = paidFull ? 'paid' : 'partial'
-      await booking.save()
-      await bookingService.logStatus(
-        booking._id,
-        fromStatus,
-        'confirmed',
-        payment.confirmedBy,
-        'Khôi phục sau khi PayOS xác nhận thanh toán'
-      )
-      changed = true
     }
+    // Booking không còn pending (đã huỷ do quá ân hạn, hoặc đã cọc rồi): không xử lý gì thêm.
+    // Ca khách chuyển tiền sau ân hạn -> mất chỗ, hoàn tiền thủ công qua liên hệ lễ tân (chốt nghiệp vụ).
   } else if (payment.type === 'remaining') {
     booking.paidAmount = booking.totalAmount
     booking.remainingAmount = 0
@@ -171,6 +180,12 @@ exports.createQR = async (booking, type, by) => {
   if (amount < 1000)
     throw new Error(`Số tiền quá nhỏ (${amount}đ). PayOS yêu cầu tối thiểu 1.000đ`)
 
+  // Đã có QR còn sống cho đúng khoản này -> trả về chính nó (không đẻ đơn mới -> không thể trả trùng).
+  const live = await reuseLiveQR({ booking: booking._id, group: null, type: paymentType }, amount)
+  if (live) return live
+
+  // Thu tiền còn lại: khách đang ở, không còn giữ chỗ. Cọc/toàn bộ: hạn QR = hạn giữ chỗ.
+  const endMs = payWindowEnd(type === 'remaining' ? null : booking.expiresAt)
   const orderCode = genOrderCode()
 
   // Lưu Payment record pending trước khi gọi PayOS
@@ -181,7 +196,7 @@ exports.createQR = async (booking, type, by) => {
     amount,
     status:         'pending',
     transactionRef: String(orderCode),
-    expiredAt:      new Date(Date.now() + 15 * 60 * 1000),
+    expiredAt:      new Date(endMs),
     confirmedBy:    by || undefined,
   })
 
@@ -196,7 +211,7 @@ exports.createQR = async (booking, type, by) => {
     description,
     returnUrl:  `${CLIENT_URL}/checkout/${booking._id}?payos=success`,
     cancelUrl:  `${CLIENT_URL}/checkout/${booking._id}?payos=cancel`,
-    expiredAt:  Math.floor((Date.now() + 15 * 60 * 1000) / 1000),
+    expiredAt:  Math.floor(endMs / 1000),
   }
 
   let payosRes
@@ -208,11 +223,10 @@ exports.createQR = async (booking, type, by) => {
     throw new Error(`PayOS lỗi: ${msg}`)
   }
 
-  // Gắn paidFull vào payment để webhook biết
-  if (paidFull) {
-    payment._paidFull = true
-    await payment.save()
-  }
+  // Lưu QR để lần bấm sau trả lại chính nó (paidFull suy ra từ amount lúc webhook về, không cần cờ riêng)
+  payment.qrCode = payosRes.qrCode
+  payment.checkoutUrl = payosRes.checkoutUrl
+  await payment.save()
 
   return {
     qrCode:      payosRes.qrCode,       // base64 hoặc URL
@@ -220,38 +234,50 @@ exports.createQR = async (booking, type, by) => {
     amount,
     orderCode,
     paymentId:   payment._id,
+    expiresAt:   new Date(endMs).toISOString(), // FE đếm ngược theo ĐÚNG mốc này, không tự cộng thời gian
   }
 }
 
 /**
- * Tạo link QR PayOS cọc GOM cho cả NHÓM (1 QR cho nhiều phòng). 1 Payment gắn group + booking đại diện.
+ * Tạo link QR PayOS GOM cho cả NHÓM (1 QR cho nhiều phòng). 1 Payment gắn group + booking đại diện.
+ *  - deposit  : cọc gom (các phòng pending)
+ *  - full     : thanh toán toàn bộ 1 lần (các phòng pending)
+ *  - remaining: thu tiền còn lại khi trả phòng (các phòng đang ở checked_in)
  * @param {Object} group — BookingGroup document
- * @param {'deposit'|'full'} type
+ * @param {'deposit'|'full'|'remaining'} type
  * @param {string} [by]
  */
 exports.createGroupQR = async (group, type, by) => {
-  const members = await Booking.find({ group: group._id, status: 'pending' })
-  if (!members.length) throw new Error('Nhóm không còn phòng nào chờ cọc')
+  const isRemaining = type === 'remaining'
+  const members = await Booking.find({ group: group._id, status: isRemaining ? 'checked_in' : 'pending' })
+  if (!members.length) throw new Error(isRemaining ? 'Nhóm không có phòng nào đang ở để thu tiền còn lại' : 'Nhóm không còn phòng nào chờ cọc')
 
-  let amount
-  if (type === 'full') amount = members.reduce((s, b) => s + (b.totalAmount || 0), 0)
-  else amount = members.reduce((s, b) => s + (b.depositAmount || 0), 0)
+  let amount, paymentType
+  if (isRemaining) { amount = members.reduce((s, b) => s + Math.max(0, b.remainingAmount || 0), 0); paymentType = 'remaining' }
+  else if (type === 'full') { amount = members.reduce((s, b) => s + (b.totalAmount || 0), 0); paymentType = 'deposit' }
+  else { amount = members.reduce((s, b) => s + (b.depositAmount || 0), 0); paymentType = 'deposit' }
   if (amount < 1000) throw new Error(`Số tiền quá nhỏ (${amount}đ). PayOS yêu cầu tối thiểu 1.000đ`)
 
+  // Đã có QR còn sống cho đúng khoản này -> trả về chính nó (không đẻ đơn mới -> không thể trả trùng).
+  const live = await reuseLiveQR({ group: group._id, type: paymentType }, amount)
+  if (live) return live
+
+  // Thu tiền còn lại: khách đang ở, không còn giữ chỗ. Cọc/toàn bộ: hạn QR = hạn giữ chỗ của nhóm.
+  const endMs = payWindowEnd(isRemaining ? null : group.expiresAt)
   const orderCode = genOrderCode()
   const payment = await Payment.create({
-    booking: members[0]._id, group: group._id, type: 'deposit', method: 'online_qr',
+    booking: members[0]._id, group: group._id, type: paymentType, method: 'online_qr',
     amount, status: 'pending', transactionRef: String(orderCode),
-    expiredAt: new Date(Date.now() + 15 * 60 * 1000), confirmedBy: by || undefined,
+    expiredAt: new Date(endMs), confirmedBy: by || undefined,
   })
 
   const groupCode = group.code || String(group._id).slice(-6).toUpperCase()
-  const description = `${groupCode} dat coc`.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25)
+  const description = `${groupCode} ${isRemaining ? 'tra phong' : 'dat coc'}`.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25)
   const payosPayload = {
     orderCode, amount, description,
     returnUrl: `${CLIENT_URL}/checkout/group/${group._id}?payos=success`,
     cancelUrl: `${CLIENT_URL}/checkout/group/${group._id}?payos=cancel`,
-    expiredAt: Math.floor((Date.now() + 15 * 60 * 1000) / 1000),
+    expiredAt: Math.floor(endMs / 1000),
   }
 
   let payosRes
@@ -263,7 +289,11 @@ exports.createGroupQR = async (group, type, by) => {
     throw new Error(`PayOS lỗi: ${msg}`)
   }
 
-  return { qrCode: payosRes.qrCode, checkoutUrl: payosRes.checkoutUrl, amount, orderCode, paymentId: payment._id }
+  payment.qrCode = payosRes.qrCode
+  payment.checkoutUrl = payosRes.checkoutUrl
+  await payment.save()
+
+  return { qrCode: payosRes.qrCode, checkoutUrl: payosRes.checkoutUrl, amount, orderCode, paymentId: payment._id, expiresAt: new Date(endMs).toISOString() }
 }
 
 /**

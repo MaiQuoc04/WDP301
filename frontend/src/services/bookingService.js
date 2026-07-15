@@ -26,8 +26,12 @@ export const bookingService = {
   checkOutGroupAll: (id, data) => post(`${base}/booking-groups/${id}/check-out`, data || {}),
   cancelGroupAll: (id, data) => post(`${base}/booking-groups/${id}/cancel`, data || {}),
   noShowGroupAll: (id) => post(`${base}/booking-groups/${id}/no-show`, {}),
+  // PayOS QR gom cho nhóm: type = 'deposit' | 'full' | 'remaining'
+  createGroupQR: (id, type) => post(`${base}/booking-groups/${id}/payos-qr`, { type }),
+  syncGroupPayments: (id) => post(`${base}/booking-groups/${id}/sync-payments`, {}),
   confirmDeposit: (id, data) => post(`${base}/bookings/${id}/confirm-deposit`, data || {}),
-  createDepositQR: (id) => post(`${base}/bookings/${id}/deposit-qr`, {}),
+  // type = 'deposit' (cọc) | 'full' (thu toàn bộ 1 lần)
+  createDepositQR: (id, type) => post(`${base}/bookings/${id}/deposit-qr`, { type }),
   checkIn: (id, data) => post(`${base}/bookings/${id}/check-in`, data || {}),
   checkOut: (id, data) => post(`${base}/bookings/${id}/check-out`, data || {}),
   // PayOS QR checkout — lễ tân gen QR, khách quét QR để trả số dư

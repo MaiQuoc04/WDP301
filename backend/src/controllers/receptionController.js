@@ -25,8 +25,10 @@ exports.checkInGroup = handle((req) => svc.checkInGroup(req.user.id, req.params.
 exports.checkOutGroup = handle((req) => svc.checkOutGroup(req.user.id, req.params.id, req.body))
 exports.cancelGroupAll = handle((req) => svc.cancelGroupAll(req.user.id, req.params.id, req.body))
 exports.noShowGroup = handle((req) => svc.noShowGroup(req.user.id, req.params.id))
+exports.createGroupQR = handle((req) => svc.createGroupQR(req.user.id, req.params.id, req.body))       // QR gom: deposit|full|remaining
+exports.syncGroupPayments = handle((req) => svc.syncGroupPayments(req.user.id, req.params.id))          // Polling PayOS nhóm
 exports.confirmDeposit = handle((req) => svc.confirmDeposit(req.user.id, req.params.id, req.body))
-exports.createDepositQR = handle((req) => svc.createDepositQR(req.user.id, req.params.id)) // Gen QR PayOS thu cọc
+exports.createDepositQR = handle((req) => svc.createDepositQR(req.user.id, req.params.id, req.body)) // Gen QR PayOS thu cọc | toàn bộ
 exports.checkIn = handle((req) => svc.checkIn(req.user.id, req.params.id, req.body))  // UC-30
 exports.checkOut = handle((req) => svc.checkOut(req.user.id, req.params.id, req.body)) // UC-31
 exports.complete = handle((req) => svc.complete(req.user.id, req.params.id))

@@ -10,22 +10,8 @@ const fitLabel = (r) => {
   return { text: 'Vừa đủ', cls: 'fit-exact' }
 }
 
-// Gợi ý chia khách vào các phòng để TỐI THIỂU phụ phí (mirror backend autoAllocate).
-// Mỗi phòng 1 người lớn trước, phần còn lại rải vào phòng còn nhiều chỗ nhất.
-function autoSplit(adults, children, rooms) {
-  const alloc = rooms.map((r) => ({ roomId: r.roomId, capacity: r.roomType?.capacity || r.capacity || 2, adults: 0, children: 0 }))
-  if (!alloc.length) return {}
-  const units = (a) => a.adults + a.children * 0.5
-  const remaining = (a) => a.capacity - units(a)
-  const mostFree = () => alloc.reduce((best, a) => (remaining(a) > remaining(best) ? a : best), alloc[0])
-  let aLeft = Math.max(0, Number(adults) || 0)
-  for (const a of alloc) { if (aLeft > 0) { a.adults = 1; aLeft-- } }
-  for (let i = 0; i < aLeft; i++) mostFree().adults++
-  for (let i = 0; i < Math.max(0, Number(children) || 0); i++) mostFree().children++
-  const out = {}
-  alloc.forEach((a) => { out[a.roomId] = { adults: a.adults, children: a.children } })
-  return out
-}
+// KHÔNG chia khách ở FE: backend là nơi duy nhất chia (bookingService.autoAllocate — tối thiểu tổng tiền).
+// FE tự tính luật giá là nguồn gốc của bug "bước 2 báo phát sinh phí, bước 3 lại vừa đủ".
 
 export default function WalkInPage() {
   const nav = useNavigate()
@@ -62,8 +48,7 @@ export default function WalkInPage() {
       ? prev.filter((r) => String(r.roomId) !== String(room.roomId))
       : [...prev, room])
 
-  // Bước 3 — phân bổ khách + báo giá nhóm
-  const [alloc, setAlloc] = useState({})        // roomId -> { adults, children }
+  // Báo giá nhóm (backend tự chia khách) — dùng cho cả bước 2 lẫn bước 3
   const [quote, setQuote] = useState(null)
   const [quoteErr, setQuoteErr] = useState('')
 
@@ -102,43 +87,33 @@ export default function WalkInPage() {
     } finally { setLoading(false) }
   }
 
-  // Sang bước phân bổ: tự chia gợi ý lần đầu
-  const goAllocate = () => {
-    if (!picked.length) return
-    setAlloc(autoSplit(form.adults, form.children, picked))
-    setStep(3)
-  }
-  const setRoomAlloc = (roomId, k, v) =>
-    setAlloc((a) => ({ ...a, [roomId]: { ...a[roomId], [k]: Math.max(k === 'adults' ? 0 : 0, parseInt(v, 10) || 0) } }))
+  const canCreate = picked.length >= 1 && !!quote && !quoteErr
 
-  // Tổng allocation hiện tại + điều kiện hợp lệ
-  const allocAdults = picked.reduce((s, r) => s + (Number(alloc[r.roomId]?.adults) || 0), 0)
-  const allocChildren = picked.reduce((s, r) => s + (Number(alloc[r.roomId]?.children) || 0), 0)
-  const eachHasAdult = picked.every((r) => (Number(alloc[r.roomId]?.adults) || 0) >= 1)
-  const sumsMatch = allocAdults === Number(form.adults) && allocChildren === Number(form.children)
-  const canCreate = picked.length >= 1 && eachHasAdult && sumsMatch
-
-  // Báo giá realtime khi phân bổ thay đổi (chỉ khi mỗi phòng đã có ≥1 người lớn — backend yêu cầu)
+  // Báo giá realtime: gửi phòng đã chọn + TỔNG khách, backend tự chia rồi tính tiền.
+  // Cùng 1 lời gọi cho bước 2 và bước 3 -> con số hai bước luôn khớp nhau.
   useEffect(() => {
-    if (step !== 3 || !picked.length || !eachHasAdult) { setQuote(null); return }
+    if (step < 2 || !picked.length) { setQuote(null); setQuoteErr(''); return }
     let cancelled = false
-    const items = picked.map((r) => ({ roomId: r.roomId, adults: Number(alloc[r.roomId]?.adults) || 0, children: Number(alloc[r.roomId]?.children) || 0 }))
-    setQuoteErr('')
-    bookingService.quoteGroup({ checkIn: form.checkIn, checkOut: form.checkOut, items })
-      .then((q) => { if (!cancelled) setQuote(q) })
-      .catch((e2) => { if (!cancelled) { setQuote(null); setQuoteErr(e2.response?.data?.message || 'Lỗi báo giá') } })
-    return () => { cancelled = true }
+    const t = setTimeout(() => {
+      bookingService.quoteGroup({
+        checkIn: form.checkIn, checkOut: form.checkOut,
+        items: picked.map((r) => ({ roomId: r.roomId })),
+        adultsTotal: Number(form.adults), childrenTotal: Number(form.children),
+      })
+        .then((q) => { if (!cancelled) { setQuote(q); setQuoteErr('') } })
+        .catch((e2) => { if (!cancelled) { setQuote(null); setQuoteErr(e2.response?.data?.message || 'Lỗi báo giá') } })
+    }, 250) // gộp nhiều lần tick phòng liên tiếp
+    return () => { cancelled = true; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, JSON.stringify(alloc), JSON.stringify(picked.map((r) => r.roomId))])
+  }, [step, JSON.stringify(picked.map((r) => r.roomId)), form.adults, form.children, form.checkIn, form.checkOut])
 
-  const quoteByRoom = {}
-  ;(quote?.rooms || []).forEach((r) => { quoteByRoom[String(r.roomId)] = r })
+  const extraBedsTotal = (quote?.rooms || []).reduce((s, r) => s + (r.extraBeds || 0), 0)
 
   const create = async () => {
     setErr(''); setLoading(true)
     try {
-      // Mọi lần đặt = 1 nhóm (kể cả 1 phòng). Dịch vụ kèm chỉ áp khi 1 phòng -> gắn vào item đó.
-      const items = picked.map((r) => ({ roomId: r.roomId, adults: Number(alloc[r.roomId]?.adults) || 0, children: Number(alloc[r.roomId]?.children) || 0 }))
+      // Mọi lần đặt = 1 nhóm (kể cả 1 phòng). Chỉ gửi roomId — backend chia khách y hệt lúc báo giá.
+      const items = picked.map((r) => ({ roomId: r.roomId }))
       if (picked.length === 1) {
         const svc = Object.entries(chosen).filter(([, q]) => q > 0).map(([serviceId, quantity]) => ({ serviceId, quantity }))
         if (svc.length) items[0].services = svc
@@ -154,10 +129,6 @@ export default function WalkInPage() {
 
   const types = [...new Map(rooms.map((r) => [r.roomType._id, r.roomType])).values()]
   const shown = typeFilter.length ? rooms.filter((r) => typeFilter.includes(r.roomType._id)) : rooms
-  const totalUnits = Number(form.adults) + Number(form.children) * 0.5
-  // Suất CẦN tính phí = floor(units): trẻ lẻ 0.5 quy về 0 (khớp backend + booking online). VD 2NL+1TE = 2.5 -> 2.
-  const neededUnits = Math.floor(totalUnits)
-  const pickedCapacity = picked.reduce((s, r) => s + (r.roomType?.capacity || 0), 0)
 
   return (
     <div style={{ maxWidth: 760 }}>
@@ -251,10 +222,15 @@ export default function WalkInPage() {
 
           <div className="rc-sticky-foot">
             <span>
-              Đã chọn <b>{picked.length}</b> phòng · sức chứa <b>{pickedCapacity}</b> / cần <b>{neededUnits}</b> suất
-              {picked.length > 0 && pickedCapacity < neededUnits && <span className="rc-field-err"> · sẽ phát sinh giường phụ</span>}
+              Đã chọn <b>{picked.length}</b> phòng · {form.adults} người lớn{Number(form.children) > 0 ? ` + ${form.children} trẻ em` : ''}
+              {/* Con số lấy từ backend (đã tự chia tối ưu) — không tự suy ra ở FE nữa */}
+              {picked.length > 0 && quoteErr && <span className="rc-field-err"> · {quoteErr}</span>}
+              {picked.length > 0 && !quoteErr && quote && (extraBedsTotal > 0
+                ? <span className="rc-field-err"> · cần {extraBedsTotal} giường phụ (+{vnd(quote.totalSurcharge)})</span>
+                : <span style={{ color: '#059669', fontWeight: 600 }}> · vừa đủ, không phát sinh giường phụ</span>)}
+              {picked.length > 0 && !quote && !quoteErr && <span className="rc-muted"> · đang tính…</span>}
             </span>
-            <button disabled={!picked.length} onClick={goAllocate}>Tiếp tục phân bổ khách →</button>
+            <button disabled={!canCreate} onClick={() => setStep(3)}>Tiếp tục →</button>
           </div>
         </div>
       )}
@@ -264,54 +240,33 @@ export default function WalkInPage() {
         <div>
           <div className="rc-bar">
             <button className="link" onClick={() => setStep(2)}>← Chọn phòng khác</button>
-            <button type="button" className="link" onClick={() => setAlloc(autoSplit(form.adults, form.children, picked))}>↺ Tự chia tối ưu</button>
           </div>
 
           <p className="rc-muted">
-            Phân bổ <b>{form.adults} người lớn + {form.children} trẻ em</b> vào {picked.length} phòng.
-            Mỗi phòng cần ít nhất 1 người lớn; phụ phí giường phụ tính theo số khách thực ngủ mỗi phòng.
+            Hệ thống đã tự xếp <b>{form.adults} người lớn + {form.children} trẻ em</b> vào {picked.length} phòng theo cách
+            <b> ít tốn nhất cho khách</b>. Khách vẫn đi lại tự do giữa các phòng đã thuê — bảng dưới chỉ để tính tiền
+            {extraBedsTotal > 0 && ' và cho biết phòng nào cần kê thêm giường'}.
           </p>
 
           <table className="rc-table">
             <thead><tr><th>Phòng</th><th>Sức chứa</th><th>Người lớn</th><th>Trẻ em</th><th>Phụ phí</th><th>Tiền phòng</th></tr></thead>
             <tbody>
-              {picked.map((r) => {
-                const q = quoteByRoom[String(r.roomId)]
+              {(quote?.rooms || []).map((q) => {
                 const f = fitLabel(q)
-                const noAdult = (Number(alloc[r.roomId]?.adults) || 0) < 1
                 return (
-                  <tr key={r.roomId}>
-                    <td><b>{r.roomNumber}</b> <small>· {r.roomType.name}</small></td>
-                    <td>{r.roomType.capacity}</td>
-                    <td>
-                      <input type="number" min={1} style={{ width: 64 }} className={noAdult ? 'err' : ''}
-                        value={alloc[r.roomId]?.adults ?? 0}
-                        onChange={(e) => setRoomAlloc(r.roomId, 'adults', e.target.value)} />
-                    </td>
-                    <td>
-                      <input type="number" min={0} style={{ width: 64 }}
-                        value={alloc[r.roomId]?.children ?? 0}
-                        onChange={(e) => setRoomAlloc(r.roomId, 'children', e.target.value)} />
-                    </td>
-                    <td>{q ? <span className={'rc-fit ' + f.cls}>{f.text}</span> : '—'}</td>
-                    <td>{q ? vnd(q.total) : '—'}</td>
+                  <tr key={q.roomId}>
+                    <td><b>{q.roomNumber}</b> <small>· {q.roomType?.name}</small></td>
+                    <td>{q.capacity}</td>
+                    <td>{q.adults}</td>
+                    <td>{q.children}</td>
+                    <td><span className={'rc-fit ' + f.cls}>{f.text}</span></td>
+                    <td>{vnd(q.total)}</td>
                   </tr>
                 )
               })}
+              {!quote && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#888' }}>Đang tính…</td></tr>}
             </tbody>
           </table>
-
-          {/* Đối chiếu tổng */}
-          <div className="rc-alloc-check">
-            <span className={allocAdults === Number(form.adults) ? 'ok' : 'bad'}>
-              Người lớn: {allocAdults}/{form.adults}
-            </span>
-            <span className={allocChildren === Number(form.children) ? 'ok' : 'bad'}>
-              Trẻ em: {allocChildren}/{form.children}
-            </span>
-            {!eachHasAdult && <span className="bad">Mỗi phòng phải có ≥1 người lớn</span>}
-            {!sumsMatch && <span className="bad">Tổng phân bổ chưa khớp tổng khách</span>}
-          </div>
 
           {quoteErr && <p className="rc-err">{quoteErr}</p>}
 

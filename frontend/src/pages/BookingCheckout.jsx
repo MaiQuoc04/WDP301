@@ -119,7 +119,7 @@ const BookingCheckout = () => {
       const res = await customerService.createPaymentLink(id, type);
       if (res.success) {
         setPaymentData(res.data);
-        expireAt.current = Date.now() + 15 * 60 * 1000; // 15 phút
+        expireAt.current = new Date(res.data.expiresAt).getTime(); // mốc do backend kẹp (<= hạn giữ chỗ)
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Lỗi tạo liên kết thanh toán');

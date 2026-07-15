@@ -3,6 +3,132 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDate, fmtDateTime, bookingStatusLabel, paymentStatusLabel } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
+import PayOSQRCode from '../../components/PayOSQRCode'
+
+// Đếm ngược hạn QR (15 phút)
+function GroupQRCountdown({ expireMs }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+  const left = Math.max(0, Math.floor((expireMs - now) / 1000))
+  const mm = String(Math.floor(left / 60)).padStart(2, '0'), ss = String(left % 60).padStart(2, '0')
+  return <span className="payos-countdown">{left > 0 ? `Hết hạn sau ${mm}:${ss}` : 'Đã hết hạn'}</span>
+}
+
+// Modal thanh toán GOM cho nhóm — 1 modal cho: cọc (deposit) / toàn bộ (full) / tiền còn lại khi trả phòng (remaining).
+// Mỗi loại đều cho chọn QR PayOS hoặc tiền mặt.
+function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError }) {
+  const [qr, setQr] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
+  const expireAt = useRef(null)
+
+  // Realtime: PayOS báo đã thu (webhook -> socket) cho đúng nhóm này
+  useEffect(() => {
+    connectSocket()
+    const onPay = (evt) => { if (String(evt?.groupId) === String(groupId)) setDone(true) }
+    socket.on('payment_success', onPay)
+    return () => socket.off('payment_success', onPay)
+  }, [groupId])
+
+  // Polling 5s (fallback khi webhook không tới localhost)
+  useEffect(() => {
+    if (!qr || done) return
+    const t = setInterval(async () => {
+      try { const r = await bookingService.syncGroupPayments(groupId); if (r?.synced > 0) setDone(true) } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(t)
+  }, [qr, done, groupId])
+
+  const genQR = async () => {
+    setLoading(true)
+    try { const d = await bookingService.createGroupQR(groupId, type); setQr(d); expireAt.current = new Date(d.expiresAt).getTime() } // mốc backend kẹp (<= hạn giữ chỗ)
+    catch (e) { onError(e.response?.data?.message || 'Không tạo được QR') }
+    finally { setLoading(false) }
+  }
+
+  const payCash = async () => {
+    setLoading(true)
+    try {
+      if (type === 'remaining') {
+        if (!window.confirm(`Trả phòng CẢ NHÓM (thu tiền mặt còn lại ${vnd(amount)}) và tự giao dọn phòng?`)) { setLoading(false); return }
+        const res = await bookingService.checkOutGroupAll(groupId, { method: 'cash' })
+        let m = `Đã trả ${res.done} phòng`
+        if (res.collected) m += ` · thu ${vnd(res.collected)}`
+        if (res.skipped?.length) m += ` · bỏ qua ${res.skipped.length} phòng`
+        onDone(m)
+      } else {
+        await bookingService.confirmGroupDeposit(groupId, { method: 'cash', paidFull: type === 'full' })
+        onDone(type === 'full' ? 'Đã thu toàn bộ cho nhóm (tiền mặt)' : 'Đã thu cọc nhóm (tiền mặt)')
+      }
+    } catch (e) { onError(e.response?.data?.message || 'Lỗi thanh toán') }
+    finally { setLoading(false) }
+  }
+
+  const kind = type === 'remaining' ? 'tiền còn lại' : type === 'full' ? 'toàn bộ' : 'cọc'
+  const doneMsg = type === 'remaining' ? 'Đã thu tiền còn lại & trả phòng cả nhóm qua QR'
+    : type === 'full' ? 'Đã thu toàn bộ nhóm qua QR' : 'Đã thu cọc nhóm qua QR'
+  const canQR = amount >= 1000
+
+  return (
+    <div className="rc-modal-overlay" onClick={onClose}>
+      <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{title} — Thanh toán</h3>
+        <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>
+          Số tiền: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(amount)}</strong>
+        </p>
+
+        {!qr && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {canQR && (
+              <button className="payos-method-btn qr" onClick={genQR} disabled={loading}>
+                <span className="payos-method-icon">📱</span>
+                <span className="payos-method-label">{loading ? 'Đang tạo QR...' : 'Tạo QR PayOS'}</span>
+                <span className="payos-method-sub">Khách quét QR để thanh toán {kind}</span>
+              </button>
+            )}
+            <button className="payos-method-btn cash" onClick={payCash} disabled={loading}>
+              <span className="payos-method-icon">💵</span>
+              <span className="payos-method-label">Thu tiền mặt</span>
+              <span className="payos-method-sub">{type === 'remaining' ? 'Trả phòng & thu tiền mặt tại quầy' : 'Xác nhận đã thu tại quầy'}</span>
+            </button>
+          </div>
+        )}
+
+        {qr && (
+          <div className="payos-qr-wrap">
+            <div className="payos-qr-header">
+              <span className="payos-amount">{vnd(qr.amount)}</span>
+              {expireAt.current && <GroupQRCountdown expireMs={expireAt.current} />}
+            </div>
+            {done ? (
+              <div className="payos-success-banner">
+                <span className="payos-success-icon">✅</span>
+                <div><strong>Thanh toán thành công!</strong></div>
+              </div>
+            ) : (
+              <>
+                <div className="payos-qr-img-wrap">
+                  <PayOSQRCode value={qr.qrCode} size={210} imageClassName="payos-qr-img" qrClassName="payos-qr-img" placeholderClassName="payos-qr-placeholder" alt="QR PayOS" />
+                </div>
+                {qr.checkoutUrl && qr.checkoutUrl !== '#' && (
+                  <a href={qr.checkoutUrl} target="_blank" rel="noreferrer" className="payos-open-link">Mở trang thanh toán PayOS ↗</a>
+                )}
+                <p className="payos-polling-hint">⟳ Hệ thống tự cập nhật khi thanh toán xong</p>
+              </>
+            )}
+            {done && (
+              <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => onDone(doneMsg)}>Đóng &amp; Làm mới →</button>
+            )}
+          </div>
+        )}
+
+        <div className="rc-modal-actions">
+          <button className="link" onClick={onClose}>Đóng</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function GroupDetailPage() {
   const { id } = useParams()
@@ -10,6 +136,7 @@ export default function GroupDetailPage() {
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
+  const [payModal, setPayModal] = useState(null) // { type, amount, title }
 
   const reload = useCallback(async () => {
     setErr('')
@@ -27,16 +154,6 @@ export default function GroupDetailPage() {
     socket.on('booking_updated', onUpd)
     return () => socket.off('booking_updated', onUpd)
   }, [reload])
-
-  const confirmDeposit = async (paidFull) => {
-    setErr(''); setMsg(''); setLoading(true)
-    try {
-      await bookingService.confirmGroupDeposit(id, { method: 'cash', paidFull })
-      setMsg(paidFull ? 'Đã thu toàn bộ cho nhóm' : 'Đã thu cọc nhóm')
-      await reload()
-    } catch (e) { setErr(e.response?.data?.message || 'Lỗi thu cọc') }
-    finally { setLoading(false) }
-  }
 
   // Thao tác hàng loạt: áp cho các phòng đủ điều kiện; báo done + phòng bị bỏ qua (lý do).
   const runGroupAction = async (label, fn, confirmText) => {
@@ -61,6 +178,12 @@ export default function GroupDetailPage() {
   const canCancel = members.some((m) => ['pending', 'confirmed'].includes(m.status))
   const canNoShow = members.some((m) => m.status === 'confirmed')
 
+  // Số tiền CHÍNH XÁC theo phòng đủ điều kiện (QR/tiền mặt sẽ thu đúng con số này)
+  const pendingMembers = members.filter((m) => m.status === 'pending')
+  const pendingDeposit = pendingMembers.reduce((s, m) => s + (m.depositAmount || 0), 0)
+  const pendingTotal = pendingMembers.reduce((s, m) => s + (m.totalAmount || 0), 0)
+  const checkinRemaining = members.filter((m) => m.status === 'checked_in').reduce((s, m) => s + Math.max(0, m.remainingAmount || 0), 0)
+
   return (
     <div className="rc-detail">
       <div className="rc-bar">
@@ -72,11 +195,13 @@ export default function GroupDetailPage() {
 
       {hasPending && (
         <div className="rc-actions">
-          <button className="btn-payos" disabled={loading} onClick={() => confirmDeposit(false)}>
-            💳 Thu cọc nhóm {vnd(rollup.depositAmount)} (tiền mặt)
+          <button className="btn-payos" disabled={loading}
+            onClick={() => setPayModal({ type: 'deposit', amount: pendingDeposit, title: 'Thu cọc nhóm' })}>
+            💳 Thu cọc nhóm {vnd(pendingDeposit)}
           </button>
-          <button disabled={loading} onClick={() => confirmDeposit(true)}>
-            Thu toàn bộ {vnd(rollup.totalAmount)}
+          <button disabled={loading}
+            onClick={() => setPayModal({ type: 'full', amount: pendingTotal, title: 'Thu toàn bộ nhóm' })}>
+            Thu toàn bộ {vnd(pendingTotal)}
           </button>
         </div>
       )}
@@ -90,9 +215,9 @@ export default function GroupDetailPage() {
             </button>
           )}
           {canCheckOut && (
-            <button disabled={loading} onClick={() => runGroupAction('Đã trả', () => bookingService.checkOutGroupAll(id, { method: 'cash' }),
-              `Trả phòng CẢ NHÓM (thu tiền mặt còn lại ${vnd(rollup.remainingAmount)}) và tự giao dọn phòng?`)}>
-              🧾 Trả tất cả
+            <button className="btn-payos" disabled={loading}
+              onClick={() => setPayModal({ type: 'remaining', amount: checkinRemaining, title: 'Trả phòng cả nhóm' })}>
+              🧾 Trả tất cả {checkinRemaining > 0 ? `(còn ${vnd(checkinRemaining)})` : ''}
             </button>
           )}
           {canNoShow && (
@@ -123,7 +248,7 @@ export default function GroupDetailPage() {
           <h3>Giao dịch</h3>
           {payments.length ? (
             <ul className="rc-hist">
-              {payments.map((p) => <li key={p._id}>{fmtDateTime(p.paidAt || p.createdAt)}: {p.type === 'deposit' ? 'Cọc' : 'Còn lại'} {vnd(p.amount)} ({p.method})</li>)}
+              {payments.map((p) => <li key={p._id}>{fmtDateTime(p.paidAt || p.createdAt)}: {p.type === 'deposit' ? 'Cọc' : 'Còn lại'} {vnd(p.amount)} ({p.method}{p.status !== 'paid' ? ` · ${p.status}` : ''})</li>)}
             </ul>
           ) : <p className="rc-muted">Chưa có giao dịch</p>}
         </section>
@@ -152,10 +277,22 @@ export default function GroupDetailPage() {
             <tr className="tot"><td>Còn lại</td><td>{vnd(rollup.remainingAmount)}</td></tr>
           </tbody></table>
           <p className="rc-muted" style={{ marginTop: 8 }}>
-            Dùng nút <b>“… tất cả”</b> ở trên để thao tác cả nhóm 1 lần (áp cho phòng đủ điều kiện; phòng chưa sẵn sàng sẽ được báo). Vẫn có thể <b>Mở →</b> từng phòng để thao tác lẻ (nhận sớm / trả muộn / đổi phòng / thêm dịch vụ…); tổng nhóm tự tính lại.
+            Dùng nút <b>“… tất cả”</b> ở trên để thao tác cả nhóm 1 lần (áp cho phòng đủ điều kiện; phòng chưa sẵn sàng sẽ được báo). Thu tiền (cọc / toàn bộ / còn lại) chọn <b>QR PayOS</b> hoặc <b>tiền mặt</b>. Vẫn có thể <b>Mở →</b> từng phòng để thao tác lẻ; tổng nhóm tự tính lại.
           </p>
         </section>
       </div>
+
+      {payModal && (
+        <GroupPayModal
+          groupId={id}
+          type={payModal.type}
+          amount={payModal.amount}
+          title={payModal.title}
+          onClose={() => { setPayModal(null); reload() }}
+          onDone={(m) => { setMsg(m); setPayModal(null); reload() }}
+          onError={(e) => setErr(e)}
+        />
+      )}
     </div>
   )
 }

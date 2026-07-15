@@ -14,7 +14,11 @@ const paymentSchema = new mongoose.Schema({
   transactionRef:  { type: String }, // mã gửi kèm khi tạo link, dùng match webhook
   transactionCode: { type: String }, // mã giao dịch ngân hàng nhận từ webhook
   paidAt:          { type: Date },
-  expiredAt:       { type: Date },    // hạn link QR online
+  expiredAt:       { type: Date },    // hạn link QR online (= hạn giữ chỗ; xem payosService.payWindowEnd)
+  // Lưu lại QR để lần bấm "Thanh toán" sau TRẢ VỀ CHÍNH NÓ, không đẻ đơn PayOS mới.
+  // Nhiều đơn cùng sống = khách có thể quét trúng 2 cái -> trả tiền 2 lần mà chỉ nhận 1 booking.
+  qrCode:          { type: String },
+  checkoutUrl:     { type: String },
   confirmedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }, // lễ tân xác nhận (remaining)
 }, { timestamps: true })
 

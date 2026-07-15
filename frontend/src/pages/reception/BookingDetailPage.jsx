@@ -62,7 +62,7 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
     try {
       const data = await bookingService.createCheckoutQR(bookingId)
       setQrData(data)
-      expireAt.current = Date.now() + 15 * 60 * 1000
+      expireAt.current = new Date(data.expiresAt).getTime() // mốc do backend kẹp (<= hạn giữ chỗ)
       setStep('qr')
     } catch (e) {
       onError(e.response?.data?.message || 'Không tạo được QR')
@@ -225,25 +225,34 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
         {step === 'cash' && (
           <>
             <h3>Check-out — Tiền mặt</h3>
-            <p className="rc-modal-hint">Đầu danh sách là người phụ trách đúng tầng &amp; đang rảnh.</p>
+            <p className="rc-modal-hint">Tự phân cho người phù hợp nhất (đúng tầng, ít việc), hoặc chọn người khác bên dưới.</p>
             {hkLoading ? <p>Đang tải...</p> : (
-              <ul className="hk-pick-list">
-                {hkPick.map((h) => (
-                  <li key={h.accountId}>
-                    <div className="hk-pick-info">
-                      <b>{h.fullName || h.email}</b>
-                      <small>
-                        {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
-                        {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
-                      </small>
-                    </div>
-                    <button className="btn-primary" onClick={() => handleCashCheckout(h.accountId)} disabled={loading}>
-                      {loading ? '...' : 'Check-out'}
-                    </button>
-                  </li>
-                ))}
-                {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
-              </ul>
+              <>
+                {hkPick.length > 0 && (
+                  <button className="btn-primary" style={{ width: '100%', marginBottom: 10 }} disabled={loading}
+                    onClick={() => handleCashCheckout(hkPick[0].accountId)}>
+                    ⚡ Tự phân: {hkPick[0].fullName || hkPick[0].email}{hkPick[0].onFloor ? ' · đúng tầng' : ''}{hkPick[0].busy ? '' : ' · rảnh'} — Check-out
+                  </button>
+                )}
+                {hkPick.length > 1 && <p className="rc-muted" style={{ margin: '4px 0' }}>hoặc chọn người khác:</p>}
+                <ul className="hk-pick-list">
+                  {hkPick.map((h) => (
+                    <li key={h.accountId}>
+                      <div className="hk-pick-info">
+                        <b>{h.fullName || h.email}</b>
+                        <small>
+                          {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
+                          {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
+                        </small>
+                      </div>
+                      <button onClick={() => handleCashCheckout(h.accountId)} disabled={loading}>
+                        {loading ? '...' : 'Giao'}
+                      </button>
+                    </li>
+                  ))}
+                  {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
+                </ul>
+              </>
             )}
             <div className="rc-modal-actions">
               <button className="link" onClick={() => setStep('choose')}>← Quay lại</button>
@@ -259,25 +268,34 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
             <div className="payos-success-banner" style={{ marginBottom: 16 }}>
               ✅ Đã thanh toán qua QR — chọn housekeeper để hoàn tất
             </div>
-            <p className="rc-modal-hint">Chọn nhân viên để dọn phòng sau check-out.</p>
+            <p className="rc-modal-hint">Tự phân cho người phù hợp nhất, hoặc chọn người khác bên dưới.</p>
             {hkLoading ? <p>Đang tải...</p> : (
-              <ul className="hk-pick-list">
-                {hkPick.map((h) => (
-                  <li key={h.accountId}>
-                    <div className="hk-pick-info">
-                      <b>{h.fullName || h.email}</b>
-                      <small>
-                        {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
-                        {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
-                      </small>
-                    </div>
-                    <button className="btn-primary" onClick={() => handleQRCheckoutWithHK(h.accountId)} disabled={loading}>
-                      {loading ? '...' : 'Xác nhận'}
-                    </button>
-                  </li>
-                ))}
-                {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
-              </ul>
+              <>
+                {hkPick.length > 0 && (
+                  <button className="btn-primary" style={{ width: '100%', marginBottom: 10 }} disabled={loading}
+                    onClick={() => handleQRCheckoutWithHK(hkPick[0].accountId)}>
+                    ⚡ Tự phân: {hkPick[0].fullName || hkPick[0].email}{hkPick[0].onFloor ? ' · đúng tầng' : ''}{hkPick[0].busy ? '' : ' · rảnh'} — Hoàn tất
+                  </button>
+                )}
+                {hkPick.length > 1 && <p className="rc-muted" style={{ margin: '4px 0' }}>hoặc chọn người khác:</p>}
+                <ul className="hk-pick-list">
+                  {hkPick.map((h) => (
+                    <li key={h.accountId}>
+                      <div className="hk-pick-info">
+                        <b>{h.fullName || h.email}</b>
+                        <small>
+                          {h.floors?.length ? `Tầng ${h.floors.join(', ')}` : 'Chưa phân tầng'}
+                          {h.onFloor ? ' · đúng tầng' : ''} · {h.busy ? `đang làm ${h.activeTasks} việc` : 'đang rảnh'}
+                        </small>
+                      </div>
+                      <button onClick={() => handleQRCheckoutWithHK(h.accountId)} disabled={loading}>
+                        {loading ? '...' : 'Giao'}
+                      </button>
+                    </li>
+                  ))}
+                  {!hkPick.length && <li className="rc-muted">Chi nhánh chưa có nhân viên buồng phòng</li>}
+                </ul>
+              </>
             )}
             <div className="rc-modal-actions">
               <button className="link" onClick={onClose}>Đóng</button>
@@ -290,11 +308,13 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
 }
 
 /* ─── Deposit QR Modal (lễ tân gen QR cho booking pending) ─────── */
-function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError }) {
+function DepositQRModal({ bookingId, depositAmount, totalAmount, onClose, onSuccess, onError }) {
   const [qrData, setQrData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [paymentDone, setPaymentDone] = useState(false)
+  const [payFull, setPayFull] = useState(false) // thu cọc (mặc định) hay thu toàn bộ 1 lần
   const expireAt = useRef(null)
+  const amount = payFull ? totalAmount : depositAmount
 
   useEffect(() => {
     connectSocket()
@@ -322,9 +342,9 @@ function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError 
   const handleGenQR = async () => {
     setLoading(true)
     try {
-      const data = await bookingService.createDepositQR(bookingId)
+      const data = await bookingService.createDepositQR(bookingId, payFull ? 'full' : 'deposit')
       setQrData(data)
-      expireAt.current = Date.now() + 15 * 60 * 1000
+      expireAt.current = new Date(data.expiresAt).getTime() // mốc do backend kẹp (<= hạn giữ chỗ)
     } catch (e) {
       onError(e.response?.data?.message || 'Không tạo được QR')
     } finally {
@@ -334,20 +354,35 @@ function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError 
 
   const handleConfirmDone = async () => {
     try {
-      await bookingService.confirmDeposit(bookingId)
-      onSuccess('Đã xác nhận thu cọc')
+      await bookingService.confirmDeposit(bookingId, { method: 'cash', paidFull: payFull })
+      onSuccess(payFull ? 'Đã thu toàn bộ (tiền mặt)' : 'Đã xác nhận thu cọc')
       onClose()
     } catch (e) {
       onError(e.response?.data?.message || 'Lỗi xác nhận')
     }
   }
 
+  const tabStyle = (on) => ({
+    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+    border: on ? '2px solid #d97706' : '1px solid #d1d5db',
+    background: on ? '#fff7ed' : '#fff', color: on ? '#b45309' : '#6b7280',
+  })
+
   return (
     <div className="rc-modal-overlay" onClick={onClose}>
       <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Thu cọc — Thanh toán QR</h3>
+        <h3>Thu tiền — QR / Tiền mặt</h3>
+
+        {/* Chọn thu cọc hay thu toàn bộ; QR và tiền mặt đều áp theo lựa chọn này */}
+        {!qrData && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <button style={tabStyle(!payFull)} onClick={() => setPayFull(false)}>Cọc {vnd(depositAmount)}</button>
+            <button style={tabStyle(payFull)} onClick={() => setPayFull(true)}>Toàn bộ {vnd(totalAmount)}</button>
+          </div>
+        )}
+
         <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>
-          Tiền cọc: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(depositAmount)}</strong>
+          Số tiền thu: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(amount)}</strong>
         </p>
 
         {!qrData && (
@@ -355,12 +390,12 @@ function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError 
             <button className="payos-method-btn qr" onClick={handleGenQR} disabled={loading}>
               <span className="payos-method-icon">📱</span>
               <span className="payos-method-label">{loading ? 'Đang tạo QR...' : 'Tạo QR PayOS'}</span>
-              <span className="payos-method-sub">Khách quét QR để thanh toán cọc</span>
+              <span className="payos-method-sub">Khách quét QR để thanh toán {payFull ? 'toàn bộ' : 'cọc'}</span>
             </button>
             <button className="payos-method-btn cash" onClick={handleConfirmDone}>
               <span className="payos-method-icon">💵</span>
               <span className="payos-method-label">Thu tiền mặt</span>
-              <span className="payos-method-sub">Xác nhận đã thu cọc tại quầy</span>
+              <span className="payos-method-sub">Xác nhận đã thu {payFull ? 'toàn bộ' : 'cọc'} tại quầy</span>
             </button>
           </div>
         )}
@@ -397,7 +432,7 @@ function DepositQRModal({ bookingId, depositAmount, onClose, onSuccess, onError 
               </>
             )}
             {paymentDone && (
-              <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => { onSuccess('Đã xác nhận cọc qua QR'); onClose() }}>
+              <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => { onSuccess(payFull ? 'Đã thu toàn bộ qua QR' : 'Đã xác nhận cọc qua QR'); onClose() }}>
                 Đóng & Làm mới →
               </button>
             )}
@@ -689,6 +724,7 @@ export default function BookingDetailPage() {
         <DepositQRModal
           bookingId={id}
           depositAmount={b.depositAmount}
+          totalAmount={b.totalAmount}
           onClose={() => { setShowDepositQRModal(false); reload() }}
           onSuccess={(m) => { setMsg(m); setShowDepositQRModal(false); reload() }}
           onError={(e) => { setErr(e); setShowDepositQRModal(false) }}

@@ -396,22 +396,80 @@ async function genGroupCode(branchCode) {
   throw new Error('Không sinh được mã nhóm, thử lại')
 }
 
-// Gợi ý chia khách vào các phòng để TỐI THIỂU phụ phí: mỗi phòng 1 người lớn trước, rồi rải theo chỗ trống.
-// rooms: [{ roomId, capacity }]. Trả [{ roomId, adults, children }].
+// Chia khách vào các phòng sao cho TỔNG TIỀN phụ phí NHỎ NHẤT (hoà tiền -> ít giường hơn -> chia đều hơn).
+// KHÔNG dùng greedy "nhét vào phòng còn nhiều chỗ nhất": giá là hàm BẬC THANG floor(suất - sức chứa), không
+// tuyến tính theo chỗ trống. Phòng ĐÃ phải kê giường còn 0.5 suất đi ké miễn phí; phòng chưa kê chỉ cần vượt
+// 0.5 là mất nguyên 1 giường -> greedy thu vượt khách (5NL+2TE vào 2 phòng cap 2: greedy 2 giường, đúng là 1).
+// Input bé (vài phòng, vài chục khách) nên quy hoạch động ra cực tiểu tuyệt đối thay vì đoán.
+// rooms: [{ roomId, capacity, extraBedFee }] — thiếu extraBedFee => coi mọi giường đồng giá (tối thiểu SỐ giường).
+// Trả [{ roomId, adults, children }], mỗi phòng >= 1 người lớn.
 exports.autoAllocate = function autoAllocate(adults, children, rooms) {
-  const alloc = rooms.map((r) => ({ roomId: r.roomId, capacity: r.capacity || 2, adults: 0, children: 0 }))
-  if (!alloc.length) return []
-  const units = (a) => a.adults * ADULT_UNIT + a.children * CHILD_UNIT
-  const remaining = (a) => a.capacity - units(a)
-  const pickMostFree = () => alloc.reduce((best, a) => (remaining(a) > remaining(best) ? a : best), alloc[0])
-  // 1 người lớn mỗi phòng (mỗi phòng phải có người lớn)
-  let aLeft = Math.max(0, adults)
-  for (const a of alloc) { if (aLeft > 0) { a.adults = 1; aLeft-- } }
-  // người lớn còn lại -> phòng còn nhiều chỗ nhất
-  for (let i = 0; i < aLeft; i++) pickMostFree().adults++
-  // trẻ em -> phòng còn nhiều chỗ nhất (0.5 đơn vị)
-  for (let i = 0; i < Math.max(0, children); i++) pickMostFree().children++
-  return alloc.map((a) => ({ roomId: a.roomId, adults: a.adults, children: a.children }))
+  const N = Array.isArray(rooms) ? rooms.length : 0
+  if (!N) return []
+  const A = Math.max(0, Math.floor(Number(adults) || 0))
+  const C = Math.max(0, Math.floor(Number(children) || 0))
+  const cap = rooms.map((r) => r.capacity || 2)
+  const fee = rooms.map((r) => (Number.isFinite(r.extraBedFee) ? r.extraBedFee : 1))
+  const beds = (i, a, c) => Math.floor(Math.max(0, a * ADULT_UNIT + c * CHILD_UNIT - cap[i]))
+  const emit = (al) => al.map((x, i) => ({ roomId: rooms[i].roomId, adults: x.adults, children: x.children }))
+
+  // Không đủ 1 người lớn/phòng: caller đã chặn trước, vẫn trả kết quả để lỗi báo đúng chỗ.
+  if (A < N) {
+    const al = rooms.map((_, i) => ({ adults: i < A ? 1 : 0, children: 0 }))
+    for (let i = 0; i < C; i++) al[i % N].children++
+    return emit(al)
+  }
+
+  // Dự phòng khi input phi lý làm nổ DP: xếp từng khách vào chỗ có CHI PHÍ BIÊN thấp nhất.
+  const greedy = () => {
+    const al = rooms.map(() => ({ adults: 1, children: 0 }))
+    const add = (key, left) => {
+      for (let n = 0; n < left; n++) {
+        let bi = 0, bk = null
+        for (let i = 0; i < N; i++) {
+          const b0 = beds(i, al[i].adults, al[i].children)
+          al[i][key]++
+          const k = [(beds(i, al[i].adults, al[i].children) - b0) * fee[i],
+            -(cap[i] - (al[i].adults * ADULT_UNIT + al[i].children * CHILD_UNIT))]
+          al[i][key]--
+          if (!bk || k[0] < bk[0] || (k[0] === bk[0] && k[1] < bk[1])) { bi = i; bk = k }
+        }
+        al[bi][key]++
+      }
+    }
+    add('adults', A - N); add('children', C)
+    return emit(al)
+  }
+  if (N * (A + 1) * (A + 1) * (C + 1) * (C + 1) > 5e6) return greedy()
+
+  // dp[a][c] = [tiền, số giường, độ lệch sức chứa] — 2 khoá sau chỉ phá hoà, không đổi tiền.
+  const better = (x, y) => !y || x[0] < y[0] || (x[0] === y[0] && (x[1] < y[1] || (x[1] === y[1] && x[2] < y[2])))
+  const K = (a, c) => a * (C + 1) + c
+  let cur = new Array((A + 1) * (C + 1)).fill(null)
+  cur[K(0, 0)] = [0, 0, 0]
+  const trace = []
+  for (let i = 0; i < N; i++) {
+    const next = new Array((A + 1) * (C + 1)).fill(null)
+    const ch = new Array((A + 1) * (C + 1)).fill(null)
+    const reserve = N - 1 - i                    // chừa 1 người lớn cho mỗi phòng phía sau
+    for (let a = 0; a <= A; a++) for (let c = 0; c <= C; c++) {
+      const st = cur[K(a, c)]
+      if (!st) continue
+      for (let ai = 1; ai <= A - a - reserve; ai++) for (let ci = 0; ci <= C - c; ci++) {
+        const b = beds(i, ai, ci)
+        const d = ai * ADULT_UNIT + ci * CHILD_UNIT - cap[i]
+        const cost = [st[0] + b * fee[i], st[1] + b, st[2] + d * d]
+        const k = K(a + ai, c + ci)
+        if (better(cost, next[k])) { next[k] = cost; ch[k] = { ai, ci, prev: K(a, c) } }
+      }
+    }
+    cur = next; trace.push(ch)
+  }
+  let k = K(A, C)
+  if (!cur[k]) return greedy()
+  const al = new Array(N)
+  for (let i = N - 1; i >= 0; i--) { const t = trace[i][k]; al[i] = { adults: t.ai, children: t.ci }; k = t.prev }
+  return emit(al)
 }
 
 // Báo giá 1 phòng cho party cụ thể (tiền phòng + phụ phí giường phụ /đêm).
@@ -437,37 +495,60 @@ async function buildServices(list, branchId) {
   return { services, extraServicesTotal }
 }
 
-// Nạp + validate các phòng của 1 nhóm (cùng chi nhánh, active, không bảo trì/khoá, không trùng). Trả Map(roomId -> room+roomType).
-async function loadGroupRooms(items, branch) {
+// Nạp + validate các phòng của 1 nhóm (cùng chi nhánh, active, không bảo trì/khoá, không trùng) VÀ chia khách vào phòng.
+//  - items chỉ có roomId  -> hệ thống TỰ CHIA theo adultsTotal/childrenTotal (tối thiểu tổng tiền). Lễ tân không chia tay nữa.
+//  - items có adults/children -> dùng đúng như caller gửi (đường override / chỉnh lẻ từng phòng sau khi tạo).
+// Trả Map(roomId -> room+roomType+adults+children).
+async function loadGroupRooms(items, branch, adultsTotal, childrenTotal) {
   if (!Array.isArray(items) || !items.length) throw new Error('Chọn ít nhất 1 phòng')
   const ids = items.map((it) => String(it.roomId))
   if (new Set(ids).size !== ids.length) throw new Error('Có phòng bị chọn trùng')
-  const map = new Map()
+
+  const loaded = []
   for (const it of items) {
-    const adults = Number(it.adults) || 0
-    const children = Number(it.children) || 0
-    if (adults < 1) throw new Error('Mỗi phòng phải có ít nhất 1 người lớn')
-    if (children < 0) throw new Error('Số trẻ em không hợp lệ')
     const room = await Room.findOne({ _id: it.roomId, isDeleted: { $ne: true } }).populate('roomType')
     if (!room) throw new Error('Phòng không tồn tại')
     if (String(room.branch) !== String(branch._id)) throw new Error(`Phòng ${room.roomNumber} không thuộc chi nhánh`)
     if (['maintenance', 'locked'].includes(room.status)) throw new Error(`Phòng ${room.roomNumber} đang ${room.status}, không thể đặt`)
     if (!room.roomType || room.roomType.status !== 'active') throw new Error(`Loại phòng của phòng ${room.roomNumber} không khả dụng`)
+    loaded.push({ it, room })
+  }
+
+  const auto = loaded.every(({ it }) => it.adults == null)
+  let alloc = null
+  if (auto) {
+    const A = Math.max(0, Math.floor(Number(adultsTotal) || 0))
+    const C = Math.max(0, Math.floor(Number(childrenTotal) || 0))
+    if (A < loaded.length) throw new Error(`Cần ít nhất ${loaded.length} người lớn cho ${loaded.length} phòng (mỗi phòng 1 người lớn)`)
+    const res = exports.autoAllocate(A, C, loaded.map(({ room }) => ({
+      roomId: String(room._id), capacity: room.roomType.capacity || 2, extraBedFee: room.roomType.extraBedFee,
+    })))
+    alloc = new Map(res.map((r) => [String(r.roomId), r]))
+  }
+
+  const map = new Map()
+  for (const { it, room } of loaded) {
+    const src = auto ? alloc.get(String(room._id)) : it
+    const adults = Number(src.adults) || 0
+    const children = Number(src.children) || 0
+    if (adults < 1) throw new Error('Mỗi phòng phải có ít nhất 1 người lớn')
+    if (children < 0) throw new Error('Số trẻ em không hợp lệ')
     map.set(String(room._id), { room, adults, children, services: it.services })
   }
   return map
 }
 
-// Báo giá NHÓM theo allocation từng phòng (để UI hiện realtime khi lễ tân chia khách). Không ghi DB.
-// items: [{ roomId, adults, children, services? }]
-exports.quoteGroup = async (branchId, checkInRaw, checkOutRaw, items = []) => {
+// Báo giá NHÓM cho các phòng đã chọn. Không ghi DB. Dùng cho CẢ bước chọn phòng lẫn bước xác nhận
+// -> hai bước không thể lệch nhau vì cùng 1 trọng tài.
+// items: [{ roomId, services? }] + tổng khách -> tự chia. (Gửi kèm adults/children từng phòng = override.)
+exports.quoteGroup = async (branchId, checkInRaw, checkOutRaw, items = [], adultsTotal, childrenTotal) => {
   const checkIn = applyHotelHours(checkInRaw, 14, 0)
   const checkOut = applyHotelHours(checkOutRaw, 12, 0)
   if (!(checkIn instanceof Date) || isNaN(checkIn) || isNaN(checkOut)) throw new Error('Ngày không hợp lệ')
   if (nightsBetween(checkIn, checkOut) < 1) throw new Error('Phải ở tối thiểu 1 đêm')
   const branch = await Branch.findById(branchId)
   if (!branch || !branch.isActive) throw new Error('Chi nhánh không tồn tại hoặc đã ngừng hoạt động')
-  const map = await loadGroupRooms(items, branch)
+  const map = await loadGroupRooms(items, branch, adultsTotal, childrenTotal)
 
   const rooms = []
   let totalRoomCharge = 0, totalSurcharge = 0, totalServices = 0, totalAmount = 0, depositAmount = 0
@@ -509,7 +590,7 @@ exports.createGroup = async (p) => {
 
   const branch = await Branch.findById(p.branchId)
   if (!branch || !branch.isActive) throw new Error('Chi nhánh không tồn tại hoặc đã ngừng hoạt động')
-  const map = await loadGroupRooms(p.items, branch)
+  const map = await loadGroupRooms(p.items, branch, p.adultsTotal, p.childrenTotal)
 
   // Đối chiếu tổng khai báo (nếu FE gửi) = Σ allocation
   const adultsTotal = [...map.values()].reduce((s, x) => s + x.adults, 0)
@@ -612,7 +693,8 @@ exports.quoteGroupOnline = async (branchId, checkInRaw, checkOutRaw, items = [],
   }
   if (adults < roomCount) throw new Error(`Cần ít nhất ${roomCount} người lớn cho ${roomCount} phòng (mỗi phòng 1 người lớn)`)
 
-  const alloc = exports.autoAllocate(adults, children, virtual.map((v) => ({ roomId: v.idx, capacity: v.roomType.capacity || 2 })))
+  // extraBedFee/đêm: số đêm chung cả nhóm nên tối thiểu Σ(giường × phí) là tối thiểu đúng tổng tiền khách trả.
+  const alloc = exports.autoAllocate(adults, children, virtual.map((v) => ({ roomId: v.idx, capacity: v.roomType.capacity || 2, extraBedFee: v.roomType.extraBedFee })))
   const allocByIdx = {}; alloc.forEach((a) => { allocByIdx[a.roomId] = a })
 
   const rooms = []
@@ -633,7 +715,8 @@ exports.quoteGroupOnline = async (branchId, checkInRaw, checkOutRaw, items = [],
   return {
     nights: nightsBetween(checkIn, checkOut), roomCount, adultsTotal: adults, childrenTotal: children,
     rooms, totalRoomCharge, totalSurcharge, totalAmount, depositAmount,
-    capacityTotal, partyUnits, enoughCapacity: capacityTotal >= partyUnits, enoughAdults: adults >= roomCount,
+    // "Đủ chỗ" = KHÔNG phát sinh giường phụ (khớp quy tắc floor: trẻ lẻ 0.5 được miễn), không so thô capacityTotal>=partyUnits.
+    capacityTotal, partyUnits, enoughCapacity: totalSurcharge === 0, enoughAdults: adults >= roomCount,
   }
 }
 
@@ -658,7 +741,8 @@ exports.createGroupOnline = async (p) => {
   if (!roomCount) throw new Error('Chọn ít nhất 1 phòng')
   if (adults < roomCount) throw new Error(`Cần ít nhất ${roomCount} người lớn cho ${roomCount} phòng (mỗi phòng 1 người lớn)`)
 
-  const alloc = exports.autoAllocate(adults, children, virtual.map((v) => ({ roomId: v.idx, capacity: v.roomType.capacity || 2 })))
+  // extraBedFee/đêm: số đêm chung cả nhóm nên tối thiểu Σ(giường × phí) là tối thiểu đúng tổng tiền khách trả.
+  const alloc = exports.autoAllocate(adults, children, virtual.map((v) => ({ roomId: v.idx, capacity: v.roomType.capacity || 2, extraBedFee: v.roomType.extraBedFee })))
   const allocByIdx = {}; alloc.forEach((a) => { allocByIdx[a.roomId] = a })
 
   // Tính tiền từng phòng ảo (đọc, ngoài transaction)
@@ -833,7 +917,8 @@ exports.cancelGroupAll = async (groupId, { reason, by } = {}) => {
 
 // Trả phòng TẤT CẢ: tự phân housekeeper theo tầng+tải + thu tiền còn lại GOM 1 lần.
 // Tạo task dọn theo THỨ TỰ (tầng, số phòng) -> assignedAt tăng dần theo lộ trình -> housekeeper dọn có chủ đích (FIFO hợp lý).
-exports.checkOutGroup = async (groupId, { by, method = 'cash' } = {}) => {
+// skipPayment=true khi tiền còn lại đã thu qua PayOS QR (Payment 'remaining' đã tạo) — không tạo lại giao dịch tiền mặt.
+exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = false } = {}) => {
   const group = await getGroupOr404(groupId)
   const members = await Booking.find({ group: groupId, status: 'checked_in' })
   if (!members.length) throw new Error('Nhóm không có phòng nào đang ở để trả')
@@ -859,8 +944,9 @@ exports.checkOutGroup = async (groupId, { by, method = 'cash' } = {}) => {
     if (b.room) await Room.findByIdAndUpdate(b.room, { status: 'cleaning' })
     try { await hk.createTurnover(b._id, b.room, assign[String(b._id)]) }
     catch (e) { console.warn('[checkOutGroup] createTurnover lỗi:', e.message) }
+    await exports.transition(b, 'completed', by, 'Hoàn tất (tự động sau trả phòng)') // bỏ bước complete thủ công
   }
-  if (totalRemaining > 0) {
+  if (totalRemaining > 0 && !skipPayment) {
     await Payment.create({ booking: members[0]._id, group: group._id, type: 'remaining', method, amount: totalRemaining, status: 'paid', paidAt: new Date(), confirmedBy: by })
   }
   return { done: members.length, skipped: [], collected: totalRemaining }
@@ -919,14 +1005,16 @@ async function loadBooking(bookingId) {
 exports.confirmDeposit = async (bookingId, { method = 'online_qr', transactionCode, by, skipCreatePayment = false, paidFull = false } = {}) => {
   const booking = await loadBooking(bookingId)
   if (booking.status !== 'pending') throw new Error('Chỉ booking đang chờ cọc mới xác nhận được')
+  // paidFull: khách thanh toán một lần toàn bộ (không cần thu remaining nữa).
+  // Giao dịch phải ghi ĐÚNG số tiền thực thu (toàn bộ, không phải mỗi cọc) để sổ quỹ/doanh thu khớp booking.
+  const collected = paidFull ? booking.totalAmount : booking.depositAmount
   if (!skipCreatePayment) {
     await Payment.create({
-      booking: booking._id, type: 'deposit', method, amount: booking.depositAmount,
+      booking: booking._id, type: 'deposit', method, amount: collected,
       status: 'paid', paidAt: new Date(), transactionCode, confirmedBy: by,
     })
   }
-  // paidFull: khách thanh toán một lần toàn bộ (không cần thu remaining nữa)
-  booking.paidAmount = paidFull ? booking.totalAmount : booking.depositAmount
+  booking.paidAmount = collected
   booking.remainingAmount = booking.totalAmount - booking.paidAmount
   booking.paymentStatus = paidFull ? 'paid' : 'partial'
   await exports.transition(booking, 'confirmed', by, paidFull ? 'Thanh toán toàn bộ' : 'Đã thu cọc')
@@ -991,6 +1079,8 @@ exports.checkOut = async (bookingId, { method = 'cash', by, housekeeperId, skipC
   // 🔗 Housekeeping: sinh task dọn turnover (urgent), GIAO cho housekeeper lễ tân chọn. Defensive.
   try { await require('./housekeepingService').createTurnover(booking._id, booking.room, housekeeperId) }
   catch (e) { console.warn('[checkOut] createTurnover lỗi:', e.message) }
+  // Trả phòng xong (đã thu đủ + bill đã chốt) -> HOÀN TẤT luôn, bỏ bước "complete" thủ công thừa thãi.
+  await exports.transition(booking, 'completed', by, 'Hoàn tất (tự động sau trả phòng)')
   return booking
 }
 
@@ -1191,13 +1281,23 @@ exports.markNoShow = async (bookingId, { by } = {}) => {
   return booking
 }
 
+// Ân hạn trước khi thật sự nhả phòng: khách bấm chuyển ở giây chót thì tiền còn đang bay về (~10-20s).
+// Huỷ ngay lúc hết hạn = tiền về sau khi phòng đã nhả -> khách mất tiền. Nán 60s để đón nốt.
+// (Trước đây ân hạn này vẫn có nhưng là ĂN MAY: job chạy mỗi 60s nên booking hết hạn ngẫu nhiên được 1-60s.)
+const EXPIRE_GRACE_MS = 60 * 1000
+
 // Job: tự huỷ booking pending quá hạn cọc (chỉ online có expiresAt). Trả về số lượng đã huỷ.
 exports.expirePendingBookings = async () => {
-  const expired = await Booking.find({ status: 'pending', expiresAt: { $lt: new Date() } })
+  const expired = await Booking.find({ status: 'pending', expiresAt: { $lt: new Date(Date.now() - EXPIRE_GRACE_MS) } })
   for (const b of expired) {
     b.cancelReason = 'payment_timeout'
     await exports.transition(b, 'cancelled', null, 'Tự huỷ: quá hạn thanh toán cọc')
     await HoldRoom.deleteMany({ booking: b._id })
+    // Realtime: khách đang ngồi ở trang thanh toán -> báo hết hạn để FE đưa về chọn phòng.
+    try {
+      const { getIO } = require('../config/socket')
+      getIO().emit('booking_expired', { bookingId: b._id, groupId: b.group || null })
+    } catch (e) { console.warn('[expire] socket emit lỗi:', e.message) }
   }
   return expired.length
 }

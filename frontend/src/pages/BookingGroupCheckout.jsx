@@ -65,6 +65,7 @@ const BookingGroupCheckout = () => {
   const [paymentData, setPaymentData] = useState(null);
   const [processingPay, setProcessingPay] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
+  const [expired, setExpired] = useState(false);   // hết hạn giữ chỗ (server báo qua socket, hoặc đồng hồ về 0)
   const expireAt = useRef(null);
 
   const fetchGroup = useCallback(async () => {
@@ -102,6 +103,21 @@ const BookingGroupCheckout = () => {
     return () => socket.off('payment_success', onPaySuccess);
   }, [id, fetchGroup]);
 
+  // Một đồng hồ duy nhất (group.expiresAt): dưới 1 phút -> cảnh báo đỏ; về 0 -> QR cũng chết theo, coi như hết hạn.
+  const [urgent, setUrgent] = useState(false);
+  useEffect(() => {
+    const exp = data?.group?.expiresAt ? new Date(data.group.expiresAt).getTime() : null;
+    if (!exp) { setUrgent(false); return undefined; }
+    const tick = () => {
+      const left = exp - Date.now();
+      setUrgent(left > 0 && left <= 60 * 1000);
+      if (left <= 0) setExpired(true);
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [data]);
+
   // Polling khi đang hiển thị QR (GET group tự sync PayOS ở backend)
   useEffect(() => {
     if (!paymentData || paymentDone) return undefined;
@@ -121,10 +137,17 @@ const BookingGroupCheckout = () => {
     const onUpd = (evt) => { if (evt?.bookingId && memberIdsRef.current.includes(String(evt.bookingId))) fetchGroup(); };
     // Admin khoá/mở chi nhánh của đơn này -> cập nhật ngay để hiện/ẩn cảnh báo (không cần reload).
     const onBranch = (evt) => { if (evt?.branchId && branchIdRef.current && String(evt.branchId) === branchIdRef.current) fetchGroup(); };
+    // Hết hạn giữ chỗ: server đã huỷ thật -> báo ngay, không để khách ngồi quét QR đã chết.
+    const onExpired = (evt) => {
+      const hit = (evt?.groupId && String(evt.groupId) === String(id))
+        || (evt?.bookingId && memberIdsRef.current.includes(String(evt.bookingId)));
+      if (hit) { setExpired(true); setPaymentData(null); fetchGroup(); }
+    };
     socket.on('booking_updated', onUpd);
     socket.on('branch_updated', onBranch);
-    return () => { socket.off('booking_updated', onUpd); socket.off('branch_updated', onBranch); };
-  }, [fetchGroup]);
+    socket.on('booking_expired', onExpired);
+    return () => { socket.off('booking_updated', onUpd); socket.off('branch_updated', onBranch); socket.off('booking_expired', onExpired); };
+  }, [fetchGroup, id]);
 
   // Rời trang khi CHƯA cọc -> nhả giữ chỗ NGAY (không đợi timeout). Chỉ đúng khi còn phòng pending & chưa thanh toán.
   const releaseRef = useRef(false);
@@ -140,7 +163,7 @@ const BookingGroupCheckout = () => {
     try {
       setProcessingPay(true); setPaymentData(null);
       const res = await customerService.createGroupPaymentLink(id, type);
-      if (res.success) { setPaymentData(res.data); expireAt.current = Date.now() + 15 * 60 * 1000; }
+      if (res.success) { setPaymentData(res.data); expireAt.current = new Date(res.data.expiresAt).getTime(); } // mốc backend kẹp (<= hạn giữ chỗ)
     } catch (err) {
       alert(err.response?.data?.message || 'Lỗi tạo liên kết thanh toán');
     } finally { setProcessingPay(false); }
@@ -190,10 +213,27 @@ const BookingGroupCheckout = () => {
           </div>
         )}
 
-        {/* Đếm ngược HẠN GIỮ CHỖ khi còn chờ cọc */}
-        {isPending && !paymentDone && group.expiresAt && (
-          <div className="mb-8 rounded-md border border-amber-300 bg-amber-50 px-5 py-4 text-center font-body text-sm text-amber-800">
-            ⏳ Giữ chỗ còn <HoldCountdown expireMs={new Date(group.expiresAt).getTime()} onExpire={fetchGroup} /> — quá hạn hệ thống sẽ <strong>tự huỷ</strong> đặt phòng. Vui lòng thanh toán cọc để giữ phòng.
+        {/* Đếm ngược HẠN GIỮ CHỖ — cũng chính là hạn của mã QR (một đồng hồ duy nhất).
+            Còn dưới 1 phút: cả khung chuyển đỏ để khách thấy ngay là sắp hết giờ. */}
+        {isPending && !paymentDone && !expired && group.expiresAt && (
+          <div className={`mb-8 rounded-md border px-5 py-4 text-center font-body text-sm ${
+            urgent ? 'border-red-400 bg-red-50 text-red-700' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+            {urgent ? '⚠️ Sắp hết giờ! Giữ chỗ còn ' : '⏳ Giữ chỗ còn '}
+            <HoldCountdown expireMs={new Date(group.expiresAt).getTime()} onExpire={() => { setExpired(true); fetchGroup(); }} />
+            {urgent
+              ? ' — thanh toán ngay, hết giờ là đơn bị huỷ.'
+              : <> — quá hạn hệ thống sẽ <strong>tự huỷ</strong> đặt phòng. Vui lòng thanh toán cọc để giữ phòng.</>}
+          </div>
+        )}
+
+        {/* Hết hạn: QR (nếu có) cũng đã chết theo -> không cho quét tiếp, mời khách chọn phòng lại. */}
+        {expired && !paymentDone && rollup.status !== 'confirmed' && (
+          <div className="mb-8 rounded-md border border-red-300 bg-red-50 px-5 py-6 text-center font-body text-sm text-red-700">
+            <p className="mb-3 text-base font-semibold">⌛ Đã hết thời gian giữ chỗ</p>
+            <p className="mb-4">Đơn đặt phòng đã được huỷ và các phòng đã mở lại cho khách khác. Bạn không bị trừ tiền.</p>
+            <button onClick={() => navigate('/booking')} className="rounded-sm bg-red-600 px-5 py-2.5 font-nav text-xs font-semibold uppercase tracking-wide text-white hover:bg-red-700">
+              ← Chọn phòng lại
+            </button>
           </div>
         )}
 
@@ -282,7 +322,7 @@ const BookingGroupCheckout = () => {
               </div>
             )}
 
-            {isPending && !paymentDone && !paymentData && (
+            {isPending && !paymentDone && !expired && !paymentData && (
               <div className="mt-6">
                 <p className="mb-3 font-body text-sm text-charcoal/60">Chọn hình thức thanh toán cọc gom:</p>
                 <button onClick={() => handlePayment('deposit')} disabled={processingPay}
@@ -315,7 +355,7 @@ const BookingGroupCheckout = () => {
               </div>
             )}
 
-            {isPending && !paymentDone && paymentData && (
+            {isPending && !paymentDone && !expired && paymentData && (
               <div className="mt-6 rounded-md bg-cream/70 px-5 py-4 text-center font-body text-sm text-charcoal/70">
                 Mã QR đã sẵn sàng — vui lòng quét mã <strong>bên dưới</strong> để hoàn tất.
               </div>
@@ -324,7 +364,7 @@ const BookingGroupCheckout = () => {
         </div>
 
         {/* QR */}
-        {isPending && !paymentDone && paymentData && (
+        {isPending && !paymentDone && !expired && paymentData && (
           <div className="mx-auto mt-7 max-w-xl rounded-lg border border-black/5 bg-white p-8 text-center shadow-raised">
             <h2 className="font-display text-2xl font-semibold text-charcoal">Quét mã để thanh toán</h2>
             <p className="mt-2 font-body text-sm text-charcoal/55">Dùng ứng dụng ngân hàng để quét mã QR bên dưới</p>

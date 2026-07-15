@@ -25,6 +25,8 @@ router.post('/booking-groups/:id/check-in', validateObjectId('id'), c.checkInGro
 router.post('/booking-groups/:id/check-out', validateObjectId('id'), c.checkOutGroup)   // trả cả nhóm (tự phân HK + thu gom)
 router.post('/booking-groups/:id/cancel', validateObjectId('id'), c.cancelGroupAll)     // huỷ cả nhóm
 router.post('/booking-groups/:id/no-show', validateObjectId('id'), c.noShowGroup)       // no-show cả nhóm
+router.post('/booking-groups/:id/payos-qr', validateObjectId('id'), c.createGroupQR)         // Gen QR gom (cọc/toàn bộ/tiền còn lại)
+router.post('/booking-groups/:id/sync-payments', validateObjectId('id'), c.syncGroupPayments) // Polling PayOS nhóm
 
 // Giai đoạn 2 — vòng đời booking
 router.post('/bookings', c.walkIn)                                                      // UC-29 walk-in
