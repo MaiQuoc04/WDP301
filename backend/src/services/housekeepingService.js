@@ -14,6 +14,16 @@ const notificationService = require('./notificationService')
 const ACTIVE_TASK_STATUSES = ['pending', 'in_progress', 'urgent']
 const DONE_TASK_STATUSES = ['completed', 'missed']
 
+// ─── Hạn BẮT ĐẦU dọn phòng ───────────────────────────────────────────────────
+// HK phải bấm Bắt đầu trong 20' kể từ khi task TỚI LƯỢT; quá hạn -> báo HK + quản lý chi nhánh.
+const CLEAN_START_SLA_MIN = 20
+// "Dọn phòng" = turnover (dọn sau trả phòng) + mid_stay (khách yêu cầu dọn).
+// inspection là kiểm kê thiết bị, không phải dọn -> không tính hạn.
+const CLEAN_TASK_TYPES = ['turnover', 'mid_stay']
+// Chưa bắt đầu = pending HOẶC urgent. Không được lọc mỗi 'pending':
+// createTurnover tạo task với status 'urgent' -> lọc 'pending' là không bao giờ khớp.
+const NOT_STARTED_STATUSES = ['pending', 'urgent']
+
 // Realtime: báo booking vừa đổi (bill/thiết bị thiếu) để màn lễ tân tự cập nhật, không reload tay. Defensive.
 function emitBookingUpdated(bookingRef) {
   const bookingId = bookingRef && (bookingRef._id || bookingRef)
@@ -564,4 +574,68 @@ exports.bookingView = async (bookingId) => {
     lastInspectionDone: inspections.find((t) => t.status === 'completed') || null,
     inspections, cleanings, turnovers,
   }
+}
+
+// ─── Quá hạn bắt đầu dọn ─────────────────────────────────────────────────────
+// Task tới lượt lúc nào? = mốc MUỘN HƠN giữa "được giao" và "task giao trước đó vừa xong".
+//
+// Vì sao KHÔNG đếm từ startedAt: không bấm Bắt đầu là không bao giờ trễ -> chỉ bắt được
+// người dọn chậm, không bắt được người lười (đúng loại cần bắt nhất).
+//
+// Vì sao KHÔNG đếm thẳng từ assignedAt: startTask có luật FIFO cấm bắt đầu task sau khi
+// task trước còn dở. Trả nhóm 5 phòng tạo 5 task trong 1 vòng lặp -> assignedAt gần như
+// bằng nhau; đếm từ đó thì 4 task báo trễ trong lúc hệ thống đang CẤM HK động vào chúng.
+// Đếm từ "tới lượt" vẫn không lách được: xong phòng trước là đồng hồ phòng sau chạy ngay,
+// chẳng dính gì tới nút Bắt đầu.
+const dueFromOf = async (task) => {
+  // Cùng câu truy vấn FIFO mà startTask dùng -> "được phép bắt đầu" ở đây khớp với thực tế.
+  const blocking = await HousekeepingTask.findOne({
+    assignedTo: task.assignedTo, status: { $in: ACTIVE_TASK_STATUSES },
+    _id: { $ne: task._id }, assignedAt: { $lt: task.assignedAt },
+  }).select('_id').lean()
+  if (blocking) return null // chưa tới lượt -> đồng hồ chưa chạy
+
+  const prevDone = await HousekeepingTask.findOne({
+    assignedTo: task.assignedTo, _id: { $ne: task._id },
+    assignedAt: { $lt: task.assignedAt }, completedAt: { $ne: null },
+  }).sort('-completedAt').select('completedAt').lean()
+
+  const assigned = new Date(task.assignedAt).getTime()
+  const freedAt = prevDone ? new Date(prevDone.completedAt).getTime() : 0
+  return new Date(Math.max(assigned, freedAt))
+}
+
+// Quét task dọn quá hạn bắt đầu -> báo HK phụ trách + quản lý chi nhánh. Trả về số task đã báo.
+exports.notifyOverdueCleaning = async () => {
+  const tasks = await HousekeepingTask.find({
+    type: { $in: CLEAN_TASK_TYPES },
+    status: { $in: NOT_STARTED_STATUSES },
+    assignedTo: { $exists: true, $ne: null },
+    overdueNotifiedAt: null,     // khớp cả doc cũ chưa có field -> không bắn lại
+    assignedAt: { $ne: null },
+  }).populate('room', 'roomNumber').lean()
+
+  const now = Date.now()
+  let sent = 0
+  for (const t of tasks) {
+    const dueFrom = await dueFromOf(t)
+    if (!dueFrom) continue
+    const lateMin = Math.floor((now - dueFrom.getTime()) / 60000)
+    if (lateMin < CLEAN_START_SLA_MIN) continue
+
+    const rn = t.room?.roomNumber || '?'
+    await safeNotify(() => notificationService.notifyUser(t.assignedTo, {
+      type: 'task_overdue', title: `Quá hạn: phòng ${rn} chưa bắt đầu dọn`,
+      body: `Đã ${lateMin} phút kể từ khi việc tới lượt bạn (hạn ${CLEAN_START_SLA_MIN} phút). Vào bấm Bắt đầu để dọn.`,
+      refType: 'task', refId: t._id, branch: t.branch,
+    }))
+    await safeNotify(() => notificationService.notifyManagers(t.branch, {
+      type: 'task_overdue', title: `Phòng ${rn} quá hạn dọn ${lateMin} phút`,
+      body: `Việc đã tới lượt nhân viên buồng phòng nhưng chưa được bắt đầu (hạn ${CLEAN_START_SLA_MIN} phút).`,
+      refType: 'task', refId: t._id, branch: t.branch,
+    }))
+    await HousekeepingTask.updateOne({ _id: t._id }, { overdueNotifiedAt: new Date() })
+    sent++
+  }
+  return sent
 }
