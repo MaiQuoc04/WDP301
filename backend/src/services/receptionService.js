@@ -95,8 +95,19 @@ exports.getBookingDetail = async (accountId, bookingId) => {
     .populate('roomType', 'name basePrice')
     .populate('room', 'roomNumber floor status awaitingRestock')
     .populate({ path: 'customer', select: 'fullName phone idCard' })
+    .populate('group', 'code') // mã nhóm cho breadcrumb; FE cần b.group.code chứ không chỉ id
     .lean()
   if (!booking) { const e = new Error('Không tìm thấy booking trong chi nhánh của bạn'); e.status = 404; throw e }
+  // Các phòng CÙNG NHÓM -> lễ tân nhảy thẳng sang phòng khác ngay trên trang này,
+  // thay vì thoát ra nhóm rồi bấm "Mở →" lại từ đầu.
+  let siblings = []
+  if (booking.group) {
+    siblings = await Booking.find({ group: booking.group._id || booking.group })
+      .select('_id status room').populate('room', 'roomNumber floor').lean()
+    // Sắp theo lộ trình phòng (tầng thấp -> cao) — sort() của Mongo không đi vào field populate được.
+    siblings.sort((a, b2) => (a.room?.floor ?? 0) - (b2.room?.floor ?? 0)
+      || String(a.room?.roomNumber || '').localeCompare(String(b2.room?.roomNumber || ''), 'vi', { numeric: true }))
+  }
   const payments = await Payment.find({ booking: bookingId }).sort('createdAt').lean()
   const history = await BookingStatusHistory.find({ booking: bookingId }).sort('createdAt').lean()
   // Phòng chưa sẵn sàng thì cho lễ tân biết AI đang dọn ngay tại đây — để chủ động gọi giục,
@@ -106,7 +117,7 @@ exports.getBookingDetail = async (accountId, bookingId) => {
     const map = await housekeepingService.roomCleaningInfo([booking.room._id])
     roomCleaning = map[String(booking.room._id)] || null
   }
-  return { booking, payments, history, roomCleaning }
+  return { booking, payments, history, roomCleaning, siblings }
 }
 
 // Đảm bảo booking thuộc chi nhánh của lễ tân trước khi thao tác (BR-30)
