@@ -230,6 +230,11 @@ exports.checkOutGroup = async (accountId, groupId, body = {}) => {
   await assertGroupInBranch(accountId, groupId)
   return bookingService.checkOutGroup(groupId, { by: accountId, method: body.method })
 }
+// Xem trước khi trả cả nhóm: phòng nào, AI sẽ được giao dọn, thu bao nhiêu — để lễ tân biết trước khi bấm.
+exports.previewCheckOutGroup = async (accountId, groupId) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.previewCheckOutGroup(groupId)
+}
 exports.cancelGroupAll = async (accountId, groupId, body = {}) => {
   await assertGroupInBranch(accountId, groupId)
   return bookingService.cancelGroupAll(groupId, { reason: body.reason, by: accountId })

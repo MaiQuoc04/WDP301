@@ -23,6 +23,7 @@ router.get('/booking-groups/:id', validateObjectId('id'), c.getGroup)           
 router.post('/booking-groups/:id/confirm-deposit', validateObjectId('id'), c.confirmGroupDeposit) // thu cọc gom
 router.post('/booking-groups/:id/check-in', validateObjectId('id'), c.checkInGroup)     // nhận cả nhóm
 router.post('/booking-groups/:id/check-out', validateObjectId('id'), c.checkOutGroup)   // trả cả nhóm (tự phân HK + thu gom)
+router.get('/booking-groups/:id/check-out/preview', validateObjectId('id'), c.previewCheckOutGroup) // xem trước: phòng + ai dọn + tiền thu
 router.post('/booking-groups/:id/cancel', validateObjectId('id'), c.cancelGroupAll)     // huỷ cả nhóm
 router.post('/booking-groups/:id/no-show', validateObjectId('id'), c.noShowGroup)       // no-show cả nhóm
 router.post('/booking-groups/:id/payos-qr', validateObjectId('id'), c.createGroupQR)         // Gen QR gom (cọc/toàn bộ/tiền còn lại)

@@ -23,6 +23,7 @@ exports.confirmGroupDeposit = handle((req) => svc.confirmGroupDeposit(req.user.i
 // Thao tác hàng loạt cả nhóm
 exports.checkInGroup = handle((req) => svc.checkInGroup(req.user.id, req.params.id))
 exports.checkOutGroup = handle((req) => svc.checkOutGroup(req.user.id, req.params.id, req.body))
+exports.previewCheckOutGroup = handle((req) => svc.previewCheckOutGroup(req.user.id, req.params.id)) // xem trước ai được giao dọn
 exports.cancelGroupAll = handle((req) => svc.cancelGroupAll(req.user.id, req.params.id, req.body))
 exports.noShowGroup = handle((req) => svc.noShowGroup(req.user.id, req.params.id))
 exports.createGroupQR = handle((req) => svc.createGroupQR(req.user.id, req.params.id, req.body))       // QR gom: deposit|full|remaining

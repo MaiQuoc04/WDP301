@@ -750,6 +750,42 @@ async function autoAssignHousekeepers(branchId, rooms) {
   return assign
 }
 
+// Xếp phòng theo LỘ TRÌNH DỌN: tầng thấp -> cao, cùng tầng theo số phòng tăng dần.
+// Dùng chung cho checkOutGroup và bản xem trước -> thứ tự xem trước = thứ tự thật.
+async function roomsInCleaningOrder(members) {
+  const withRoom = []
+  for (const b of members) {
+    const room = b.room ? await Room.findById(b.room).select('floor roomNumber') : null
+    withRoom.push({ booking: b, roomId: b.room, floor: room?.floor ?? 9999, roomNumber: room?.roomNumber || '' })
+  }
+  withRoom.sort((a, x) => (a.floor - x.floor) || String(a.roomNumber).localeCompare(String(x.roomNumber), 'vi', { numeric: true }))
+  return withRoom
+}
+
+// Xem TRƯỚC khi trả cả nhóm: phòng nào, ai sẽ được giao dọn, thu bao nhiêu.
+// Gọi ĐÚNG autoAssignHousekeepers mà checkOutGroup dùng -> bảng xem trước không thể lệch với việc thật sự xảy ra
+// (tự tính lại ở chỗ khác chính là nguồn gốc mọi bug lệch nhau của hệ thống này).
+exports.previewCheckOutGroup = async (groupId) => {
+  const group = await getGroupOr404(groupId)
+  const members = await Booking.find({ group: groupId, status: 'checked_in' })
+  const withRoom = await roomsInCleaningOrder(members)
+  const totalRemaining = withRoom.reduce((s, w) => s + Math.max(0, w.booking.remainingAmount || 0), 0)
+  if (!members.length) return { rooms: [], totalRemaining: 0, canAssign: true }
+
+  const assign = await autoAssignHousekeepers(group.branch, withRoom.map((w) => ({ bookingId: w.booking._id, roomId: w.roomId, floor: w.floor })))
+  const pool = await require('./housekeepingService').suggestHousekeepers(group.branch, null)
+  const nameById = Object.fromEntries(pool.map((h) => [String(h.accountId), h.fullName || h.email]))
+  return {
+    canAssign: !!assign, // false = chi nhánh chưa có nhân viên buồng phòng -> trả phòng sẽ bị chặn
+    totalRemaining,
+    rooms: withRoom.map((w) => ({
+      bookingId: w.booking._id, roomNumber: w.roomNumber, floor: w.floor,
+      remaining: Math.max(0, w.booking.remainingAmount || 0),
+      housekeeper: assign ? (nameById[String(assign[String(w.booking._id)])] || null) : null,
+    })),
+  }
+}
+
 // Áp 1 thao tác cho các phòng đủ điều kiện; phòng không hợp lệ -> bỏ qua + báo lý do (không chặn cả nhóm).
 async function applyToMembers(members, fn) {
   const done = [], skipped = []
@@ -801,13 +837,7 @@ exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = fal
     message: `Phòng ${b.room?.roomNumber || '?'} chưa nhận phòng nên không có gì để trả`,
   }))
 
-  const withRoom = []
-  for (const b of members) {
-    const room = b.room ? await Room.findById(b.room).select('floor roomNumber') : null
-    withRoom.push({ booking: b, roomId: b.room, floor: room?.floor ?? 9999, roomNumber: room?.roomNumber || '' })
-  }
-  // Lộ trình dọn: tầng thấp -> cao, cùng tầng theo số phòng tăng dần.
-  withRoom.sort((a, x) => (a.floor - x.floor) || String(a.roomNumber).localeCompare(String(x.roomNumber), 'vi', { numeric: true }))
+  const withRoom = await roomsInCleaningOrder(members) // cùng hàm với previewCheckOutGroup -> thứ tự khớp nhau
 
   const assign = await autoAssignHousekeepers(group.branch, withRoom.map((w) => ({ bookingId: w.booking._id, roomId: w.roomId, floor: w.floor })))
   if (!assign) throw new Error('Chi nhánh chưa có nhân viên buồng phòng để giao dọn phòng')
