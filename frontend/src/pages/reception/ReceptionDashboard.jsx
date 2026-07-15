@@ -55,8 +55,8 @@ export default function ReceptionDashboard() {
 
         <nav className="manager-nav">
           <NavLink to="/reception" end className="manager-nav-item"><DashboardOutlined /><span>Tổng quan</span></NavLink>
-          <NavLink to="/reception/bookings" className="manager-nav-item"><BookOutlined /><span>Bookings</span></NavLink>
-          <NavLink to="/reception/walk-in" className="manager-nav-item"><UserAddOutlined /><span>Walk-in</span></NavLink>
+          <NavLink to="/reception/bookings" className="manager-nav-item"><BookOutlined /><span>Đặt phòng</span></NavLink>
+          <NavLink to="/reception/walk-in" className="manager-nav-item"><UserAddOutlined /><span>Khách tại quầy</span></NavLink>
           <NavLink to="/reception/rooms" className="manager-nav-item"><AppstoreOutlined /><span>Phòng</span></NavLink>
           <NavLink to="/reception/schedule" className="manager-nav-item"><CalendarOutlined /><span>Lịch</span></NavLink>
           <NavLink to="/reception/services" className="manager-nav-item"><CoffeeOutlined /><span>Dịch vụ</span></NavLink>

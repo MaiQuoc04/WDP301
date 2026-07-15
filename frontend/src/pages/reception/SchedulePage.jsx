@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { bookingService, fmtDate, bookingStatusLabel } from '../../services'
+import DateField from '../../components/common/DateField'
 
 const DAY = 86400000
 const COL = 64 // px mỗi ngày (khớp background-size trong reception.css)
@@ -36,10 +37,15 @@ export default function SchedulePage() {
   return (
     <div>
       <div className="rc-bar">
-        <h2>Lịch phòng (Gantt)</h2>
+        <div className="rc-bar-titles">
+          <h2>Lịch phòng</h2>
+          <p className="rc-sub">Phòng nào bận ngày nào — kéo ngang để xem cả kỳ, bấm vào thanh để biết mã đặt.</p>
+        </div>
         <div className="rc-filters" style={{ margin: 0 }}>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <span className="rc-filters-label">Từ</span>
+          <div style={{ width: 150 }}><DateField value={from} onChange={setFrom} max={to} allowClear={false} /></div>
+          <span className="rc-filters-label">đến</span>
+          <div style={{ width: 150 }}><DateField value={to} onChange={setTo} min={from} allowClear={false} /></div>
         </div>
       </div>
       {err && <p className="rc-err">{err}</p>}
@@ -76,9 +82,11 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+      {/* Ô màu chú giải lấy ĐÚNG class của thanh (s-*) — trước đây hard-code hex riêng
+          (#E0A800, #248ACC…) nên chú giải không khớp màu thanh thật trên biểu đồ. */}
       <div className="gantt-legend">
-        {[['#E0A800', 'Chờ cọc'], ['#248ACC', 'Đã cọc'], ['#2e7d32', 'Đang ở'], ['#8a8a8a', 'Đã trả'], ['#5a5a5a', 'Hoàn tất']].map(([c, label]) => (
-          <span key={label}><i style={{ background: c }} /> {label}</span>
+        {[['pending', 'Chờ cọc'], ['confirmed', 'Đã cọc'], ['checked_in', 'Đang ở'], ['checked_out', 'Đã trả'], ['completed', 'Hoàn tất']].map(([s, label]) => (
+          <span key={s}><i className={'s-' + s} /> {label}</span>
         ))}
       </div>
     </div>

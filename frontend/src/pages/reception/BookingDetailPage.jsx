@@ -23,6 +23,32 @@ function QRCountdown({ expireMs }) {
   )
 }
 
+/* ─── Modal chọn số giờ (nhận sớm / trả muộn) ───────────────────
+   Thay window.prompt: hộp thoại trình duyệt không hiện được luật tính phí cho ra hồn,
+   và gõ tay thì nhập được cả "abc" lẫn số quá hạn mức. */
+function HoursModal({ title, note, max, confirmLabel, onPick, onClose }) {
+  const [h, setH] = useState(1)
+  return (
+    <div className="rc-modal-overlay" onClick={onClose}>
+      <div className="rc-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ color: 'var(--rc-text-main)' }}>{title}</h3>
+        <p className="rc-modal-hint">{note}</p>
+        <div className="rc-hours">
+          {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
+            <button key={n} className={'rc-hour' + (h === n ? ' on' : '')} onClick={() => setH(n)}>
+              {n} giờ
+            </button>
+          ))}
+        </div>
+        <div className="rc-modal-actions">
+          <button className="link" onClick={onClose}>Huỷ</button>
+          <button className="primary" onClick={() => onPick(h)}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Payment Method Modal (Reception Checkout) ─────────────────── */
 function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, onError }) {
   const [step, setStep] = useState('choose')       // 'choose' | 'qr' | 'cash'
@@ -131,34 +157,45 @@ function CheckoutPaymentModal({ bookingId, remainingAmount, onClose, onSuccess, 
         {/* ── Bước 1: Chọn phương thức ── */}
         {step === 'choose' && (
           <>
-            <h3 style={{ marginBottom: 6 }}>Thanh toán Check-out</h3>
-            <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>
-              Số tiền còn lại: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(remainingAmount)}</strong>
-            </p>
+            <h3 style={{ color: 'var(--rc-text-main)' }}>Thanh toán Check-out</h3>
+            <div className="payos-amount-box">
+              <span className="lbl">Số tiền còn lại</span>
+              <span className="val">{vnd(remainingAmount)}</span>
+            </div>
             {remainingAmount <= 0 ? (
-              <div className="payos-paid-banner">✅ Đã thanh toán đủ — có thể check-out</div>
+              <>
+                <div className="payos-paid-banner">✅ Đã thanh toán đủ — có thể check-out</div>
+                <button className="payos-opt cash" style={{ marginTop: 12 }} onClick={() => setStep('qr-done-hk')}>
+                  <span className="payos-opt-icon">🏨</span>
+                  <span className="payos-opt-text">
+                    <b>Tiếp tục check-out</b>
+                    <small>Chọn nhân viên buồng phòng dọn phòng</small>
+                  </span>
+                  <span className="payos-opt-arrow">›</span>
+                </button>
+              </>
             ) : (
-              <div className="payos-method-grid">
-                <button className="payos-method-btn qr" onClick={handleChooseQR} disabled={loading}>
-                  <span className="payos-method-icon">📱</span>
-                  <span className="payos-method-label">Thanh toán QR</span>
-                  <span className="payos-method-sub">Khách quét QR PayOS</span>
-                </button>
-                <button className="payos-method-btn cash" onClick={handleChooseCash} disabled={loading}>
-                  <span className="payos-method-icon">💵</span>
-                  <span className="payos-method-label">Tiền mặt</span>
-                  <span className="payos-method-sub">Thu trực tiếp tại quầy</span>
-                </button>
-              </div>
-            )}
-            {remainingAmount <= 0 && (
-              <div style={{ marginTop: 16 }}>
-                <button className="payos-method-btn cash" onClick={() => setStep('qr-done-hk')}>
-                  <span className="payos-method-icon">🏨</span>
-                  <span className="payos-method-label">Tiếp tục check-out</span>
-                  <span className="payos-method-sub">Chọn housekeeper dọn phòng</span>
-                </button>
-              </div>
+              <>
+                <p className="payos-section-label">Chọn phương thức</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button className="payos-opt qr" onClick={handleChooseQR} disabled={loading}>
+                    <span className="payos-opt-icon">📱</span>
+                    <span className="payos-opt-text">
+                      <b>Thanh toán QR</b>
+                      <small>Khách quét QR PayOS</small>
+                    </span>
+                    <span className="payos-opt-arrow">›</span>
+                  </button>
+                  <button className="payos-opt cash" onClick={handleChooseCash} disabled={loading}>
+                    <span className="payos-opt-icon">💵</span>
+                    <span className="payos-opt-text">
+                      <b>Tiền mặt</b>
+                      <small>Thu trực tiếp tại quầy</small>
+                    </span>
+                    <span className="payos-opt-arrow">›</span>
+                  </button>
+                </div>
+              </>
             )}
             <div className="rc-modal-actions">
               <button className="link" onClick={onClose}>Huỷ</button>
@@ -362,42 +399,50 @@ function DepositQRModal({ bookingId, depositAmount, totalAmount, onClose, onSucc
     }
   }
 
-  const tabStyle = (on) => ({
-    flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-    border: on ? '2px solid #d97706' : '1px solid #d1d5db',
-    background: on ? '#fff7ed' : '#fff', color: on ? '#b45309' : '#6b7280',
-  })
-
   return (
     <div className="rc-modal-overlay" onClick={onClose}>
       <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Thu tiền — QR / Tiền mặt</h3>
+        <h3 style={{ color: 'var(--rc-text-main)' }}>Thu tiền — QR / Tiền mặt</h3>
 
         {/* Chọn thu cọc hay thu toàn bộ; QR và tiền mặt đều áp theo lựa chọn này */}
         {!qrData && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            <button style={tabStyle(!payFull)} onClick={() => setPayFull(false)}>Cọc {vnd(depositAmount)}</button>
-            <button style={tabStyle(payFull)} onClick={() => setPayFull(true)}>Toàn bộ {vnd(totalAmount)}</button>
+          <div className="rc-seg">
+            <button className={'rc-seg-btn' + (!payFull ? ' on' : '')} onClick={() => setPayFull(false)}>
+              Cọc <b>{vnd(depositAmount)}</b>
+            </button>
+            <button className={'rc-seg-btn' + (payFull ? ' on' : '')} onClick={() => setPayFull(true)}>
+              Toàn bộ <b>{vnd(totalAmount)}</b>
+            </button>
           </div>
         )}
 
-        <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>
-          Số tiền thu: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(amount)}</strong>
-        </p>
+        <div className="payos-amount-box">
+          <span className="lbl">Số tiền thu</span>
+          <span className="val">{vnd(amount)}</span>
+        </div>
 
         {!qrData && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button className="payos-method-btn qr" onClick={handleGenQR} disabled={loading}>
-              <span className="payos-method-icon">📱</span>
-              <span className="payos-method-label">{loading ? 'Đang tạo QR...' : 'Tạo QR PayOS'}</span>
-              <span className="payos-method-sub">Khách quét QR để thanh toán {payFull ? 'toàn bộ' : 'cọc'}</span>
-            </button>
-            <button className="payos-method-btn cash" onClick={handleConfirmDone}>
-              <span className="payos-method-icon">💵</span>
-              <span className="payos-method-label">Thu tiền mặt</span>
-              <span className="payos-method-sub">Xác nhận đã thu {payFull ? 'toàn bộ' : 'cọc'} tại quầy</span>
-            </button>
-          </div>
+          <>
+            <p className="payos-section-label">Chọn phương thức</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="payos-opt qr" onClick={handleGenQR} disabled={loading}>
+                <span className="payos-opt-icon">📱</span>
+                <span className="payos-opt-text">
+                  <b>{loading ? 'Đang tạo QR…' : 'Tạo QR PayOS'}</b>
+                  <small>Khách quét QR để thanh toán {payFull ? 'toàn bộ' : 'cọc'}</small>
+                </span>
+                <span className="payos-opt-arrow">›</span>
+              </button>
+              <button className="payos-opt cash" onClick={handleConfirmDone}>
+                <span className="payos-opt-icon">💵</span>
+                <span className="payos-opt-text">
+                  <b>Thu tiền mặt</b>
+                  <small>Xác nhận đã thu {payFull ? 'toàn bộ' : 'cọc'} tại quầy</small>
+                </span>
+                <span className="payos-opt-arrow">›</span>
+              </button>
+            </div>
+          </>
         )}
 
         {qrData && (
@@ -462,6 +507,7 @@ export default function BookingDetailPage() {
   const [msg, setMsg] = useState('')
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [showDepositQRModal, setShowDepositQRModal] = useState(false)
+  const [hoursFor, setHoursFor] = useState(null)   // 'early' | 'late'
 
   const reload = useCallback(async () => {
     setErr('')
@@ -516,16 +562,8 @@ export default function BookingDetailPage() {
     if (type === 'inspection') await act(() => bookingService.requestInspection(id, hkId), 'Đã giao kiểm tra phòng')
     else if (type === 'cleaning') await act(() => bookingService.requestCleaning(id, hkId), 'Đã giao dọn phòng')
   }
-  const askEarly = () => {
-    const h = window.prompt('Nhận sớm mấy giờ? (tối đa 3 — chỉ trong 4h trước giờ nhận, tự kẹp theo giờ trả phòng trước; phí 10% giá đêm/giờ)', '1')
-    if (h === null) return
-    act(() => bookingService.setEarlyCheckin(id, Number(h)), 'Đã ghi nhận sớm')
-  }
-  const askLate = () => {
-    const h = window.prompt('Trả muộn mấy giờ? (phí 10% giá đêm/giờ; quá 18:00 tính 1 đêm)', '1')
-    if (h === null) return
-    act(() => bookingService.setLateCheckout(id, Number(h)), 'Đã ghi trả muộn')
-  }
+  const askEarly = () => setHoursFor('early')
+  const askLate = () => setHoursFor('late')
   const inspectionCtrl = () => {
     const a = hk?.activeInspection
     if (a) return <span className={'hk-state ' + (a.status === 'in_progress' ? 'doing' : 'wait')}>
@@ -539,7 +577,9 @@ export default function BookingDetailPage() {
       {arr.map((t) => <li key={t._id}><span className={'hk-tag s-' + t.status}>{HK_STATUS[t.status] || t.status}</span> {fmtDateTime(t.requestedAt || t.createdAt)}{t.assignedTo?.email && ` · ${t.assignedTo.email}`}</li>)}
     </ul>
   ) : <p className="rc-muted">Chưa có</p>
-  const showHk = st === 'checked_in' || hk?.inspections?.length || hk?.cleanings?.length
+  // !! bắt buộc: `[].length` là 0, và `{0 && <section/>}` render ra chữ "0" trên trang
+  // (React chỉ bỏ qua false/null/undefined, KHÔNG bỏ qua số 0).
+  const showHk = st === 'checked_in' || !!hk?.inspections?.length || !!hk?.cleanings?.length
 
   return (
     <div className="rc-detail">
@@ -574,24 +614,23 @@ export default function BookingDetailPage() {
         </p>
       )}
 
+      {/* ĐÚNG MỘT nút vàng = việc chính theo pha hiện tại (thu cọc / check-in / check-out / hoàn tất).
+          "Nhận sớm", "Trả muộn", "No-show" là ngoại lệ -> nút viền. "Huỷ" đỏ, tự đẩy sang phải. */}
       <div className="rc-actions">
         {st === 'pending' && (
-          <button
-            className="btn-payos"
-            onClick={() => setShowDepositQRModal(true)}
-          >
-            💳 Thu cọc {vnd(b.depositAmount)} → QR / Tiền mặt
+          <button className="primary" onClick={() => setShowDepositQRModal(true)}>
+            Thu cọc {vnd(b.depositAmount)} → QR / Tiền mặt
           </button>
         )}
-        {st === 'confirmed' && <button onClick={() => act(() => bookingService.checkIn(id), 'Đã check-in')}>Check-in</button>}
+        {st === 'confirmed' && <button className="primary" onClick={() => act(() => bookingService.checkIn(id), 'Đã check-in')}>Check-in</button>}
         {st === 'confirmed' && <button onClick={askEarly}>Nhận sớm</button>}
         {st === 'checked_in' && (
-          <button className="btn-payos" onClick={() => setShowCheckoutModal(true)}>
-            💳 Check-out — Thanh toán
+          <button className="primary" onClick={() => setShowCheckoutModal(true)}>
+            Check-out — Thanh toán
           </button>
         )}
         {st === 'checked_in' && <button onClick={askLate}>Trả muộn</button>}
-        {st === 'checked_out' && <button onClick={() => act(() => bookingService.complete(id), 'Đã hoàn tất')}>Complete</button>}
+        {st === 'checked_out' && <button className="primary" onClick={() => act(() => bookingService.complete(id), 'Đã hoàn tất')}>Hoàn tất</button>}
         {st === 'confirmed' && <button onClick={() => act(() => bookingService.noShow(id), 'Đã đánh no-show')}>No-show</button>}
         {['pending', 'confirmed'].includes(st) &&
           <button className="danger" onClick={() => window.confirm('Huỷ booking này?') && act(() => bookingService.cancel(id, { reason: 'Huỷ tại quầy' }), 'Đã huỷ')}>Huỷ</button>}
@@ -630,28 +669,38 @@ export default function BookingDetailPage() {
         </section>
 
         <section>
-          <h3>Bill</h3>
+          <h3>Hoá đơn</h3>
+          {/* Chia NHÓM để khách hỏi "sao lại tính chỗ này" là chỉ đúng dòng được ngay.
+              Khoản phát sinh (thiết bị thiếu / nhận sớm / trả muộn) tô đỏ — đó là chỗ hay bị thắc mắc. */}
           {bill && (
             <table className="rc-bill"><tbody>
+              <tr className="grp"><td colSpan={2}>Tiền phòng</td></tr>
               <tr><td>Tiền phòng</td><td>{vnd(bill.roomCharge)}</td></tr>
-              {bill.services.map((s) => (
-                <tr key={s._id}><td>(Dịch vụ) {s.name} ×{s.quantity}</td><td>{vnd(s.price * s.quantity)}</td></tr>
-              ))}
-              {bill.missingAmenities.map((a) => (
-                <tr key={a._id}><td>(Thiết bị) {a.name} ×{a.quantity}</td><td>{vnd(a.price * a.quantity)}</td></tr>
-              ))}
               {bill.bedSurchargeApplied && bill.bedSurcharge > 0 && (
-                <tr><td>(Phụ phí) Giường phụ</td><td>{vnd(bill.bedSurcharge)}</td></tr>
+                <tr><td>Phụ phí giường phụ</td><td>{vnd(bill.bedSurcharge)}</td></tr>
               )}
+
+              {bill.services.length > 0 && <tr className="grp"><td colSpan={2}>Dịch vụ</td></tr>}
+              {bill.services.map((s) => (
+                <tr key={s._id}><td>{s.name} ×{s.quantity}</td><td>{vnd(s.price * s.quantity)}</td></tr>
+              ))}
+
+              {bill.missingAmenities.length > 0 && <tr className="grp"><td colSpan={2}>Thiết bị thiếu</td></tr>}
+              {bill.missingAmenities.map((a) => (
+                <tr key={a._id}><td>{a.name} ×{a.quantity}</td><td className="extra">{vnd(a.price * a.quantity)}</td></tr>
+              ))}
+
+              {(bill.earlyHours > 0 || bill.lateHours > 0) && <tr className="grp"><td colSpan={2}>Phát sinh giờ</td></tr>}
               {bill.earlyHours > 0 && (
-                <tr><td>(Giờ) Nhận sớm {bill.earlyHours}h</td><td>{vnd(bill.earlyFee)}</td></tr>
+                <tr><td>Nhận sớm {bill.earlyHours}h</td><td className="extra">{vnd(bill.earlyFee)}</td></tr>
               )}
               {bill.lateHours > 0 && (
-                <tr><td>(Giờ) Trả muộn {bill.lateHours}h {bill.lateFullNight ? '(sau 18h — tính 1 đêm)' : '(trước 18h)'}</td><td>{vnd(bill.lateFee)}</td></tr>
+                <tr><td>Trả muộn {bill.lateHours}h {bill.lateFullNight ? '(sau 18h — tính 1 đêm)' : '(trước 18h)'}</td><td className="extra">{vnd(bill.lateFee)}</td></tr>
               )}
+
               <tr className="tot"><td>Tổng</td><td>{vnd(bill.totalAmount)}</td></tr>
-              <tr><td>Đã trả</td><td>{vnd(bill.paidAmount)}</td></tr>
-              <tr className="tot"><td>Còn lại</td><td>{vnd(bill.remainingAmount)}</td></tr>
+              <tr className="paid"><td>Đã trả</td><td>{vnd(bill.paidAmount)}</td></tr>
+              <tr className="due"><td>Còn lại</td><td>{vnd(bill.remainingAmount)}</td></tr>
             </tbody></table>
           )}
 
@@ -724,6 +773,28 @@ export default function BookingDetailPage() {
             <div className="rc-modal-actions"><button className="link" onClick={() => setPickerFor(null)}>Hủy</button></div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal nhận sớm / trả muộn ── */}
+      {hoursFor === 'early' && (
+        <HoursModal
+          title="Khách nhận phòng sớm"
+          note="Chỉ áp dụng trong 4 giờ trước giờ nhận (14:00) và tự kẹp theo giờ trả của khách trước. Phí 10% giá đêm cho mỗi giờ."
+          max={3}
+          confirmLabel="Ghi nhận sớm"
+          onClose={() => setHoursFor(null)}
+          onPick={(h) => { setHoursFor(null); act(() => bookingService.setEarlyCheckin(id, h), 'Đã ghi nhận sớm') }}
+        />
+      )}
+      {hoursFor === 'late' && (
+        <HoursModal
+          title="Khách trả phòng muộn"
+          note="Phí 10% giá đêm cho mỗi giờ. Quá 18:00 sẽ tính trọn 1 đêm."
+          max={6}
+          confirmLabel="Ghi trả muộn"
+          onClose={() => setHoursFor(null)}
+          onPick={(h) => { setHoursFor(null); act(() => bookingService.setLateCheckout(id, h), 'Đã ghi trả muộn') }}
+        />
       )}
 
       {/* ── Modal Checkout (QR / Cash) ── */}

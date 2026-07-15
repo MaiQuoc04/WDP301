@@ -36,8 +36,12 @@ export default function RoomsPage() {
   return (
     <div>
       <div className="rc-bar">
-        <h2>Phòng <small style={{ color: 'var(--rc-text-muted)', fontWeight: 500, fontSize: 14 }}>· {rooms.length} phòng</small></h2>
+        <div className="rc-bar-titles">
+          <h2>Phòng <span className="rc-count">· {rooms.length} phòng</span></h2>
+          <p className="rc-sub">Tình trạng vật lý của phòng ngay lúc này — tự cập nhật khi có check-in/out hoặc dọn xong.</p>
+        </div>
         <div className="rc-filters" style={{ margin: 0 }}>
+          <span className="rc-filters-label">Lọc:</span>
           <select value={f} onChange={(e) => setF(e.target.value)}>
             {FILTERS.map(([v, label]) => (
               <option key={v} value={v}>{label} ({v ? cnt(v) : rooms.length})</option>
@@ -55,10 +59,10 @@ export default function RoomsPage() {
               <span className="room-box-badge">{ROOM_STATUS_LABEL[r.status] || r.status}</span>
             </div>
             <div className="room-box-type">{r.roomType?.name || ''}</div>
-            {r.awaitingRestock && <div style={{ fontSize: 11, color: '#d97706', marginTop: 4, fontWeight: 600 }}>⚠ chờ bổ sung đồ</div>}
+            {r.awaitingRestock && <div className="room-box-warn">⚠ chờ bổ sung đồ</div>}
           </div>
         ))}
-        {!shown.length && <p style={{ color: '#888' }}>Không có phòng.</p>}
+        {!shown.length && <p className="rc-empty">Không có phòng.</p>}
       </div>
     </div>
   )

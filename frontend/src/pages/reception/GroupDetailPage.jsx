@@ -11,7 +11,12 @@ function GroupQRCountdown({ expireMs }) {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
   const left = Math.max(0, Math.floor((expireMs - now) / 1000))
   const mm = String(Math.floor(left / 60)).padStart(2, '0'), ss = String(left % 60).padStart(2, '0')
-  return <span className="payos-countdown">{left > 0 ? `Hết hạn sau ${mm}:${ss}` : 'Đã hết hạn'}</span>
+  // .payos-expire (không phải .payos-countdown — class đó chưa từng tồn tại trong CSS nên đồng hồ bị trần)
+  return (
+    <span className={'payos-expire' + (left === 0 ? ' expired' : left < 60 ? ' urgent' : '')}>
+      {left > 0 ? `⏱ Hết hạn sau ${mm}:${ss}` : '⌛ Đã hết hạn'}
+    </span>
+  )
 }
 
 // Modal thanh toán GOM cho nhóm — 1 modal cho: cọc (deposit) / toàn bộ (full) / tiền còn lại khi trả phòng (remaining).
@@ -20,7 +25,19 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
   const [qr, setQr] = useState(null)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [preview, setPreview] = useState(null) // trả phòng: phòng nào + ai sẽ được giao dọn
   const expireAt = useRef(null)
+
+  // Trả phòng -> hệ thống TỰ PHÂN người dọn. Lễ tân phải thấy TRƯỚC ai sẽ nhận việc,
+  // thay vì bấm xong mới biết (trước đây chỉ có window.confirm hỏi trống không).
+  useEffect(() => {
+    if (type !== 'remaining') return
+    let cancelled = false
+    bookingService.previewCheckOutGroup(groupId)
+      .then((p) => { if (!cancelled) setPreview(p) })
+      .catch(() => { if (!cancelled) setPreview(null) })
+    return () => { cancelled = true }
+  }, [type, groupId])
 
   // Realtime: PayOS báo đã thu (webhook -> socket) cho đúng nhóm này
   useEffect(() => {
@@ -50,7 +67,8 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
     setLoading(true)
     try {
       if (type === 'remaining') {
-        if (!window.confirm(`Trả phòng CẢ NHÓM (thu tiền mặt còn lại ${vnd(amount)}) và tự giao dọn phòng?`)) { setLoading(false); return }
+        // Không hỏi window.confirm nữa: bảng xem trước ngay trên màn hình đã nói rõ trả phòng nào,
+        // thu bao nhiêu, ai được giao dọn. Hỏi lại bằng hộp thoại trống không chỉ là nghi thức thừa.
         const res = await bookingService.checkOutGroupAll(groupId, { method: 'cash' })
         let m = `Đã trả ${res.done} phòng`
         if (res.collected) m += ` · thu ${vnd(res.collected)}`
@@ -72,26 +90,68 @@ function GroupPayModal({ groupId, type, amount, title, onClose, onDone, onError 
   return (
     <div className="rc-modal-overlay" onClick={onClose}>
       <div className="rc-modal payos-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{title} — Thanh toán</h3>
-        <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>
-          Số tiền: <strong style={{ color: '#d97706', fontSize: 18 }}>{vnd(amount)}</strong>
-        </p>
+        <h3 style={{ color: 'var(--rc-text-main)' }}>{title} — Thanh toán</h3>
+
+        <div className="payos-amount-box">
+          <span className="lbl">Số tiền cần thu</span>
+          <span className="val">{vnd(amount)}</span>
+        </div>
+
+        {/* Trả phòng: hiện TRƯỚC phòng nào sẽ trả + AI được giao dọn (hệ thống tự phân theo tầng + tải việc) */}
+        {type === 'remaining' && !qr && !done && (
+          <div style={{ marginBottom: 18 }}>
+            {!preview && <p className="rc-muted">Đang tính người sẽ được giao dọn…</p>}
+            {preview && preview.canAssign === false && (
+              <p className="rc-err">⚠️ Chi nhánh chưa có nhân viên buồng phòng — <b>không trả phòng được</b>. Cần thêm nhân viên trước.</p>
+            )}
+            {preview && preview.rooms?.length > 0 && (
+              <>
+                <p className="payos-section-label">
+                  Sẽ trả <b>{preview.rooms.length} phòng</b> và <b>tự giao dọn</b> theo lộ trình (tầng thấp → cao):
+                </p>
+                <table className="rc-table" style={{ marginBottom: 0 }}>
+                  <thead><tr><th>Phòng</th><th className="rc-num">Còn lại</th><th>Người được giao dọn</th></tr></thead>
+                  <tbody>
+                    {preview.rooms.map((r, i) => (
+                      <tr key={r.bookingId}>
+                        <td><small className="rc-muted">{i + 1}.</small> <b>{r.roomNumber}</b> <small>T{r.floor}</small></td>
+                        <td className="rc-num">{r.remaining > 0 ? vnd(r.remaining) : <span className="rc-muted">—</span>}</td>
+                        <td>{r.housekeeper
+                          ? <span className="rc-fit fit-exact">{r.housekeeper}</span>
+                          : <span className="rc-field-err">chưa xác định</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+        )}
 
         {!qr && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {canQR && (
-              <button className="payos-method-btn qr" onClick={genQR} disabled={loading}>
-                <span className="payos-method-icon">📱</span>
-                <span className="payos-method-label">{loading ? 'Đang tạo QR...' : 'Tạo QR PayOS'}</span>
-                <span className="payos-method-sub">Khách quét QR để thanh toán {kind}</span>
+          <>
+            <p className="payos-section-label">Chọn phương thức</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {canQR && (
+                <button className="payos-opt qr" onClick={genQR} disabled={loading}>
+                  <span className="payos-opt-icon">📱</span>
+                  <span className="payos-opt-text">
+                    <b>{loading ? 'Đang tạo QR…' : 'Tạo QR PayOS'}</b>
+                    <small>Khách quét QR để thanh toán {kind}</small>
+                  </span>
+                  <span className="payos-opt-arrow">›</span>
+                </button>
+              )}
+              <button className="payos-opt cash" onClick={payCash} disabled={loading}>
+                <span className="payos-opt-icon">💵</span>
+                <span className="payos-opt-text">
+                  <b>Thu tiền mặt</b>
+                  <small>{type === 'remaining' ? 'Trả phòng & thu tiền mặt tại quầy' : 'Xác nhận đã thu tại quầy'}</small>
+                </span>
+                <span className="payos-opt-arrow">›</span>
               </button>
-            )}
-            <button className="payos-method-btn cash" onClick={payCash} disabled={loading}>
-              <span className="payos-method-icon">💵</span>
-              <span className="payos-method-label">Thu tiền mặt</span>
-              <span className="payos-method-sub">{type === 'remaining' ? 'Trả phòng & thu tiền mặt tại quầy' : 'Xác nhận đã thu tại quầy'}</span>
-            </button>
-          </div>
+            </div>
+          </>
         )}
 
         {qr && (
@@ -137,9 +197,11 @@ const readyOf = (m) => {
     ? { text: 'Chờ bổ sung thiết bị', cls: 'fit-short', ready: false }
     : { text: 'Sẵn sàng', cls: 'fit-exact', ready: true }
   if (m.room.status === 'cleaning') {
-    const who = m.cleaning?.housekeeper
-    const verb = m.cleaning?.status === 'in_progress' ? 'Đang dọn' : 'Chờ dọn'
-    return { text: `${verb}${who ? ` — ${who}` : ' — chưa ai nhận'}`, cls: 'fit-short', ready: false }
+    // 3 tình huống KHÁC NHAU, đừng gộp: không có việc nào (bất thường) / có việc chưa ai nhận / đang dọn dở.
+    if (!m.cleaning) return { text: '⚠️ Phòng kẹt: không có việc dọn nào đang mở', cls: 'fit-short', ready: false, stuck: true }
+    const who = m.cleaning.housekeeper
+    const verb = m.cleaning.status === 'in_progress' ? 'Đang dọn' : 'Chờ dọn'
+    return { text: `${verb}${who ? ` — ${who}` : ' — chưa ai nhận việc'}`, cls: 'fit-short', ready: false }
   }
   if (m.room.status === 'occupied') return { text: 'Đang có khách', cls: 'fit-exact', ready: true }
   return { text: m.room.status, cls: 'fit-short', ready: false }
@@ -241,39 +303,39 @@ export default function GroupDetailPage() {
         </p>
       )}
 
-      {hasPending && (
+      {/* Một khu thao tác, ĐÚNG MỘT nút vàng = việc chính lúc này (thu cọc -> nhận -> trả).
+          Việc phụ để nút viền; huỷ/no-show là nút đỏ tự đẩy sang phải. */}
+      {(hasPending || canCheckIn || canCheckOut || canCancel || canNoShow) && (
         <div className="rc-actions">
-          <button className="btn-payos" disabled={loading}
-            onClick={() => setPayModal({ type: 'deposit', amount: pendingDeposit, title: 'Thu cọc nhóm' })}>
-            💳 Thu cọc nhóm {vnd(pendingDeposit)}
-          </button>
-          <button disabled={loading}
-            onClick={() => setPayModal({ type: 'full', amount: pendingTotal, title: 'Thu toàn bộ nhóm' })}>
-            Thu toàn bộ {vnd(pendingTotal)}
-          </button>
-        </div>
-      )}
-
-      {/* Thao tác HÀNG LOẠT cả nhóm (áp cho các phòng đủ điều kiện) */}
-      {(canCheckIn || canCheckOut || canCancel || canNoShow) && (
-        <div className="rc-actions" style={{ marginTop: hasPending ? 8 : 0 }}>
+          {hasPending && (
+            <>
+              <button className="primary" disabled={loading}
+                onClick={() => setPayModal({ type: 'deposit', amount: pendingDeposit, title: 'Thu cọc nhóm' })}>
+                Thu cọc nhóm {vnd(pendingDeposit)}
+              </button>
+              <button disabled={loading}
+                onClick={() => setPayModal({ type: 'full', amount: pendingTotal, title: 'Thu toàn bộ nhóm' })}>
+                Thu toàn bộ {vnd(pendingTotal)}
+              </button>
+            </>
+          )}
           {/* Nút phải NÓI ĐÚNG việc nó sắp làm: ghi "tất cả" mà chỉ nhận được một phần là nói dối lễ tân.
               Không phòng nào sẵn sàng -> khoá luôn, đừng để bấm rồi mới báo "0 phòng". */}
           {canCheckIn && (
-            <button disabled={loading || readyToCheckIn === 0}
+            <button className={hasPending ? '' : 'primary'} disabled={loading || readyToCheckIn === 0}
               title={readyToCheckIn === 0 ? 'Chưa phòng nào sẵn sàng để nhận' : undefined}
               onClick={() => runGroupAction('Đã nhận', () => bookingService.checkInGroup(id))}>
               {readyToCheckIn === 0
-                ? '🏨 Chưa nhận được phòng nào'
+                ? 'Chưa nhận được phòng nào'
                 : blockers.length === 0
-                  ? `🏨 Nhận tất cả (${waiting.length} phòng)`
-                  : `🏨 Nhận ${readyToCheckIn}/${waiting.length} phòng sẵn sàng`}
+                  ? `Nhận tất cả (${waiting.length} phòng)`
+                  : `Nhận ${readyToCheckIn}/${waiting.length} phòng sẵn sàng`}
             </button>
           )}
           {canCheckOut && (
-            <button className="btn-payos" disabled={loading}
+            <button className={hasPending || canCheckIn ? '' : 'primary'} disabled={loading}
               onClick={() => setPayModal({ type: 'remaining', amount: checkinRemaining, title: 'Trả phòng cả nhóm' })}>
-              🧾 {notCheckedIn.length > 0
+              {notCheckedIn.length > 0
                 ? `Trả ${inHouse.length}/${rollup.activeCount} phòng đang ở`
                 : `Trả tất cả (${inHouse.length} phòng)`}
               {checkinRemaining > 0 ? ` · còn ${vnd(checkinRemaining)}` : ''}
@@ -282,14 +344,14 @@ export default function GroupDetailPage() {
           {canNoShow && (
             <button disabled={loading} onClick={() => runGroupAction('No-show', () => bookingService.noShowGroupAll(id),
               'Đánh no-show CẢ NHÓM (giữ cọc)?')}>
-              🚫 No-show tất cả
+              No-show tất cả
             </button>
           )}
           {canCancel && (
-            <button disabled={loading} style={{ background: '#dc2626', borderColor: '#dc2626' }}
+            <button className="danger" disabled={loading}
               onClick={() => runGroupAction('Đã huỷ', () => bookingService.cancelGroupAll(id, {}),
                 'Huỷ CẢ NHÓM (các phòng chưa nhận)? Cọc đã thu KHÔNG hoàn.')}>
-              ✖ Huỷ tất cả
+              Huỷ tất cả
             </button>
           )}
         </div>
@@ -315,35 +377,39 @@ export default function GroupDetailPage() {
 
         <section>
           <h3>Các phòng trong nhóm</h3>
+          <div className="rc-table-wrap">
           <table className="rc-table">
-            <thead><tr><th>Phòng</th><th>Khách</th><th>Trạng thái</th><th>Tình trạng phòng</th><th>Tiền</th><th></th></tr></thead>
+            <thead><tr>
+              <th>Phòng</th><th>Khách</th><th>Trạng thái</th><th>Tình trạng phòng</th><th className="rc-num">Tiền</th><th></th>
+            </tr></thead>
             <tbody>
               {members.map((m) => {
                 const rd = readyOf(m)
                 return (
                   <tr key={m._id}>
-                    <td><b>{m.room?.roomNumber || '—'}</b> <small>· {m.roomType?.name}</small></td>
+                    <td><b style={{ fontSize: 15 }}>{m.room?.roomNumber || '—'}</b><br /><small>{m.roomType?.name}</small></td>
                     <td>{m.adults}NL{m.children > 0 ? ` + ${m.children}TE` : ''}</td>
                     <td><span className={'rc-badge s-' + m.status}>{bookingStatusLabel(m.status)}</span></td>
                     {/* Chỉ có nghĩa khi đang chờ nhận; phòng đã trả/huỷ thì trạng thái vật lý không liên quan */}
                     <td>{m.status === 'confirmed' && rd
                       ? <span className={'rc-fit ' + rd.cls}>{rd.text}</span>
                       : <span className="rc-muted">—</span>}</td>
-                    <td>{vnd(m.totalAmount)}</td>
+                    <td className="rc-num">{vnd(m.totalAmount)}</td>
                     <td><Link className="link" to={`/reception/bookings/${m._id}`}>Mở →</Link></td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          </div>
 
           <h3>Hoá đơn gom</h3>
           <table className="rc-bill"><tbody>
             <tr className="tot"><td>Tổng nhóm</td><td>{vnd(rollup.totalAmount)}</td></tr>
-            <tr><td>Đã trả</td><td>{vnd(rollup.paidAmount)}</td></tr>
-            <tr className="tot"><td>Còn lại</td><td>{vnd(rollup.remainingAmount)}</td></tr>
+            <tr className="paid"><td>Đã trả</td><td>{vnd(rollup.paidAmount)}</td></tr>
+            <tr className="due"><td>Còn lại</td><td>{vnd(rollup.remainingAmount)}</td></tr>
           </tbody></table>
-          <p className="rc-muted" style={{ marginTop: 8 }}>
+          <p className="rc-muted" style={{ marginTop: 12 }}>
             Dùng nút <b>“… tất cả”</b> ở trên để thao tác cả nhóm 1 lần (áp cho phòng đủ điều kiện; phòng chưa sẵn sàng sẽ được báo). Thu tiền (cọc / toàn bộ / còn lại) chọn <b>QR PayOS</b> hoặc <b>tiền mặt</b>. Vẫn có thể <b>Mở →</b> từng phòng để thao tác lẻ; tổng nhóm tự tính lại.
           </p>
         </section>
