@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { customerService } from '../../services';
 import Reveal from '../../components/common/Reveal';
+import BranchReviewsModal from '../../components/common/BranchReviewsModal';
 
 const bedLabel = (t) =>
   t === 'king' ? 'Giường King' : t === 'double' ? 'Giường Đôi' : t === 'twin' ? '2 Giường Đơn' : 'Giường Đơn';
@@ -42,6 +43,7 @@ const RoomList = () => {
   const [rooms, setRooms] = useState([]);
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(''); // '' = Tất cả chi nhánh
+  const [viewReviews, setViewReviews] = useState(null);     // chi nhánh đang mở bảng đánh giá
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('ROOMS');
@@ -157,6 +159,24 @@ const RoomList = () => {
               </button>
             ))}
           </div>
+
+          {/* Đọc đánh giá của chi nhánh đang chọn. Để RIÊNG dưới hàng pill chứ không nhét
+              vào trong pill: <button> lồng <button> là HTML sai, mà bấm vào cũng sẽ kích
+              luôn nút lọc bên ngoài. */}
+          {selectedBranch && (() => {
+            const b = branches.find((x) => x._id === selectedBranch)
+            if (!b) return null
+            return (
+              <div className="mt-4 text-center">
+                <button onClick={() => setViewReviews(b)}
+                  className="font-nav text-xs font-semibold uppercase tracking-wide text-gold transition-opacity hover:opacity-70">
+                  {b.rating?.count > 0
+                    ? `Xem ${b.rating.count} đánh giá của chi nhánh này →`
+                    : 'Chi nhánh này chưa có đánh giá →'}
+                </button>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -289,6 +309,8 @@ const RoomList = () => {
           </Reveal>
         </div>
       </section>
+
+      {viewReviews && <BranchReviewsModal branch={viewReviews} onClose={() => setViewReviews(null)} />}
     </div>
   );
 };

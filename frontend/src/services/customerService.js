@@ -67,13 +67,14 @@ export const customerService = {
     const response = await axiosInstance.post('/customer/reviews', data) // { groupId, rating, comment }
     return response.data
   },
-  getBranchReviews: async (branchId) => {
-    const response = await axiosInstance.get(`/public/branches/${branchId}/reviews`)
-    return response.data
+  // params: { star?: 1-5, skip?, limit? }
+  getBranchReviews: async (branchId, params = {}) => {
+    const response = await axiosInstance.get(`/public/branches/${branchId}/reviews`, { params })
+    return response.data // { success, data: { items, total, hasMore } }
   },
   getBranchRating: async (branchId) => {
     const response = await axiosInstance.get(`/public/branches/${branchId}/rating`)
-    return response.data // { success, data: { average, count } }
+    return response.data // { success, data: { average, count, breakdown: {1..5} } }
   },
   // TODO(Khánh): searchRooms, getRoomDetail, getBill ...
 }
