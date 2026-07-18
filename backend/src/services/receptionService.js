@@ -442,6 +442,15 @@ exports.transfer = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.transferRoom(bookingId, { newRoomId: body.newRoomId, by: accountId })
 }
+// UC-37: đổi phòng CẢ NHÓM (chọn lại dàn phòng kiểu walk-in). Xem trước tiền rồi mới xác nhận.
+exports.previewTransferGroup = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.previewTransferGroup(groupId, { items: body.items })
+}
+exports.transferGroup = async (accountId, groupId, body = {}) => {
+  await assertGroupInBranch(accountId, groupId)
+  return bookingService.transferGroup(groupId, { items: body.items, vacate: body.vacate, by: accountId })
+}
 exports.update = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.updateBooking(bookingId, { ...body, by: accountId })

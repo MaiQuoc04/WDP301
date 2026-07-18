@@ -58,7 +58,9 @@ exports.removeMissingAmenity = handle((req) => svc.removeMissingAmenity(req.user
 // GĐ4 — huỷ / no-show
 exports.cancel = handle((req) => svc.cancel(req.user.id, req.params.id, req.body))      // UC-35
 exports.markNoShow = handle((req) => svc.markNoShow(req.user.id, req.params.id))        // UC-36
-exports.transfer = handle((req) => svc.transfer(req.user.id, req.params.id, req.body))  // UC-37
+exports.transfer = handle((req) => svc.transfer(req.user.id, req.params.id, req.body))  // UC-37 (đổi 1 phòng, cũ)
+exports.previewTransferGroup = handle((req) => svc.previewTransferGroup(req.user.id, req.params.id, req.body)) // UC-37 xem trước tiền
+exports.transferGroup = handle((req) => svc.transferGroup(req.user.id, req.params.id, req.body))                // UC-37 đổi dàn phòng
 exports.update = handle((req) => svc.update(req.user.id, req.params.id, req.body))       // UC-38
 
 // Hộp thư liên hệ

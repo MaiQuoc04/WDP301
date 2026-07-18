@@ -61,7 +61,10 @@ router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'),
 // Giai đoạn 4 — huỷ / no-show
 router.post('/bookings/:id/cancel', validateObjectId('id'), c.cancel)       // UC-35 huỷ trước check-in
 router.post('/bookings/:id/no-show', validateObjectId('id'), c.markNoShow)  // UC-36 giữ cọc
-router.post('/bookings/:id/transfer', validateObjectId('id'), c.transfer)   // UC-37 đổi phòng in-house
+router.post('/bookings/:id/transfer', validateObjectId('id'), c.transfer)   // UC-37 đổi phòng in-house (1 phòng, cũ)
+// UC-37 đổi phòng CẢ NHÓM (chọn lại dàn phòng): xem trước tiền -> xác nhận
+router.post('/booking-groups/:id/transfer/preview', validateObjectId('id'), c.previewTransferGroup)
+router.post('/booking-groups/:id/transfer', validateObjectId('id'), c.transferGroup)
 router.patch('/bookings/:id', validateObjectId('id'), c.update)             // UC-38 cập nhật booking
 
 // Hộp thư liên hệ (khách gửi từ trang Contact)

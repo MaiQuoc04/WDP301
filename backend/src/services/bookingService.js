@@ -174,20 +174,27 @@ exports.quote = async (roomType, checkIn, checkOut, adults = 1, children = 0) =>
 }
 
 // Tính lại bill: total = phòng + dịch vụ + amenity thiếu + (phụ phí giường phụ nếu đã áp); remaining = total - đã trả - credit
-// Giá đêm trung bình của booking (để tính phí giờ = 10% giá đêm)
+// Mốc bắt đầu chặng hiện tại (đổi phòng). Chưa đổi -> = checkIn.
+const segmentStart = (booking) => booking.roomSegmentStart || booking.checkIn
+// Giá đêm trung bình của CHẶNG HIỆN TẠI (để tính phí giờ = 10% giá đêm). Phí giờ áp lúc trả phòng
+// nên phải theo phòng khách đang ở, không phải trung bình cả kỳ đã đổi phòng.
 function nightlyRate(booking) {
-  const nights = Math.max(1, nightsBetween(booking.checkIn, booking.checkOut))
+  const nights = Math.max(1, nightsBetween(segmentStart(booking), booking.checkOut))
   return Math.round((booking.roomCharge || 0) / nights)
 }
 function recalcBill(booking) {
-  const surcharge = booking.bedSurchargeApplied ? (booking.bedSurcharge || 0) : 0
+  // Tiền phòng + giường phụ = (các chặng đã khoá) + (chặng hiện tại). Booking chưa đổi phòng:
+  // Locked=0 -> ra đúng số cũ. KHÔNG kẹp remaining về 0: đổi xuống phòng rẻ khi đã trả đủ ->
+  // remaining âm = "khách sạn cần hoàn khách" (hoàn thủ công), giấu số đi thì lễ tân không biết hoàn bao nhiêu.
+  const roomTotal = (booking.roomChargeLocked || 0) + (booking.roomCharge || 0)
+  const surcharge = (booking.bedSurchargeLocked || 0) + (booking.bedSurchargeApplied ? (booking.bedSurcharge || 0) : 0)
   // Phí giờ: nhận sớm + trả muộn (10% giá đêm/giờ); trả muộn quá 18:00 -> tính 1 đêm
   const nightly = nightlyRate(booking)
   const perHour = Math.round(nightly * HOURLY_RATE_PCT)
   const earlyFee = perHour * (booking.earlyHours || 0)
   const lateFee = booking.lateFullNight ? nightly : perHour * (booking.lateHours || 0)
   booking.extraHourFee = earlyFee + lateFee
-  booking.totalAmount = booking.roomCharge + (booking.extraServicesTotal || 0) + (booking.missingAmenitiesTotal || 0) + surcharge + booking.extraHourFee
+  booking.totalAmount = roomTotal + (booking.extraServicesTotal || 0) + (booking.missingAmenitiesTotal || 0) + surcharge + booking.extraHourFee
   booking.remainingAmount = booking.totalAmount - (booking.paidAmount || 0) - (booking.creditApplied || 0)
   return booking
 }
@@ -1261,6 +1268,237 @@ exports.transferRoom = async (bookingId, { newRoomId, by } = {}) => {
   return booking
 }
 
+// ── UC-37: ĐỔI PHÒNG cả nhóm (walk-in re-select) ─────────────────────────────
+// Lễ tân chọn lại DÀN PHÒNG mới (1 hay nhiều, cùng/khác loại). Kế toán CẮT MỐC tại hôm nay:
+// dàn cũ khoá tiền các đêm ĐÃ NGỦ, dàn mới tính các đêm CÒN LẠI. Tiền đã trả giữ nguyên trên
+// từng booking -> cộng dồn ở cấp nhóm thành TÍN DỤNG; remaining nhóm âm = cần hoàn khách.
+//
+// 3 loại phòng sau khi so dàn cũ vs mới:
+//   GIỮ  (cũ ∩ mới): tách sổ, KHÔNG dọn, khách ở tiếp.
+//   BỎ   (cũ − mới): khoá tiền tới hôm nay, checked_out; lễ tân chọn giao HK dọn / để available.
+//   MỚI  (mới − cũ): tạo booking mới, tính đêm còn lại, chia khách vào.
+//
+// Số khách giữ nguyên (group.adultsTotal/childrenTotal), chia lại vào DÀN MỚI bằng autoAllocate.
+//
+// Setup dùng chung cho PREVIEW và COMMIT: validate + chia khách + phân loại phòng.
+// Preview và commit gọi CÙNG hàm này -> bảng xem trước không thể lệch với việc thực sự xảy ra.
+async function _transferSetup(groupId, items) {
+  const group = await getGroupOr404(groupId)
+  const branch = await Branch.findById(group.branch)
+  if (!branch) throw new Error('Không tìm thấy chi nhánh')
+
+  // Chỉ đổi các phòng ĐANG Ở. Phòng đã trả/huỷ trong nhóm không tính.
+  const current = await Booking.find({ group: groupId, status: 'checked_in' }).populate('room')
+  if (!current.length) throw new Error('Nhóm không có phòng nào đang ở để đổi')
+
+  const boundary = startOfDay(new Date())                       // mốc cắt = hôm nay (tính đêm theo DATE)
+  const checkOut = current[0].checkOut
+  if (nightsBetween(boundary, checkOut) < 1) throw new Error('Khách trả phòng trong hôm nay — dùng Trả phòng, không đổi phòng')
+
+  if (!Array.isArray(items) || !items.length) throw new Error('Chọn ít nhất 1 phòng cho dàn mới')
+  const newIds = items.map((it) => String(it.roomId))
+  if (new Set(newIds).size !== newIds.length) throw new Error('Có phòng bị chọn trùng trong dàn mới')
+
+  // Nạp + validate phòng mới. Trùng phòng: overlap [hôm nay → trả] nhưng LOẠI TRỪ nhóm mình
+  // (phòng GIỮ chính là booking checked_in của nhóm này -> không được coi là "bận").
+  const newRooms = []
+  for (const id of newIds) {
+    const room = await Room.findOne({ _id: id, isDeleted: { $ne: true } }).populate('roomType')
+    if (!room) throw new Error('Phòng không tồn tại')
+    if (String(room.branch) !== String(branch._id)) throw new Error(`Phòng ${room.roomNumber} không thuộc chi nhánh`)
+    if (['maintenance', 'locked'].includes(room.status)) throw new Error(`Phòng ${room.roomNumber} đang ${room.status}`)
+    if (!room.roomType || room.roomType.status !== 'active') throw new Error(`Loại phòng của phòng ${room.roomNumber} không khả dụng`)
+    const clash = await Booking.countDocuments({
+      room: room._id, status: { $in: OCCUPYING }, group: { $ne: group._id },
+      checkIn: { $lt: checkOut }, checkOut: { $gt: boundary },
+    })
+    if (clash) throw new Error(`Phòng ${room.roomNumber} đã có khách khác đặt trong thời gian còn lại`)
+    newRooms.push(room)
+  }
+
+  // Chia LẠI đúng số khách của nhóm vào dàn mới (mỗi phòng ≥ 1 người lớn).
+  const A = group.adultsTotal || current.reduce((s, b) => s + b.adults, 0)
+  const C = group.childrenTotal || current.reduce((s, b) => s + b.children, 0)
+  if (A < newRooms.length) throw new Error(`Cần ít nhất ${newRooms.length} người lớn cho ${newRooms.length} phòng`)
+  const alloc = exports.autoAllocate(A, C, newRooms.map((r) => ({
+    roomId: String(r._id), capacity: r.roomType.capacity, extraBedFee: r.roomType.extraBedFee || 0,
+  })))
+  const allocByRoom = Object.fromEntries(alloc.map((a) => [String(a.roomId), a]))
+
+  const curByRoom = Object.fromEntries(current.map((b) => [String(b.room._id), b]))
+  const keptIds = new Set(newIds.filter((id) => curByRoom[id]))       // cũ ∩ mới
+  const droppedMembers = current.filter((b) => !newIds.includes(String(b.room._id))) // cũ − mới
+  const addedRooms = newRooms.filter((r) => !curByRoom[String(r._id)])               // mới − cũ
+  return { group, branch, current, boundary, checkOut, newRooms, allocByRoom, curByRoom, keptIds, droppedMembers, addedRooms }
+}
+
+// Tiền một CHẶNG MỚI của 1 phòng (phòng giữ / phòng mới): tiền phòng + phụ phí giường phụ cho [từ → trả].
+async function _segmentCharge(roomType, from, to, adults, children) {
+  const roomCharge = await computeRoomCharge(roomType, from, to)
+  const occ = computeOccupancy(roomType, adults, children)
+  const bedSurcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nightsBetween(from, to)
+  return { roomCharge, bedSurcharge, extraBeds: occ.extraBeds }
+}
+
+// PREVIEW: cho lễ tân thấy TRƯỚC khi bấm — tổng mới, đã trả, cần thu thêm / cần hoàn.
+// Tính bằng recalcBill trên bản SAO (không ghi) -> con số khớp y hệt lúc commit.
+exports.previewTransferGroup = async (groupId, { items } = {}) => {
+  const s = await _transferSetup(groupId, items)
+  const clone = (b) => new Booking(b.toObject ? b.toObject() : b)
+  let total = 0, paid = 0
+  const rooms = []
+  for (const b of s.current) {
+    const rt = await RoomType.findById(b.roomType)
+    const segStart = b.roomSegmentStart || b.checkIn
+    const slept = await computeRoomCharge(rt, segStart, s.boundary)
+    const occSlept = computeOccupancy(rt, b.adults, b.children)
+    const sleptBed = b.bedSurchargeApplied ? occSlept.extraBeds * (rt.extraBedFee || 0) * nightsBetween(segStart, s.boundary) : 0
+    const c = clone(b)
+    c.roomChargeLocked = (b.roomChargeLocked || 0) + slept
+    c.bedSurchargeLocked = (b.bedSurchargeLocked || 0) + sleptBed
+    const kept = s.keptIds.has(String(b.room._id))
+    if (kept) {
+      const a = s.allocByRoom[String(b.room._id)]
+      const seg = await _segmentCharge(rt, s.boundary, s.checkOut, a.adults, a.children)
+      c.roomCharge = seg.roomCharge; c.bedSurcharge = seg.bedSurcharge; c.bedSurchargeApplied = seg.extraBeds > 0
+    } else {
+      c.roomCharge = 0; c.bedSurcharge = 0
+    }
+    recalcBill(c)
+    total += c.totalAmount; paid += (b.paidAmount || 0)
+    rooms.push({ roomNumber: b.room.roomNumber, kind: kept ? 'kept' : 'dropped', total: c.totalAmount })
+  }
+  for (const room of s.addedRooms) {
+    const a = s.allocByRoom[String(room._id)]
+    const seg = await _segmentCharge(room.roomType, s.boundary, s.checkOut, a.adults, a.children)
+    const c = new Booking({ branch: s.branch._id, roomType: room.roomType._id, checkIn: s.boundary, checkOut: s.checkOut, roomSegmentStart: s.boundary, roomCharge: seg.roomCharge, bedSurcharge: seg.bedSurcharge, bedSurchargeApplied: seg.extraBeds > 0 })
+    recalcBill(c)
+    total += c.totalAmount
+    rooms.push({ roomNumber: room.roomNumber, kind: 'added', total: c.totalAmount })
+  }
+  const remaining = total - paid
+  return {
+    kept: s.keptIds.size, dropped: s.droppedMembers.length, added: s.addedRooms.length,
+    droppedRooms: s.droppedMembers.map((b) => ({ bookingId: b._id, roomNumber: b.room.roomNumber })),
+    newTotal: total, paid, remaining,
+    collectMore: remaining > 0 ? remaining : 0,   // dương = còn thu thêm lúc trả phòng
+    refundDue: remaining < 0 ? -remaining : 0,    // âm = cần hoàn khách
+  }
+}
+
+// items: [{ roomId }]  — dàn phòng mới (số khách backend tự chia).
+// vacate: { [bookingId]: 'clean' | 'available' } — cách xử phòng BỎ (mặc định 'clean' để có kiểm kê bắt đồ hỏng).
+exports.transferGroup = async (groupId, { items, vacate = {}, by } = {}) => {
+  const { group, branch, current, boundary, checkOut, allocByRoom, curByRoom, keptIds, droppedMembers, addedRooms } = await _transferSetup(groupId, items)
+
+  // Khoá tiền chặng ĐÃ NGỦ của 1 member (từ segmentStart tới hôm nay).
+  const lockPast = async (b) => {
+    const segStart = b.roomSegmentStart || b.checkIn
+    const rt = await RoomType.findById(b.roomType)
+    const sleptCharge = await computeRoomCharge(rt, segStart, boundary)
+    const sleptNights = nightsBetween(segStart, boundary)
+    const occ = computeOccupancy(rt, b.adults, b.children)
+    const sleptSurcharge = b.bedSurchargeApplied ? occ.extraBeds * (rt.extraBedFee || 0) * sleptNights : 0
+    b.roomChargeLocked = (b.roomChargeLocked || 0) + sleptCharge
+    b.bedSurchargeLocked = (b.bedSurchargeLocked || 0) + sleptSurcharge
+    return rt
+  }
+
+  const codes = []
+  for (let i = 0; i < addedRooms.length; i++) codes.push(await genBookingCode(branch.code))
+
+  const hk = require('./housekeepingService')
+  // Tự phân HK cho các phòng BỎ cần dọn (giống checkOutGroup) — theo tầng + tải việc.
+  const toClean = droppedMembers.filter((b) => (vacate[String(b._id)] || 'clean') === 'clean')
+  let assign = {}
+  if (toClean.length) {
+    assign = await autoAssignHousekeepers(branch._id, toClean.map((b) => ({
+      bookingId: b._id, roomId: b.room._id, floor: b.room.floor,
+    }))) || {}
+  }
+
+  const result = await runInTransaction(async (session) => {
+    // 1) PHÒNG GIỮ: khoá chặng cũ, mở chặng mới từ hôm nay, chia khách mới.
+    for (const id of keptIds) {
+      const b = curByRoom[id]
+      const rt = await lockPast(b)
+      const a = allocByRoom[id]
+      b.roomSegmentStart = boundary
+      b.adults = a.adults; b.children = a.children; b.guests = a.adults + a.children
+      b.roomCharge = await computeRoomCharge(rt, boundary, checkOut)
+      const occ = computeOccupancy(rt, a.adults, a.children)
+      b.bedSurcharge = occ.extraBeds * (rt.extraBedFee || 0) * nightsBetween(boundary, checkOut)
+      b.bedSurchargeApplied = occ.extraBeds > 0     // hệ thống tự quyết theo phòng mới; lễ tân đè sau
+      recalcBill(b)
+      await b.save({ session })
+      await logStatus(b._id, 'checked_in', 'checked_in', by, `Đổi phòng: giữ ${b.room.roomNumber}, tách chặng`)
+    }
+
+    // 2) PHÒNG BỎ: khoá tiền tới hôm nay, chặng hiện tại về 0, checked_out.
+    for (const b of droppedMembers) {
+      await lockPast(b)
+      b.roomCharge = 0; b.bedSurcharge = 0
+      b.status = 'checked_out'
+      recalcBill(b)
+      await b.save({ session })
+      const mode = vacate[String(b._id)] || 'clean'
+      if (mode === 'available') {
+        await Room.updateOne({ _id: b.room._id }, { status: 'available' }, { session })
+      } else {
+        await Room.updateOne({ _id: b.room._id }, { status: 'cleaning' }, { session })
+      }
+      await logStatus(b._id, 'checked_in', 'checked_out', by, `Đổi phòng: rời ${b.room.roomNumber} (${mode === 'available' ? 'để trống luôn' : 'giao dọn'})`)
+    }
+
+    // 3) PHÒNG MỚI: tạo booking checked_in, tính đêm còn lại từ hôm nay.
+    const created = []
+    for (let i = 0; i < addedRooms.length; i++) {
+      const room = addedRooms[i]
+      const a = allocByRoom[String(room._id)]
+      const roomCharge = await computeRoomCharge(room.roomType, boundary, checkOut)
+      const occ = computeOccupancy(room.roomType, a.adults, a.children)
+      const bedSurcharge = occ.extraBeds * (room.roomType.extraBedFee || 0) * nightsBetween(boundary, checkOut)
+      const [nb] = await Booking.create([{
+        code: codes[i], group: group._id, branch: branch._id, roomType: room.roomType._id, room: room._id,
+        customer: group.customer, guestName: group.guestName, guestPhone: group.guestPhone,
+        checkIn: boundary, checkOut, roomSegmentStart: boundary,
+        guests: a.adults + a.children, adults: a.adults, children: a.children,
+        source: group.source, status: 'checked_in', paymentStatus: 'unpaid',
+        roomCharge, bedSurcharge, bedSurchargeApplied: occ.extraBeds > 0,
+        totalAmount: 0, paidAmount: 0, remainingAmount: 0, createdBy: by,
+      }], { session })
+      recalcBill(nb); await nb.save({ session })
+      await Room.updateOne({ _id: room._id }, { status: 'occupied' }, { session })
+      await BookingStatusHistory.create([{ booking: nb._id, fromStatus: null, toStatus: 'checked_in', changedBy: by, note: `Đổi phòng: nhận thêm ${room.roomNumber}` }], { session })
+      created.push(nb)
+    }
+    return { created }
+  })
+
+  // Giao HK dọn phòng bỏ (ngoài transaction — notify không được làm hỏng luồng tiền).
+  for (const b of toClean) {
+    try { await hk.createTurnover(b._id, b.room._id, assign[String(b._id)]) }
+    catch (e) { console.warn('[transferGroup] createTurnover lỗi:', e.message) }
+  }
+
+  // Cập nhật realtime cho màn đang mở
+  try {
+    const { emitBookingUpdated } = require('../config/socket')
+    for (const b of current) emitBookingUpdated(b._id)
+    for (const b of result.created) emitBookingUpdated(b._id)
+  } catch { /* ignore */ }
+
+  // Tổng hợp lại nhóm (LIVE) để trả về + biết có cần hoàn không
+  const members = await Booking.find({ group: groupId })
+  const roll = groupRollup(members)
+  return {
+    kept: keptIds.size, dropped: droppedMembers.length, added: result.created.length,
+    cleaned: toClean.length, availableNow: droppedMembers.length - toClean.length,
+    groupTotal: roll.totalAmount, groupPaid: roll.paidAmount, groupRemaining: roll.remainingAmount,
+    refundDue: roll.remainingAmount < 0 ? -roll.remainingAmount : 0,   // âm = cần hoàn khách
+  }
+}
+
 // UC-38: cập nhật thông tin booking (số khách / tên / sđt / ghi chú). Đổi số khách -> tính lại bedSurcharge.
 exports.updateBooking = async (bookingId, { adults, children, guestName, guestPhone, notes, by } = {}) => {
   const booking = await loadBooking(bookingId)
@@ -1274,7 +1512,8 @@ exports.updateBooking = async (bookingId, { adults, children, guestName, guestPh
     const roomType = await RoomType.findById(booking.roomType)
     const occ = computeOccupancy(roomType, newAdults, newChildren)
     booking.adults = newAdults; booking.children = newChildren; booking.guests = newAdults + newChildren
-    const nights = nightsBetween(booking.checkIn, booking.checkOut)
+    // Phụ phí giường phụ tính cho CHẶNG HIỆN TẠI (đổi phòng cắt mốc); chưa đổi -> segmentStart = checkIn -> cả kỳ
+    const nights = nightsBetween(segmentStart(booking), booking.checkOut)
     booking.bedSurcharge = occ.extraBeds * (roomType.extraBedFee || 0) * nights
     recalcBill(booking) // nếu bedSurchargeApplied thì total cập nhật theo
     await refreshPendingDeposit(booking)
