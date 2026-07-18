@@ -41,6 +41,14 @@ const bookingSchema = new mongoose.Schema({
   missingAmenitiesTotal: { type: Number, default: 0 },
   bedSurcharge:          { type: Number, default: 0 },      // phụ phí giường phụ (ước tính, theo §9.7)
   bedSurchargeApplied:   { type: Boolean, default: false }, // đã cộng vào bill chưa (tự áp khi check-in)
+
+  // ── Đổi phòng giữa kỳ (UC-37) — kế toán theo CHẶNG ─────────────────────
+  // Mỗi lần đổi phòng cắt 1 mốc: tiền các chặng ĐÃ QUA khoá vào ...Locked (bất biến),
+  // còn roomCharge/bedSurcharge chỉ tính cho CHẶNG HIỆN TẠI [roomSegmentStart → checkOut].
+  // Mặc định: chưa đổi phòng -> Locked=0, segmentStart=checkIn -> bill y hệt trước, không đổi số.
+  roomChargeLocked:      { type: Number, default: 0 },      // Σ tiền phòng các chặng đã qua
+  bedSurchargeLocked:    { type: Number, default: 0 },      // Σ phụ phí giường phụ các chặng đã qua
+  roomSegmentStart:      { type: Date },                    // mốc bắt đầu chặng hiện tại (null = checkIn)
   // Phí giờ: nhận sớm / trả muộn — 10% giá đêm/giờ; trả muộn quá 18:00 -> tính 1 đêm (lateFullNight)
   earlyHours:            { type: Number, default: 0 },
   lateHours:             { type: Number, default: 0 },

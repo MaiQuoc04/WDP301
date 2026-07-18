@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom'
 import { bookingService, vnd, fmtDate, fmtDateTime, bookingStatusLabel, paymentStatusLabel, mixedSummary } from '../../services'
 import { socket, connectSocket } from '../../services/socketService'
 import PayOSQRCode from '../../components/PayOSQRCode'
+import TransferModal from './TransferModal'
 
 // Đếm ngược hạn QR (15 phút)
 function GroupQRCountdown({ expireMs }) {
@@ -273,6 +274,7 @@ export default function GroupDetailPage() {
   const [msgTone, setMsgTone] = useState('ok')
   const [loading, setLoading] = useState(false)
   const [payModal, setPayModal] = useState(null) // { type, amount, title }
+  const [showTransfer, setShowTransfer] = useState(false)
 
   const reload = useCallback(async () => {
     setErr('')
@@ -398,6 +400,12 @@ export default function GroupDetailPage() {
               {checkinRemaining > 0 ? ` · còn ${vnd(checkinRemaining)}` : ''}
             </button>
           )}
+          {/* Đổi phòng: chỉ khi có phòng ĐANG Ở (đổi giữa kỳ) */}
+          {canCheckOut && (
+            <button disabled={loading} onClick={() => setShowTransfer(true)}>
+              Đổi phòng
+            </button>
+          )}
           {canNoShow && (
             <button disabled={loading} onClick={() => runGroupAction('No-show', () => bookingService.noShowGroupAll(id),
               'Đánh no-show CẢ NHÓM (giữ cọc)?')}>
@@ -481,6 +489,23 @@ export default function GroupDetailPage() {
           onClose={() => { setPayModal(null); reload() }}
           onDone={(m) => { setMsg(m); setPayModal(null); reload() }}
           onError={(e) => setErr(e)}
+        />
+      )}
+
+      {showTransfer && (
+        <TransferModal
+          groupId={id}
+          group={group}
+          currentMembers={members.filter((m) => m.status === 'checked_in')}
+          onClose={() => setShowTransfer(false)}
+          onDone={(res) => {
+            setShowTransfer(false)
+            let m = `Đã đổi phòng: giữ ${res.kept}, rời ${res.dropped}, nhận thêm ${res.added}`
+            if (res.refundDue > 0) m += ` · cần hoàn khách ${vnd(res.refundDue)}`
+            else if (res.groupRemaining > 0) m += ` · còn thu ${vnd(res.groupRemaining)}`
+            setMsg(m); setMsgTone(res.refundDue > 0 ? 'warn' : 'ok'); reload()
+          }}
+          onError={(e) => { setErr(e); setShowTransfer(false) }}
         />
       )}
     </div>

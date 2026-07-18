@@ -1170,6 +1170,23 @@
   margin-bottom: 4px;
 }
 
+/* ── Đổi phòng (TransferModal) ── */
+.rc-vacate-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 0;
+}
+.rc-vacate-row .rc-seg { min-width: 200px; }
+/* Bảng xem trước tiền khi đổi phòng */
+.rc-xfer-preview {
+  margin-top: 14px; padding: 14px 16px;
+  background: var(--rc-cream); border: 1px solid #F0E6D8; border-radius: var(--rc-radius-md);
+}
+.rc-xfer-preview .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; color: var(--rc-text-main); }
+.rc-xfer-preview .row.due { border-top: 1px solid #E7DCCB; margin-top: 4px; padding-top: 10px; font-weight: 700; }
+.rc-xfer-preview .row.due b { font-family: var(--font-display, serif); font-size: 20px; color: var(--rc-gold); }
+/* Cần hoàn tiền -> đỏ, dấu hiệu khách sạn nợ khách (khác hẳn còn-phải-thu) */
+.rc-xfer-preview .row.refund b { color: #DC2626; }
+
 /* Segmented control (Cọc / Toàn bộ) — hai lựa chọn loại trừ nhau, dính liền thành 1 khối
    để đọc ra là "chọn 1 trong 2", không phải 2 nút bấm rời chạy 2 hành động khác nhau. */
 .rc-seg {

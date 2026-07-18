@@ -47,6 +47,9 @@ export const bookingService = {
   cancel: (id, data) => post(`${base}/bookings/${id}/cancel`, data || {}),
   noShow: (id) => post(`${base}/bookings/${id}/no-show`, {}),
   transfer: (id, data) => post(`${base}/bookings/${id}/transfer`, data),
+  // Đổi phòng CẢ NHÓM (chọn lại dàn phòng). preview: xem trước tiền; transfer: xác nhận.
+  previewTransferGroup: (groupId, items) => post(`${base}/booking-groups/${groupId}/transfer/preview`, { items }),
+  transferGroup: (groupId, data) => post(`${base}/booking-groups/${groupId}/transfer`, data), // { items, vacate }
   update: (id, data) => patch(`${base}/bookings/${id}`, data),
   addService: (id, data) => post(`${base}/bookings/${id}/services`, data),
   removeService: (id, lineId) => del(`${base}/bookings/${id}/services/${lineId}`),
