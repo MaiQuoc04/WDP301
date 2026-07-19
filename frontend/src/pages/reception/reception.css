@@ -1110,6 +1110,22 @@
 .rc-modal p { margin: 0 0 10px; line-height: 1.5; color: var(--rc-text-main); }
 .rc-modal-hint { font-size: 13px; color: var(--rc-text-muted); }
 .rc-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; align-items: center; }
+
+/* Form trong modal chỉnh sửa booking */
+.rc-edit-form { display: flex; flex-direction: column; gap: 14px; margin: 14px 0 4px; }
+.rc-edit-form label { display: block; margin: 0; font-size: 13px; font-weight: 600; color: var(--rc-text-main); }
+.rc-edit-form label > span { display: block; margin-bottom: 6px; }
+.rc-edit-form input, .rc-edit-form textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit;
+  color: var(--rc-text-main); background: #fff;
+  border: 1px solid var(--rc-border); border-radius: 10px;
+}
+.rc-edit-form textarea { resize: vertical; }
+.rc-edit-form input:focus, .rc-edit-form textarea:focus {
+  outline: none; border-color: var(--rc-gold); box-shadow: 0 0 0 3px rgba(161, 131, 72, 0.15);
+}
+.rc-edit-form input:disabled { background: #f5f1ea; color: var(--rc-text-muted); cursor: not-allowed; }
+.rc-edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .rc-main .rc-modal button.rc-modal-danger {
   background: linear-gradient(135deg, #e11d48, #fb7185); color: #fff; border: none;
   padding: 10px 20px; border-radius: var(--rc-radius-md); font-weight: 600; cursor: pointer;

@@ -1596,6 +1596,7 @@ exports.updateBooking = async (bookingId, { adults, children, guestName, guestPh
     await refreshPendingDeposit(booking)
   }
   await booking.save()
+  emitBookingUpdated(booking._id) // realtime: mọi màn đang mở booking/nhóm/list tự cập nhật
   return booking
 }
 
