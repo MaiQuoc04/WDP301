@@ -298,7 +298,7 @@
 /* Danh sách loại trừ bọc trong :where() -> specificity = 0, nên cả selector chỉ (0,1,1).
    KHÔNG dùng chuỗi :not(.a):not(.b)… : mỗi :not() cộng specificity, chuỗi dài biến rule
    "mặc định" này thành rule mạnh nhất file và đè chết mọi biến thể nút (tab, segment, svc-toggle). */
-.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .ant-btn)), .rc-btn {
+.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .rc-qty-btn, .ant-btn)), .rc-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -313,7 +313,7 @@
   cursor: pointer;
   transition: var(--rc-transition);
 }
-.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .ant-btn)):hover {
+.rc-main button:not(:where(.link, .rc-chip, .rc-type-chip, .rc-qty-btn, .ant-btn)):hover {
   border-color: var(--rc-gold);
   background: #FDFBF8;
   color: var(--rc-gold);
@@ -585,6 +585,20 @@
 
 .rc-lines { list-style: none; padding: 0; margin: 12px 0; }
 .rc-lines li { padding: 8px 0; font-size: 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f8fafc; }
+/* Dòng dịch vụ/thiết bị đã thêm: tên co giãn, núm số lượng + thành tiền + xoá gom phải */
+.rc-line { gap: 10px; }
+.rc-line .rc-line-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-line .rc-line-sum { flex: 0 0 auto; font-weight: 700; color: var(--rc-text-main); min-width: 84px; text-align: right; }
+.rc-qty { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.rc-qty b { min-width: 30px; text-align: center; font-size: 13px; color: var(--rc-text-main); }
+.rc-qty-btn {
+  width: 24px; height: 24px; padding: 0; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rc-border); border-radius: 6px;
+  background: var(--rc-surface); color: var(--rc-text-main);
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: var(--rc-transition);
+}
+.rc-qty-btn:hover { border-color: var(--rc-gold); color: var(--rc-gold); background: #FDFBF8; }
 .rc-add { display: flex; gap: 10px; align-items: center; margin: 12px 0; }
 .rc-hist { font-size: 13px; color: var(--rc-text-muted); padding-left: 20px; line-height: 1.8; }
 .rc-hist li { list-style: circle; }

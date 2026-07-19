@@ -1148,7 +1148,24 @@ exports.addExtraService = async (bookingId, serviceId, quantity = 1, by) => {
   const service = await Service.findOne({ _id: serviceId, branch: booking.branch })
   if (!service || service.status !== 'active') throw new Error('Dịch vụ không khả dụng')
   const qty = Math.max(1, parseInt(quantity, 10) || 1)
-  booking.services.push({ service: service._id, name: service.name, price: service.price, quantity: qty, addedAt: new Date() })
+  // Gộp vào dòng cùng dịch vụ CHƯA GIAO (thay vì đẻ ra dòng "×1" trùng lặp).
+  // Dòng đã giao thì giữ nguyên, thêm mới -> tách dòng để không đụng phần đã bàn giao.
+  const existing = booking.services.find((s) => String(s.service) === String(service._id) && s.status !== 'delivered')
+  if (existing) existing.quantity += qty
+  else booking.services.push({ service: service._id, name: service.name, price: service.price, quantity: qty, addedAt: new Date() })
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+// Chỉnh số lượng 1 dòng dịch vụ: delta ±. Về 0 thì xoá dòng. Dòng đã giao không chỉnh.
+exports.adjustExtraService = async (bookingId, lineId, delta, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ sửa bill khi chưa check-out')
+  const line = booking.services.id(lineId)
+  if (!line) throw new Error('Không tìm thấy dòng dịch vụ')
+  if (line.status === 'delivered') throw new Error('Dịch vụ đã giao, không đổi số lượng')
+  const next = line.quantity + (parseInt(delta, 10) || 0)
+  if (next <= 0) booking.services.pull(lineId)
+  else line.quantity = next
   recomputeExtras(booking); recalcBill(booking); await booking.save()
   return booking
 }
@@ -1182,7 +1199,21 @@ exports.addMissingAmenity = async (bookingId, amenityId, quantity = 1, by) => {
   const amenity = await Amenity.findOne({ _id: amenityId, branch: booking.branch })
   if (!amenity) throw new Error('Thiết bị không hợp lệ')
   const qty = Math.max(1, parseInt(quantity, 10) || 1)
-  booking.missingAmenities.push({ amenity: amenity._id, name: amenity.name, price: amenity.missingPrice, quantity: qty })
+  const existing = booking.missingAmenities.find((a) => String(a.amenity) === String(amenity._id))
+  if (existing) existing.quantity += qty
+  else booking.missingAmenities.push({ amenity: amenity._id, name: amenity.name, price: amenity.missingPrice, quantity: qty })
+  recomputeExtras(booking); recalcBill(booking); await booking.save()
+  return booking
+}
+// Chỉnh số lượng 1 dòng thiết bị thiếu: delta ±. Về 0 thì xoá dòng.
+exports.adjustMissingAmenity = async (bookingId, lineId, delta, by) => {
+  const booking = await loadBooking(bookingId)
+  if (!BILL_EDITABLE.includes(booking.status)) throw new Error('Chỉ sửa bill khi chưa check-out')
+  const line = booking.missingAmenities.id(lineId)
+  if (!line) throw new Error('Không tìm thấy dòng thiết bị')
+  const next = line.quantity + (parseInt(delta, 10) || 0)
+  if (next <= 0) booking.missingAmenities.pull(lineId)
+  else line.quantity = next
   recomputeExtras(booking); recalcBill(booking); await booking.save()
   return booking
 }
