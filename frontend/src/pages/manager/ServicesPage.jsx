@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm, message } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, CustomerServiceOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
 import PageHeader from '../../components/common/PageHeader'
@@ -8,6 +8,7 @@ import PageHeader from '../../components/common/PageHeader'
 export default function ServicesPage() {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(false)
+  const [q, setQ] = useState('')
   const [formModalVisible, setFormModalVisible] = useState(false)
   const [editingService, setEditingService] = useState(null)
 
@@ -79,7 +80,15 @@ export default function ServicesPage() {
       title: 'Tên dịch vụ',
       dataIndex: 'name',
       key: 'name',
-      render: (text) => <strong>{text}</strong>
+      render: (text, r) => (
+        <div className="mgr-cell-name">
+          <span className="mgr-row-ic"><CustomerServiceOutlined /></span>
+          <div>
+            <b>{text}</b>
+            {r.description && <div className="mgr-cell-sub" title={r.description}>{r.description}</div>}
+          </div>
+        </div>
+      )
     },
     {
       title: 'Giá dịch vụ',
@@ -133,9 +142,14 @@ export default function ServicesPage() {
         actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm dịch vụ</Button>}
       />
 
+      <div className="mgr-toolbar">
+        <Input className="mgr-search" allowClear prefix={<SearchOutlined />}
+          placeholder="Tìm dịch vụ theo tên..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+
       <div className="mgr-card">
         <Table
-          dataSource={services}
+          dataSource={services.filter((s) => (s.name || '').toLowerCase().includes(q.trim().toLowerCase()))}
           columns={columns}
           rowKey="_id"
           loading={loading}

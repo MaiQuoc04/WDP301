@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm, message } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, InboxOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
 import PageHeader from '../../components/common/PageHeader'
@@ -8,6 +8,7 @@ import PageHeader from '../../components/common/PageHeader'
 export default function AmenitiesPage() {
   const [amenities, setAmenities] = useState([])
   const [loading, setLoading] = useState(false)
+  const [q, setQ] = useState('')
   const [formModalVisible, setFormModalVisible] = useState(false)
   const [editingAmenity, setEditingAmenity] = useState(null)
 
@@ -79,7 +80,15 @@ export default function AmenitiesPage() {
       title: 'Tên tiện nghi',
       dataIndex: 'name',
       key: 'name',
-      render: (text) => <strong>{text}</strong>
+      render: (text, r) => (
+        <div className="mgr-cell-name">
+          <span className="mgr-row-ic"><InboxOutlined /></span>
+          <div>
+            <b>{text}</b>
+            <div className="mgr-cell-sub">Đơn vị: {r.unit || 'cái'}</div>
+          </div>
+        </div>
+      )
     },
     {
       title: 'Đơn vị tính',
@@ -137,9 +146,14 @@ export default function AmenitiesPage() {
         actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm tiện nghi</Button>}
       />
 
+      <div className="mgr-toolbar">
+        <Input className="mgr-search" allowClear prefix={<SearchOutlined />}
+          placeholder="Tìm tiện nghi theo tên..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+
       <div className="mgr-card">
         <Table
-          dataSource={amenities}
+          dataSource={amenities.filter((a) => (a.name || '').toLowerCase().includes(q.trim().toLowerCase()))}
           columns={columns}
           rowKey="_id"
           loading={loading}
