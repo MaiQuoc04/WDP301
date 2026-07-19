@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Switch, message, Divider, Checkbox, Row, Col } from 'antd'
-import { PlusOutlined, EditOutlined, SettingOutlined, NumberOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, SettingOutlined, NumberOutlined, SearchOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
 import PageHeader from '../../components/common/PageHeader'
@@ -9,6 +9,7 @@ export default function RoomTypesPage() {
   const [roomTypes, setRoomTypes] = useState([])
   const [allAmenities, setAllAmenities] = useState([])
   const [loading, setLoading] = useState(false)
+  const [q, setQ] = useState('')
   
   // Modal states
   const [formModalVisible, setFormModalVisible] = useState(false)
@@ -156,7 +157,15 @@ export default function RoomTypesPage() {
       title: 'Tên loại phòng',
       dataIndex: 'name',
       key: 'name',
-      render: (text) => <strong>{text}</strong>
+      render: (text, r) => (
+        <div className="mgr-cell-name">
+          <span className="mgr-row-ic"><AppstoreOutlined /></span>
+          <div>
+            <b>{text}</b>
+            {r.area && <div className="mgr-cell-sub">{r.area} m² · chứa {r.capacity}</div>}
+          </div>
+        </div>
+      )
     },
     {
       title: 'Hạng phòng',
@@ -240,9 +249,14 @@ export default function RoomTypesPage() {
         actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm loại phòng</Button>}
       />
 
+      <div className="mgr-toolbar">
+        <Input className="mgr-search" allowClear prefix={<SearchOutlined />}
+          placeholder="Tìm loại phòng theo tên..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+
       <div className="mgr-card">
         <Table
-          dataSource={roomTypes}
+          dataSource={roomTypes.filter((t) => (t.name || '').toLowerCase().includes(q.trim().toLowerCase()))}
           columns={columns}
           rowKey="_id"
           loading={loading}

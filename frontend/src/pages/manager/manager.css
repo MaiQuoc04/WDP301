@@ -512,5 +512,20 @@
 }
 .mgr-back:hover { color: var(--color-gold-active, #8a6f3c); text-decoration: underline; }
 
+/* Ô tìm kiếm trong toolbar */
+.mgr-search { max-width: 340px; }
+/* Ô tên có icon dòng + dòng phụ (bám mẫu Stitch) */
+.mgr-cell-name { display: flex; align-items: center; gap: 11px; }
+.mgr-row-ic {
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--mg-cream); color: var(--color-gold); font-size: 16px;
+}
+.mgr-cell-name b { display: block; line-height: 1.25; }
+.mgr-cell-sub {
+  font-size: 12px; color: var(--mg-muted); margin-top: 1px;
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .mgr-empty { text-align: center; color: var(--mg-muted); padding: 44px 0; }
 .mgr-empty .anticon { font-size: 30px; color: #cdc4b8; display: block; margin-bottom: 10px; }
