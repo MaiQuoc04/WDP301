@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Alert, Select, Table, Tag } from 'antd'
 import { taskService } from '../../services/taskService'
 import { fmtDateTime } from '../../utils/date'
+import PageHeader from '../../components/common/PageHeader'
 
 const statusColor = {
   completed: 'success',
@@ -65,26 +66,29 @@ export default function HistoryPage() {
   ]
 
   return (
-    <div>
-      <div className="hk-page-head">
-        <div>
-          <h1>Lịch sử buồng phòng</h1>
-          <p>Các task bạn đã hoàn tất hoặc bị missed.</p>
-        </div>
-        <Select
-          value={status}
-          onChange={setStatus}
-          style={{ width: 170 }}
-          options={[
-            { value: '', label: 'Tất cả' },
-            { value: 'completed', label: 'Hoàn tất' },
-            { value: 'missed', label: 'Missed' },
-          ]}
-        />
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Lịch sử buồng phòng"
+        subtitle="Các task bạn đã hoàn tất hoặc bị bỏ lỡ."
+        count={tasks.length}
+        actions={
+          <Select
+            value={status}
+            onChange={setStatus}
+            style={{ width: 170 }}
+            options={[
+              { value: '', label: 'Tất cả' },
+              { value: 'completed', label: 'Hoàn tất' },
+              { value: 'missed', label: 'Bỏ lỡ' },
+            ]}
+          />
+        }
+      />
 
-      {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} />
+      {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16, borderRadius: 12 }} />}
+      <div className="mgr-card">
+        <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} />
+      </div>
     </div>
   )
 }

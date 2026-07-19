@@ -411,3 +411,106 @@
 .badge-severity-high { background-color: #fbe9e7; color: #d84315; border: 1px solid #ffab91; }
 .badge-severity-medium { background-color: #fff8e1; color: #ff8f00; border: 1px solid #ffe082; }
 .badge-severity-low { background-color: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+
+/* ============================================================
+   PAGE-SHELL dùng chung cho các TRANG CON Manager/Admin/HK
+   Bám tông dashboard-overview (cream ấm + serif + gold) để cả
+   back-office nhìn như một hệ. Bọc trang bằng .mgr-page.
+   ============================================================ */
+.mgr-page { --mg-cream: #fbf7f1; --mg-border: #ece4da; --mg-ink: #211c14; --mg-muted: #8c8378; }
+
+/* Header trang: tiêu đề serif + phụ đề + hành động bên phải, có kẻ gold mảnh */
+.mgr-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  padding-bottom: 18px; margin-bottom: 22px;
+  border-bottom: 1px solid var(--mg-border);
+}
+/* .mgr-page tăng đặc hiệu để THẮNG rule "Inter !important" của admin.css (.admin-container h2) */
+.mgr-page .mgr-head-titles h2 {
+  font-family: var(--font-display) !important;
+  font-size: 30px; font-weight: 600; color: var(--mg-ink);
+  margin: 0; letter-spacing: 0.3px; line-height: 1.15;
+}
+.mgr-head-titles p { margin: 6px 0 0; color: var(--mg-muted); font-size: 14px; }
+.mgr-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Chip đếm cạnh tiêu đề */
+.mgr-count {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: 12px; padding: 3px 11px; border-radius: 999px;
+  background: var(--mg-cream); border: 1px solid var(--mg-border);
+  font-size: 12.5px; font-weight: 700; color: var(--color-gold);
+  vertical-align: middle;
+}
+
+/* Thanh công cụ / bộ lọc */
+.mgr-toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: #fff; border: 1px solid var(--mg-border); border-radius: 14px;
+  padding: 14px 18px; margin-bottom: 18px;
+  box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05);
+}
+.mgr-toolbar-label {
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: var(--mg-muted);
+}
+.mgr-toolbar .spacer { margin-left: auto; }
+
+/* Thẻ bọc bảng / nội dung */
+.mgr-card {
+  background: #fff; border: 1px solid var(--mg-border); border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05); overflow: hidden;
+}
+.mgr-card.pad { padding: 22px 24px; }
+.mgr-card + .mgr-card { margin-top: 18px; }
+
+/* Antd Table trong mgr-card: header cream uppercase, hàng viền mềm */
+.mgr-card .ant-table { background: transparent; }
+.mgr-card .ant-table-thead > tr > th {
+  background: var(--mg-cream) !important;
+  color: var(--mg-muted) !important;
+  font-size: 11px !important; font-weight: 700 !important;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  border-bottom: 1px solid var(--mg-border) !important;
+  padding: 14px 16px !important;
+}
+.mgr-card .ant-table-thead > tr > th::before { display: none !important; }
+.mgr-card .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f4efe8 !important;
+  padding: 15px 16px !important;
+}
+.mgr-card .ant-table-tbody > tr:hover > td { background: #fcfaf6 !important; }
+.mgr-card .ant-table-tbody > tr:last-child > td { border-bottom: none !important; }
+.mgr-card .ant-table-pagination { padding: 0 16px; }
+/* Bảng rộng (nhiều cột / email dài) cuộn ngang trong thẻ thay vì tràn/cắt mất cột cuối */
+.mgr-card .ant-table-content { overflow-x: auto; }
+
+/* KPI mini (vài trang có ô thống kê nhỏ trên đầu) */
+.mgr-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.mgr-stat {
+  background: #fff; border: 1px solid var(--mg-border); border-radius: 14px;
+  padding: 16px 18px; box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05);
+  display: flex; align-items: center; gap: 14px;
+}
+.mgr-stat-icon {
+  width: 44px; height: 44px; flex: 0 0 auto; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--mg-cream); color: var(--color-gold); font-size: 20px;
+}
+.mgr-stat-val { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--mg-ink); line-height: 1; }
+.mgr-stat-lbl { font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--mg-muted); margin-top: 5px; }
+
+/* Link quay lại trên trang chi tiết */
+.mgr-back {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 600; color: var(--color-gold);
+  text-decoration: none; margin-bottom: 10px;
+}
+.mgr-back:hover { color: var(--color-gold-active, #8a6f3c); text-decoration: underline; }
+
+.mgr-empty { text-align: center; color: var(--mg-muted); padding: 44px 0; }
+.mgr-empty .anticon { font-size: 30px; color: #cdc4b8; display: block; margin-bottom: 10px; }

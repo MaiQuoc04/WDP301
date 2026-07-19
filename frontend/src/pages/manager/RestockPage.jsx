@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Table, Button, Modal, InputNumber, Tag, message } from 'antd'
 import { ReloadOutlined, InboxOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+import PageHeader from '../../components/common/PageHeader'
 
 // Bổ sung thiết bị cho phòng đã dọn xong nhưng còn thiếu (awaitingRestock). Đủ chuẩn -> phòng mở bán.
 export default function RestockPage() {
@@ -56,23 +57,24 @@ export default function RestockPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Bổ sung thiết bị</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Phòng đã dọn xong nhưng còn thiếu đồ — bổ sung đủ chuẩn để mở bán lại</p>
-        </div>
-        <Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>
-      </div>
-
-      <Table
-        rowKey="_id"
-        loading={loading}
-        dataSource={rooms}
-        columns={columns}
-        pagination={{ pageSize: 10 }}
-        locale={{ emptyText: 'Không có phòng nào chờ bổ sung 🎉' }}
+    <div className="mgr-page">
+      <PageHeader
+        title="Bổ sung thiết bị"
+        subtitle="Phòng đã dọn xong nhưng còn thiếu đồ — bổ sung đủ chuẩn để mở bán lại"
+        count={rooms.length}
+        actions={<Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>}
       />
+
+      <div className="mgr-card">
+        <Table
+          rowKey="_id"
+          loading={loading}
+          dataSource={rooms}
+          columns={columns}
+          pagination={{ pageSize: 10 }}
+          locale={{ emptyText: 'Không có phòng nào chờ bổ sung 🎉' }}
+        />
+      </div>
 
       <Modal
         title={`Bổ sung thiết bị — Phòng ${inv?.room?.roomNumber || ''}`}

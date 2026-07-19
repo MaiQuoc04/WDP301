@@ -4,6 +4,7 @@ import { Alert, Button, Select, Space, Table, Tag, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
 import { fmtDateTime } from '../../utils/date'
+import PageHeader from '../../components/common/PageHeader'
 
 const statusColor = {
   pending: 'default',
@@ -123,16 +124,16 @@ export default function TasksPage() {
   })
 
   return (
-    <div>
-      <div className="hk-page-head">
-        <div>
-          <h1>Task buồng phòng</h1>
-          <p>Theo dõi task chưa nhận, đang làm và task khẩn cấp trong chi nhánh của bạn.</p>
-        </div>
-        <Button icon={<ReloadOutlined />} onClick={loadTasks}>Làm mới</Button>
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Task buồng phòng"
+        subtitle="Theo dõi task chưa nhận, đang làm và task khẩn cấp trong chi nhánh của bạn."
+        count={tasks.length}
+        actions={<Button icon={<ReloadOutlined />} onClick={loadTasks}>Làm mới</Button>}
+      />
 
-      <div className="hk-toolbar">
+      <div className="mgr-toolbar">
+        <span className="mgr-toolbar-label">Trạng thái</span>
         <Select
           value={filters.status}
           onChange={(status) => setFilters((prev) => ({ ...prev, status }))}
@@ -144,10 +145,11 @@ export default function TasksPage() {
             { value: 'urgent', label: 'Khẩn cấp' },
           ]}
         />
+        <span className="mgr-toolbar-label">Phân công</span>
         <Select
           value={filters.assigned}
           onChange={(assigned) => setFilters((prev) => ({ ...prev, assigned }))}
-          style={{ width: 180 }}
+          style={{ width: 190 }}
           options={[
             { value: '', label: 'Tất cả của tôi/ trống' },
             { value: 'unassigned', label: 'Chưa ai nhận' },
@@ -156,8 +158,10 @@ export default function TasksPage() {
         />
       </div>
 
-      {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-      <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} scroll={{ x: true }} />
+      {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16, borderRadius: 12 }} />}
+      <div className="mgr-card">
+        <Table rowKey="_id" loading={loading} dataSource={tasks} columns={columns} scroll={{ x: true }} />
+      </div>
     </div>
   )
 }

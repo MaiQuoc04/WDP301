@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm,
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
+import PageHeader from '../../components/common/PageHeader'
 
 export default function ServicesPage() {
   const [services, setServices] = useState([])
@@ -124,21 +125,22 @@ export default function ServicesPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Quản lý dịch vụ khách sạn (Service)</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Cung cấp các dịch vụ gia tăng như giặt là, spa, ẩm thực ăn uống...</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm dịch vụ</Button>
-      </div>
-
-      <Table 
-        dataSource={services} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý dịch vụ"
+        subtitle="Cung cấp các dịch vụ gia tăng như giặt là, spa, ẩm thực ăn uống..."
+        count={services.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm dịch vụ</Button>}
       />
+
+      <div className="mgr-card">
+        <Table
+          dataSource={services}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+        />
+      </div>
 
       <Modal
         title={editingService ? 'Cập nhật dịch vụ' : 'Thêm dịch vụ mới'}

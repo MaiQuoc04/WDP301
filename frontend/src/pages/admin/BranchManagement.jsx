@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { fetchBranches, createBranch, toggleBranch, updateBranch } from '../../redux/slices/adminSlice'
+import PageHeader from '../../components/common/PageHeader'
 
 const PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/
 
@@ -115,25 +116,21 @@ const BranchManagement = () => {
   )
 
   return (
-    <div>
-      {/* Title Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: 0 }}>
-            Quản Lý Chi Nhánh
-          </h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>
-            Quản lý thông tin, cấu hình tiền cọc và theo dõi hiệu suất hoạt động từng chi nhánh
-          </p>
-        </div>
-        <button className="admin-btn admin-btn-primary" onClick={() => setShowModal(true)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Thêm chi nhánh
-        </button>
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý chi nhánh"
+        subtitle="Quản lý thông tin, cấu hình tiền cọc và theo dõi hiệu suất hoạt động từng chi nhánh"
+        count={branches.length}
+        actions={
+          <button className="admin-btn admin-btn-primary" onClick={() => setShowModal(true)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Thêm chi nhánh
+          </button>
+        }
+      />
 
       {/* Filter / Search Bar */}
       <div className="admin-filter-bar">

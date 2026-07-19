@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Alert, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message } from 'antd'
 import { taskService } from '../../services/taskService'
+import PageHeader from '../../components/common/PageHeader'
 
 const statusColor = {
   pending: 'default',
@@ -164,18 +165,18 @@ export default function TaskDetailPage() {
   ]
 
   return (
-    <div>
-      <div className="hk-page-head">
-        <div>
-          <Link to="/housekeeping">← Quay lại danh sách</Link>
-          <h1>Task phòng {task.room?.roomNumber}</h1>
-          <p>{task.booking?.code || 'Không có booking'} · {task.booking?.guestName || 'Khách lưu trú'}</p>
-        </div>
-        <Space>
-          <Tag color={typeColor[task.type] || 'default'}>{typeLabel[task.type] || 'Việc phòng'}</Tag>
-          <Tag color={statusColor[task.status]}>{statusLabel[task.status] || task.status}</Tag>
-        </Space>
-      </div>
+    <div className="mgr-page">
+      <Link to="/housekeeping" className="mgr-back">← Quay lại danh sách</Link>
+      <PageHeader
+        title={`Task phòng ${task.room?.roomNumber}`}
+        subtitle={`${task.booking?.code || 'Không có booking'} · ${task.booking?.guestName || 'Khách lưu trú'}`}
+        actions={
+          <Space>
+            <Tag color={typeColor[task.type] || 'default'}>{typeLabel[task.type] || 'Việc phòng'}</Tag>
+            <Tag color={statusColor[task.status]}>{statusLabel[task.status] || task.status}</Tag>
+          </Space>
+        }
+      />
 
       <div className="hk-detail-grid">
         <section className="hk-panel">

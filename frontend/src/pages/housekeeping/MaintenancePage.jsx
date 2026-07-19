@@ -3,6 +3,7 @@ import { Table, Tag, Button, Modal, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { taskService } from '../../services/taskService'
 import { fmtDateTime } from '../../utils/date'
+import PageHeader from '../../components/common/PageHeader'
 
 const statusLabel = { maintaining: 'Đang bảo trì', fix_requested: 'Đã báo sửa — chờ xác nhận' }
 const fmt = (d) => fmtDateTime(d) || '-'
@@ -46,16 +47,17 @@ export default function MaintenancePage() {
   ]
 
   return (
-    <div>
-      <div className="hk-page-head">
-        <div>
-          <h1>Phòng đang bảo trì</h1>
-          <p>Bấm “Đã sửa xong” để báo quản lý kiểm tra & xác nhận mở lại phòng.</p>
-        </div>
-        <Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>
+    <div className="mgr-page">
+      <PageHeader
+        title="Phòng đang bảo trì"
+        subtitle="Bấm “Đã sửa xong” để báo quản lý kiểm tra & xác nhận mở lại phòng."
+        count={rows.length}
+        actions={<Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>}
+      />
+      <div className="mgr-card">
+        <Table rowKey="_id" loading={loading} dataSource={rows} columns={columns}
+          locale={{ emptyText: 'Không có phòng nào đang bảo trì' }} />
       </div>
-      <Table rowKey="_id" loading={loading} dataSource={rows} columns={columns}
-        locale={{ emptyText: 'Không có phòng nào đang bảo trì' }} />
     </div>
   )
 }

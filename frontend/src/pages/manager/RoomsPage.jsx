@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Popconfirm, message, Spin, Empty, Divider, Card, Badge, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+import PageHeader from '../../components/common/PageHeader'
+
+const ROOM_STATUS_VI = { available: 'Trống', occupied: 'Đang ở', cleaning: 'Đang dọn', maintenance: 'Bảo trì', locked: 'Khóa' }
 
 export default function RoomsPage() {
   const [rooms, setRooms] = useState([])
@@ -126,45 +129,33 @@ export default function RoomsPage() {
   const sortedFloors = Object.keys(roomsByFloor).sort((a, b) => Number(a) - Number(b))
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Quản lý phòng vật lý</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Quản lý danh mục phòng, sơ đồ tầng và cập nhật trạng thái phòng</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm phòng mới</Button>
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý phòng vật lý"
+        subtitle="Quản lý danh mục phòng, sơ đồ tầng và cập nhật trạng thái phòng"
+        count={rooms.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm phòng mới</Button>}
+      />
 
-      {/* Filter Bar */}
-      <div className="rooms-filter-bar">
-        <div className="filter-group">
-          <div>
-            <span style={{ marginRight: 8, fontWeight: 500 }}>Loại phòng:</span>
-            <Select value={filterType} onChange={setFilterType} style={{ width: 180 }} allowClear placeholder="Tất cả loại phòng">
-              {roomTypes.map(t => (
-                <Select.Option key={t._id} value={t._id}>{t.name}</Select.Option>
-              ))}
-            </Select>
-          </div>
-
-          <div>
-            <span style={{ marginRight: 8, fontWeight: 500 }}>Trạng thái:</span>
-            <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 150 }} allowClear placeholder="Tất cả trạng thái">
-              <Select.Option value="available">Sẵn sàng (Available)</Select.Option>
-              <Select.Option value="occupied">Đang ở (Occupied)</Select.Option>
-              <Select.Option value="cleaning">Đang dọn (Cleaning)</Select.Option>
-              <Select.Option value="maintenance">Bảo trì (Maintenance)</Select.Option>
-              <Select.Option value="locked">Khóa (Locked)</Select.Option>
-            </Select>
-          </div>
-
-          <div>
-            <span style={{ marginRight: 8, fontWeight: 500 }}>Tầng:</span>
-            <InputNumber value={filterFloor} onChange={setFilterFloor} style={{ width: 100 }} placeholder="Tầng" min={1} />
-          </div>
-        </div>
-        
-        <Button type="text" onClick={() => { setFilterType(''); setFilterStatus(''); setFilterFloor('') }}>Làm sạch bộ lọc</Button>
+      {/* Bộ lọc */}
+      <div className="mgr-toolbar">
+        <span className="mgr-toolbar-label">Loại phòng</span>
+        <Select value={filterType} onChange={setFilterType} style={{ width: 180 }} allowClear placeholder="Tất cả loại phòng">
+          {roomTypes.map(t => (
+            <Select.Option key={t._id} value={t._id}>{t.name}</Select.Option>
+          ))}
+        </Select>
+        <span className="mgr-toolbar-label">Trạng thái</span>
+        <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 160 }} allowClear placeholder="Tất cả trạng thái">
+          <Select.Option value="available">Trống (Available)</Select.Option>
+          <Select.Option value="occupied">Đang ở (Occupied)</Select.Option>
+          <Select.Option value="cleaning">Đang dọn (Cleaning)</Select.Option>
+          <Select.Option value="maintenance">Bảo trì (Maintenance)</Select.Option>
+          <Select.Option value="locked">Khóa (Locked)</Select.Option>
+        </Select>
+        <span className="mgr-toolbar-label">Tầng</span>
+        <InputNumber value={filterFloor} onChange={setFilterFloor} style={{ width: 90 }} placeholder="Tầng" min={1} />
+        <Button className="spacer" type="text" onClick={() => { setFilterType(''); setFilterStatus(''); setFilterFloor('') }}>Làm sạch bộ lọc</Button>
       </div>
 
       {/* Grid Floor Visualization */}
@@ -187,7 +178,7 @@ export default function RoomsPage() {
                 >
                   <div className="room-box-header">
                     <span className="room-box-number">{room.roomNumber}</span>
-                    <span className="room-box-badge">{room.status}</span>
+                    <span className="room-box-badge">{ROOM_STATUS_VI[room.status] || room.status}</span>
                   </div>
                   
                   <div className="room-box-type" title={room.roomType?.name || 'Không rõ loại'}>
