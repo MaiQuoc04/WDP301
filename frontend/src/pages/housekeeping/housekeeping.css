@@ -134,14 +134,19 @@
 
 .hk-panel {
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 18px;
-  margin-bottom: 16px;
+  border: 1px solid #ece4da;
+  border-radius: 16px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05);
 }
 
 .hk-panel h3 {
   margin-top: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: #211c14;
 }
 
 .hk-panel-head {

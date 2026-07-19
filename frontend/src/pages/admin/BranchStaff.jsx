@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useParams, Link } from 'react-router-dom'
 import { 
-  fetchStaff, 
+  fetchStaff,
   fetchBranches,
   createStaff,
   toggleAccount,
@@ -10,6 +10,7 @@ import {
   assignStaffBranch,
   removeStaffBranch
 } from '../../redux/slices/adminSlice'
+import PageHeader from '../../components/common/PageHeader'
 
 const PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/
 
@@ -192,35 +193,22 @@ const BranchStaff = () => {
   )
 
   return (
-    <div>
-      {/* Title Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <Link to="/admin/branches" className="admin-btn-icon" style={{ borderRadius: '50%' }} title="Quay lại danh sách chi nhánh">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-              </svg>
-            </Link>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: 'var(--color-black)', margin: 0 }}>
-              Nhân viên chi nhánh: {currentBranch?.name || '...'}
-            </h2>
-            {currentBranch?.code && <span className="admin-badge admin-badge-role">{currentBranch.code}</span>}
-          </div>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px', paddingLeft: '40px' }}>
-            Danh sách nhân viên đang làm việc tại chi nhánh này
-          </p>
-        </div>
-
-        <button className="admin-btn admin-btn-primary" onClick={() => setShowModal(true)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Tạo tài khoản nhân viên
-        </button>
-      </div>
+    <div className="mgr-page">
+      <Link to="/admin/branches" className="mgr-back">← Quay lại danh sách chi nhánh</Link>
+      <PageHeader
+        title={`Nhân viên: ${currentBranch?.name || '...'}`}
+        subtitle={`Danh sách nhân viên đang làm việc tại chi nhánh${currentBranch?.code ? ` ${currentBranch.code}` : ''}`}
+        count={filteredStaff.length}
+        actions={
+          <button className="admin-btn admin-btn-primary" onClick={() => setShowModal(true)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Tạo tài khoản nhân viên
+          </button>
+        }
+      />
 
       {/* Search */}
       <div className="admin-filter-bar">

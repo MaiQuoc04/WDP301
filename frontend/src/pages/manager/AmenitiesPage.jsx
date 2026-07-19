@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, InputNumber, Tag, Popconfirm,
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
+import PageHeader from '../../components/common/PageHeader'
 
 export default function AmenitiesPage() {
   const [amenities, setAmenities] = useState([])
@@ -128,21 +129,22 @@ export default function AmenitiesPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Quản lý tiện nghi phòng (Amenity)</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Danh mục các vật dụng được trang bị trong phòng và giá đền bù khi làm mất</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm tiện nghi</Button>
-      </div>
-
-      <Table 
-        dataSource={amenities} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý tiện nghi phòng"
+        subtitle="Danh mục vật dụng trang bị trong phòng và giá đền bù khi làm mất"
+        count={amenities.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm tiện nghi</Button>}
       />
+
+      <div className="mgr-card">
+        <Table
+          dataSource={amenities}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+        />
+      </div>
 
       <Modal
         title={editingAmenity ? 'Cập nhật tiện nghi' : 'Thêm tiện nghi mới'}

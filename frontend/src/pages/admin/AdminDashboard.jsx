@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
+import '../manager/manager.css'   // bộ page-shell .mgr-* dùng chung back-office
 import './admin.css'
 
 // Logo sen — đồng bộ với Manager/Reception sidebar

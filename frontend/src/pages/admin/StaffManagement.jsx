@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { toggleAccount, fetchUsers } from '../../redux/slices/adminSlice'
+import PageHeader from '../../components/common/PageHeader'
 
 const StaffManagement = () => {
   const dispatch = useDispatch()
@@ -25,16 +26,12 @@ const StaffManagement = () => {
   )
 
   return (
-    <div>
-      {/* Title Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: '0 0 4px 0' }}>
-          Quản Lý Tài Khoản Khách Hàng
-        </h2>
-        <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>
-          Theo dõi danh sách khách hàng đã đăng ký tài khoản trong hệ thống HBMS
-        </p>
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý tài khoản khách hàng"
+        subtitle="Theo dõi danh sách khách hàng đã đăng ký tài khoản trong hệ thống HBMS"
+        count={usersList.length}
+      />
 
       {/* Search */}
       <div className="admin-filter-bar">

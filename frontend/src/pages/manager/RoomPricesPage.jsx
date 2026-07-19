@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, InputNumber, Select, Tag, DatePicker
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd, fmtDate } from '../../services'
+import PageHeader from '../../components/common/PageHeader'
 import dayjs from 'dayjs'
 
 export default function RoomPricesPage() {
@@ -133,21 +134,22 @@ export default function RoomPricesPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Cấu hình giá động (RoomPrice)</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Cấu hình giá phòng tăng/giảm theo cuối tuần, ngày lễ hoặc ngày đặc biệt</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setFormModalVisible(true); }}>Thiết lập giá</Button>
-      </div>
-
-      <Table 
-        dataSource={prices} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
+    <div className="mgr-page">
+      <PageHeader
+        title="Cấu hình giá động"
+        subtitle="Cấu hình giá phòng tăng/giảm theo cuối tuần, ngày lễ hoặc ngày đặc biệt"
+        count={prices.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setFormModalVisible(true); }}>Thiết lập giá</Button>}
       />
+
+      <div className="mgr-card">
+        <Table
+          dataSource={prices}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+        />
+      </div>
 
       <Modal
         title="Thiết lập giá động mới"

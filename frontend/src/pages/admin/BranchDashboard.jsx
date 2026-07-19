@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { fetchBranchDashboard, fetchBranches, fetchDashboardStats } from '../../redux/slices/adminSlice'
+import PageHeader from '../../components/common/PageHeader'
 
 const BranchDashboard = () => {
   const { branchId } = useParams()
@@ -54,15 +55,12 @@ const BranchDashboard = () => {
     const housekeepingKPI = dashboardStats?.housekeepingKPI || []
 
     return (
-      <div>
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '32px', color: 'var(--color-black)', margin: '0 0 4px 0' }}>
-            Hiệu Năng Hoạt Động Các Chi Nhánh
-          </h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px' }}>
-            Báo cáo chi tiết và giám sát hiệu suất phòng, công việc dọn dẹp theo từng chi nhánh
-          </p>
-        </div>
+      <div className="mgr-page">
+        <PageHeader
+          title="Hiệu năng hoạt động các chi nhánh"
+          subtitle="Báo cáo chi tiết và giám sát hiệu suất phòng, công việc dọn dẹp theo từng chi nhánh"
+          count={occupancyByBranch.length}
+        />
 
         {/* Branch Performance Table */}
         <div className="admin-card" style={{ marginBottom: '24px' }}>
@@ -191,58 +189,32 @@ const BranchDashboard = () => {
     : ''
 
   return (
-    <div>
-      {/* Back button and title */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px', flexWrap: 'wrap' }}>
-          <Link to="/admin/reports" className="admin-btn-icon" style={{ borderRadius: '50%' }} title="Quay lại danh sách">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-          </Link>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', color: 'var(--color-black)', margin: 0 }}>
-            Báo Cáo Chi Nhánh:
-          </h2>
+    <div className="mgr-page">
+      <Link to="/admin/reports" className="mgr-back">← Quay lại danh sách</Link>
+      <PageHeader
+        title="Báo cáo chi nhánh"
+        subtitle={branch.address ? `Địa chỉ: ${branch.address} · Điện thoại: ${branch.phone || branch.hotline || 'N/A'}` : undefined}
+        actions={
           <select
             value={branchId || ''}
             onChange={(e) => navigate(`/admin/reports/${e.target.value}`)}
             style={{
-              padding: '8px 32px 8px 16px',
-              fontSize: '16px',
-              fontWeight: '600',
-              borderRadius: '6px',
-              border: '1px solid var(--color-border)',
-              backgroundColor: 'var(--color-white)',
-              color: 'var(--color-charcoal)',
-              cursor: 'pointer',
-              fontFamily: 'Inter, sans-serif',
-              minWidth: '240px',
-              outline: 'none',
+              padding: '8px 32px 8px 16px', fontSize: '15px', fontWeight: '600',
+              borderRadius: '8px', border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-white)', color: 'var(--color-charcoal)',
+              cursor: 'pointer', minWidth: '240px', outline: 'none',
               boxShadow: 'var(--shadow-subtle)',
               backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'right 8px center',
-              backgroundSize: '16px',
-              WebkitAppearance: 'none',
-              MozAppearance: 'none',
-              appearance: 'none'
+              backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px',
+              WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none'
             }}
           >
             {branches.map(b => (
-              <option key={b._id} value={b._id}>
-                {b.name} ({b.code})
-              </option>
+              <option key={b._id} value={b._id}>{b.name} ({b.code})</option>
             ))}
           </select>
-          {branch.code && <span className="admin-badge admin-badge-role" style={{ height: 'fit-content' }}>{branch.code}</span>}
-        </div>
-        {branch.address && (
-          <p style={{ color: 'var(--color-light-gray)', margin: 0, fontSize: '14px', paddingLeft: '40px' }}>
-            Địa chỉ: {branch.address} | Điện thoại: {branch.phone || branch.hotline || 'N/A'}
-          </p>
-        )}
-      </div>
+        }
+      />
 
       {/* KPI Cards Grid */}
       <div className="admin-kpi-grid">
@@ -296,7 +268,7 @@ const BranchDashboard = () => {
       <div className="admin-charts-grid" style={{ gridTemplateColumns: '1fr' }}>
         <div className="admin-card">
           <div className="admin-card-header">
-            <h3 className="admin-card-title">Xu hình đặt phòng tại chi nhánh (6 tháng)</h3>
+            <h3 className="admin-card-title">Xu hướng đặt phòng tại chi nhánh (6 tháng)</h3>
           </div>
           {monthlyBookingTrend.length === 0 ? (
             <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-light-gray)' }}>

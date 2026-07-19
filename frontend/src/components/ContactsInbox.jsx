@@ -1,6 +1,7 @@
 // Owner: Quốc — hộp thư tin nhắn liên hệ (dùng chung lễ tân & QL). Phản hồi thủ công qua email (mailto).
 import { useEffect, useState, useCallback } from 'react'
 import { fmtDateTime as fmt } from '../utils/date'
+import PageHeader from './common/PageHeader'
 
 const S = {
   wrap: { maxWidth: 900 },
@@ -47,17 +48,20 @@ export default function ContactsInbox({ fetchList, onHandle, title = 'Hộp thư
   const newCount = list.filter((m) => m.status !== 'handled').length
 
   return (
-    <div style={S.wrap}>
-      <div style={S.bar}>
-        <h2 style={{ margin: 0 }}>{title}</h2>
-        {newCount > 0 && <span style={S.pill(false)}>{newCount} chưa xử lý</span>}
-        <span style={{ flex: 1 }} />
-        <select style={S.select} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Tất cả</option>
-          <option value="new">Chưa xử lý</option>
-          <option value="handled">Đã xử lý</option>
-        </select>
-      </div>
+    <div className="mgr-page" style={S.wrap}>
+      <PageHeader
+        title={title}
+        subtitle="Tin nhắn khách gửi từ trang Liên hệ — phản hồi qua email"
+        count={list.length}
+        actions={
+          <select style={S.select} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">Tất cả</option>
+            <option value="new">Chưa xử lý</option>
+            <option value="handled">Đã xử lý</option>
+          </select>
+        }
+      />
+      {newCount > 0 && <div style={{ marginBottom: 14 }}><span style={S.pill(false)}>{newCount} tin chưa xử lý</span></div>}
 
       {err && <p style={S.err}>{err}</p>}
 

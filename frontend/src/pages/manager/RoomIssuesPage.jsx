@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, Select, Tag, message } from '
 import { PlusOutlined, CheckOutlined, CloseOutlined, SyncOutlined, EyeOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { fmtDateTime } from '../../utils/date'
+import PageHeader from '../../components/common/PageHeader'
 
 const STATUS_LABEL = { open: 'Chờ duyệt', maintaining: 'Đang bảo trì', fix_requested: 'Chờ xác nhận sửa', resolved: 'Đã khắc phục', cancelled: 'Đã hủy' }
 const SEV_LABEL = { high: 'Nghiêm trọng', medium: 'Trung bình', low: 'Thấp' }
@@ -139,6 +140,7 @@ export default function RoomIssuesPage() {
       title: 'Người báo cáo',
       dataIndex: ['reporter', 'email'],
       key: 'reporter',
+      ellipsis: true,
       render: (text) => text || 'Nhân viên dọn dẹp'
     },
     {
@@ -154,11 +156,13 @@ export default function RoomIssuesPage() {
     {
       title: 'Người sửa',
       key: 'fixedBy',
+      ellipsis: true,
       render: (_, r) => r.fixRequestedBy?.email || <span style={{ color: '#bbb' }}>—</span>
     },
     {
       title: 'Người xác nhận',
       key: 'confirmedBy',
+      ellipsis: true,
       render: (_, r) => {
         if (r.status === 'resolved') return r.resolvedBy?.email || '-'
         if (r.status === 'cancelled') return <span style={{ color: '#999' }}>{r.cancelledBy?.email || 'Đã hủy'}</span>
@@ -168,6 +172,7 @@ export default function RoomIssuesPage() {
     {
       title: 'Thao tác',
       key: 'actions',
+      width: 260,
       render: (_, record) => {
         const s = record.status
         return (
@@ -197,49 +202,43 @@ export default function RoomIssuesPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Nhật ký sự cố phòng & Sửa chữa</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Ghi nhận hư hỏng, theo dõi khắc phục kỹ thuật và giải tỏa trạng thái bảo trì phòng</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { createForm.resetFields(); setCreateModalVisible(true); }}>Báo sự cố thủ công</Button>
-      </div>
-
-      {/* Filter Row */}
-      <div className="rooms-filter-bar">
-        <div className="filter-group">
-          <div>
-            <span style={{ marginRight: 8, fontWeight: 500 }}>Trạng thái sự cố:</span>
-            <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 160 }} placeholder="Tất cả trạng thái">
-              <Select.Option value="">Tất cả trạng thái</Select.Option>
-              <Select.Option value="open">Chờ duyệt</Select.Option>
-              <Select.Option value="maintaining">Đang bảo trì</Select.Option>
-              <Select.Option value="fix_requested">Chờ xác nhận sửa</Select.Option>
-              <Select.Option value="resolved">Đã khắc phục</Select.Option>
-              <Select.Option value="cancelled">Đã hủy bỏ</Select.Option>
-            </Select>
-          </div>
-
-          <div>
-            <span style={{ marginRight: 8, fontWeight: 500 }}>Độ nghiêm trọng:</span>
-            <Select value={filterSeverity} onChange={setFilterSeverity} style={{ width: 160 }} placeholder="Tất cả mức độ">
-              <Select.Option value="">Tất cả mức độ</Select.Option>
-              <Select.Option value="low">Thấp (Low)</Select.Option>
-              <Select.Option value="medium">Trung bình (Medium)</Select.Option>
-              <Select.Option value="high">Cao (High)</Select.Option>
-            </Select>
-          </div>
-        </div>
-        <Button type="primary" icon={<SyncOutlined />} onClick={loadData}>Làm mới</Button>
-      </div>
-
-      <Table 
-        dataSource={issues} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
+    <div className="mgr-page">
+      <PageHeader
+        title="Nhật ký sự cố phòng"
+        subtitle="Ghi nhận hư hỏng, theo dõi khắc phục kỹ thuật và giải tỏa trạng thái bảo trì phòng"
+        count={issues.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={() => { createForm.resetFields(); setCreateModalVisible(true); }}>Báo sự cố thủ công</Button>}
       />
+
+      {/* Bộ lọc */}
+      <div className="mgr-toolbar">
+        <span className="mgr-toolbar-label">Trạng thái</span>
+        <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 170 }} placeholder="Tất cả trạng thái">
+          <Select.Option value="">Tất cả trạng thái</Select.Option>
+          <Select.Option value="open">Chờ duyệt</Select.Option>
+          <Select.Option value="maintaining">Đang bảo trì</Select.Option>
+          <Select.Option value="fix_requested">Chờ xác nhận sửa</Select.Option>
+          <Select.Option value="resolved">Đã khắc phục</Select.Option>
+          <Select.Option value="cancelled">Đã hủy bỏ</Select.Option>
+        </Select>
+        <span className="mgr-toolbar-label">Mức độ</span>
+        <Select value={filterSeverity} onChange={setFilterSeverity} style={{ width: 160 }} placeholder="Tất cả mức độ">
+          <Select.Option value="">Tất cả mức độ</Select.Option>
+          <Select.Option value="low">Thấp (Low)</Select.Option>
+          <Select.Option value="medium">Trung bình (Medium)</Select.Option>
+          <Select.Option value="high">Cao (High)</Select.Option>
+        </Select>
+        <Button className="spacer" icon={<SyncOutlined />} onClick={loadData}>Làm mới</Button>
+      </div>
+
+      <div className="mgr-card">
+        <Table
+          dataSource={issues}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+        />
+      </div>
 
       {/* CREATE MANUAL ISSUE MODAL */}
       <Modal

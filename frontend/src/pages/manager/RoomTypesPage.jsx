@@ -3,6 +3,7 @@ import { Table, Button, Space, Modal, Form, Input, InputNumber, Select, Tag, Swi
 import { PlusOutlined, EditOutlined, SettingOutlined, NumberOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
 import { vnd } from '../../services'
+import PageHeader from '../../components/common/PageHeader'
 
 export default function RoomTypesPage() {
   const [roomTypes, setRoomTypes] = useState([])
@@ -231,22 +232,23 @@ export default function RoomTypesPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Quản lý loại phòng</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Cấu hình danh mục loại phòng và tiện nghi đi kèm</p>
-        </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm loại phòng</Button>
-      </div>
-
-      <Table 
-        dataSource={roomTypes} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
-        pagination={{ pageSize: 10 }}
+    <div className="mgr-page">
+      <PageHeader
+        title="Quản lý loại phòng"
+        subtitle="Cấu hình danh mục loại phòng và tiện nghi đi kèm"
+        count={roomTypes.length}
+        actions={<Button type="primary" icon={<PlusOutlined />} onClick={startCreate}>Thêm loại phòng</Button>}
       />
+
+      <div className="mgr-card">
+        <Table
+          dataSource={roomTypes}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+          pagination={{ pageSize: 10 }}
+        />
+      </div>
 
       {/* CREATE / EDIT MODAL */}
       <Modal

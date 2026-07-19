@@ -319,10 +319,10 @@
 
 .admin-card {
   background-color: var(--color-white);
-  border-radius: 8px;
+  border-radius: 16px;
   padding: var(--space-6);
-  box-shadow: var(--shadow-raised);
-  border: 1px solid rgba(0, 0, 0, 0.03);
+  box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05);
+  border: 1px solid #ece4da;
 }
 
 .admin-card-header {
@@ -350,10 +350,10 @@
 .admin-table-wrapper {
   overflow-x: auto;
   background-color: var(--color-white);
-  border-radius: 8px;
-  box-shadow: var(--shadow-raised);
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(33, 28, 20, 0.05);
   margin-bottom: var(--space-8);
-  border: 1px solid rgba(0, 0, 0, 0.03);
+  border: 1px solid #ece4da;
 }
 
 .admin-table {
@@ -364,13 +364,13 @@
 }
 
 .admin-table th {
-  background-color: #fcfcfc;
-  color: var(--color-medium-gray);
-  font-weight: 600;
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 2px solid var(--color-border);
+  background-color: #fbf7f1;
+  color: #8c8378;
+  font-weight: 700;
+  padding: 14px var(--space-6);
+  border-bottom: 1px solid #ece4da;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.5px;
 }
 

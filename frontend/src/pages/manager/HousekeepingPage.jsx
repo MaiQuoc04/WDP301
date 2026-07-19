@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Table, Button, Space, Select, Tag, Switch, Modal, Form, Input, message, Alert } from 'antd'
 import { UserOutlined, WarningOutlined, AlertOutlined, SyncOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+import PageHeader from '../../components/common/PageHeader'
 
 export default function HousekeepingPage() {
   const [tasks, setTasks] = useState([])
@@ -138,6 +139,7 @@ export default function HousekeepingPage() {
       render: (status) => {
         const config = {
           pending: { color: 'default', text: 'Chờ xử lý' },
+          urgent: { color: 'warning', text: 'Chờ dọn (khẩn)' },
           in_progress: { color: 'processing', text: 'Đang dọn dẹp' },
           completed: { color: 'success', text: 'Hoàn thành' },
           missed: { color: 'error', text: 'Bỏ lỡ' }
@@ -177,30 +179,34 @@ export default function HousekeepingPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Giám sát hoạt động buồng phòng</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Điều phối công việc dọn dẹp phòng, chỉ định nhân viên và kiểm soát chất lượng</p>
-        </div>
-        <Space>
-          <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 160 }} placeholder="Lọc trạng thái">
-            <Select.Option value="">Tất cả trạng thái</Select.Option>
-            <Select.Option value="pending">Chờ xử lý (Pending)</Select.Option>
-            <Select.Option value="in_progress">Đang dọn dẹp (In Progress)</Select.Option>
-            <Select.Option value="completed">Đã hoàn thành (Completed)</Select.Option>
-            <Select.Option value="missed">Bỏ lỡ (Missed)</Select.Option>
-          </Select>
-          <Button type="primary" icon={<SyncOutlined />} onClick={loadData}>Làm mới</Button>
-        </Space>
+    <div className="mgr-page">
+      <PageHeader
+        title="Giám sát buồng phòng"
+        subtitle="Điều phối công việc dọn dẹp phòng, chỉ định nhân viên và kiểm soát chất lượng"
+        count={tasks.length}
+      />
+
+      {/* Bộ lọc */}
+      <div className="mgr-toolbar">
+        <span className="mgr-toolbar-label">Trạng thái</span>
+        <Select value={filterStatus} onChange={setFilterStatus} style={{ width: 200 }} placeholder="Lọc trạng thái">
+          <Select.Option value="">Tất cả trạng thái</Select.Option>
+          <Select.Option value="pending">Chờ xử lý (Pending)</Select.Option>
+          <Select.Option value="in_progress">Đang dọn dẹp (In Progress)</Select.Option>
+          <Select.Option value="completed">Đã hoàn thành (Completed)</Select.Option>
+          <Select.Option value="missed">Bỏ lỡ (Missed)</Select.Option>
+        </Select>
+        <Button className="spacer" icon={<SyncOutlined />} onClick={loadData}>Làm mới</Button>
       </div>
 
-      <Table 
-        dataSource={tasks} 
-        columns={columns} 
-        rowKey="_id" 
-        loading={loading}
-      />
+      <div className="mgr-card">
+        <Table
+          dataSource={tasks}
+          columns={columns}
+          rowKey="_id"
+          loading={loading}
+        />
+      </div>
 
       {/* REPORT ISSUE FROM TASK MODAL */}
       <Modal

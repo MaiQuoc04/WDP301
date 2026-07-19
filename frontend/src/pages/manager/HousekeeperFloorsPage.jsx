@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Table, Select, Alert, Tag, Button, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { roomService } from '../../services/roomService'
+import PageHeader from '../../components/common/PageHeader'
 
 // Branch manager phân tầng phụ trách cho từng housekeeper — lễ tân giao việc theo tầng.
 export default function HousekeeperFloorsPage() {
@@ -62,25 +63,26 @@ export default function HousekeeperFloorsPage() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Phân tầng buồng phòng</h2>
-          <p style={{ color: 'var(--color-light-gray)', margin: 0 }}>Gán tầng phụ trách cho từng housekeeper — lễ tân giao việc ưu tiên theo tầng</p>
-        </div>
-        <Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>
-      </div>
+    <div className="mgr-page">
+      <PageHeader
+        title="Phân tầng buồng phòng"
+        subtitle="Gán tầng phụ trách cho từng housekeeper — lễ tân giao việc ưu tiên theo tầng"
+        count={rows.length}
+        actions={<Button icon={<ReloadOutlined />} onClick={load}>Làm mới</Button>}
+      />
 
       {unset.length > 0 && (
         <Alert
-          type="warning" showIcon style={{ marginBottom: 16 }}
+          type="warning" showIcon style={{ marginBottom: 16, borderRadius: 12 }}
           message={`Có ${unset.length} nhân viên chưa được phân tầng`}
           description="Nhân viên chưa phân tầng sẽ bị xếp cuối khi lễ tân giao việc. Hãy gán tầng cho họ."
         />
       )}
 
-      <Table rowKey={(r) => r.account._id} loading={loading} dataSource={rows} columns={columns} pagination={false}
-        locale={{ emptyText: 'Chi nhánh chưa có nhân viên buồng phòng' }} />
+      <div className="mgr-card">
+        <Table rowKey={(r) => r.account._id} loading={loading} dataSource={rows} columns={columns} pagination={false}
+          locale={{ emptyText: 'Chi nhánh chưa có nhân viên buồng phòng' }} />
+      </div>
     </div>
   )
 }
