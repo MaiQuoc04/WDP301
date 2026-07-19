@@ -890,9 +890,14 @@ exports.checkOutGroup = async (groupId, { by, method = 'cash', skipPayment = fal
   return { done: members.length, skipped, collected: totalRemaining }
 }
 
-// Gộp trạng thái nhóm từ các phòng (rollup, chỉ để hiển thị)
+// Gộp trạng thái nhóm từ các phòng (rollup, chỉ để hiển thị).
+// Phòng ĐÃ ĐỔI ĐI (transferredOut) không quyết trạng thái hiện tại của nhóm — chúng chỉ là
+// chặng đã kết thúc. Xét trên phòng "sống" (chưa đổi đi); nếu không còn phòng sống nào thì mới
+// rơi về xét cả phòng đã đổi để không trả nhầm 'pending'.
 function rollupGroupStatus(members) {
-  const active = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))
+  const notDead = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))
+  const live = notDead.filter((b) => !b.transferredOut)
+  const active = live.length ? live : notDead
   if (!active.length) {
     if (!members.length) return 'pending'
     return members.every((b) => b.status === 'no_show') ? 'no_show' : 'cancelled'
@@ -912,19 +917,24 @@ exports.rollupGroupStatus = rollupGroupStatus
 // (receptionService.listBookings), nên đổi status sẽ làm nhóm hỗn hợp BIẾN MẤT khỏi mọi bộ lọc.
 // Giữ status = pha chính (để lọc/sắp xếp vẫn chạy) + cờ mixed & breakdown để hiện nhãn cảnh báo.
 function groupRollup(members) {
+  // TIỀN: cộng mọi phòng còn hiệu lực, KỂ CẢ phòng đã đổi đi (đêm đã ngủ trước khi đổi vẫn phải thu).
   const active = members.filter((b) => !['cancelled', 'no_show'].includes(b.status))
   const sum = (k) => active.reduce((s, b) => s + (b[k] || 0), 0)
   const totalAmount = sum('totalAmount'), paidAmount = sum('paidAmount'), remainingAmount = sum('remainingAmount')
   const paymentStatus = remainingAmount <= 0 && paidAmount > 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'unpaid'
-  // Đếm theo trạng thái, tính cả huỷ/no-show để lễ tân thấy đủ bức tranh khi nhóm bị lệch.
+  // TRẠNG THÁI / ĐẾM / HỖN HỢP: chỉ xét phòng "nhìn thấy" (ẩn phòng đã đổi đi) — đổi phòng không
+  // được làm nhóm thành "hỗn hợp" hay phồng số phòng. 'live' = phòng đang còn hiệu lực thật sự.
+  const visible = members.filter((b) => !b.transferredOut)
+  const live = active.filter((b) => !b.transferredOut)
   const counts = {}
-  members.forEach((b) => { counts[b.status] = (counts[b.status] || 0) + 1 })
+  visible.forEach((b) => { counts[b.status] = (counts[b.status] || 0) + 1 }) // vẫn tính huỷ/no-show cho lễ tân thấy
   const breakdown = Object.entries(counts).map(([status, count]) => ({ status, count }))
   return {
     status: rollupGroupStatus(members),
-    mixed: new Set(active.map((b) => b.status)).size > 1,
+    mixed: new Set(live.map((b) => b.status)).size > 1,
     breakdown,
-    roomCount: members.length, activeCount: active.length,
+    roomCount: visible.length, activeCount: live.length,
+    transferredCount: members.length - visible.length,   // số phòng đã đổi đi (hiện riêng)
     totalAmount, paidAmount, remainingAmount, paymentStatus,
     depositAmount: sum('depositAmount'),
   }
@@ -1291,7 +1301,11 @@ async function _transferSetup(groupId, items) {
   const current = await Booking.find({ group: groupId, status: 'checked_in' }).populate('room')
   if (!current.length) throw new Error('Nhóm không có phòng nào đang ở để đổi')
 
-  const boundary = startOfDay(new Date())                       // mốc cắt = hôm nay (tính đêm theo DATE)
+  // Mốc cắt = hôm nay, nhưng KHÔNG sớm hơn ngày khách bắt đầu ở. Nếu nhóm đang ở mà
+  // ngày nhận lại trong tương lai (dữ liệu lệch / nhận sớm), cắt tại hôm nay sẽ tính dư
+  // đêm khách chưa ở. Kẹp về ngày nhận sớm nhất của nhóm để chặng còn lại = đúng số đêm thật.
+  const groupCheckIn = current.reduce((min, b) => (b.checkIn < min ? b.checkIn : min), current[0].checkIn)
+  const boundary = startOfDay(new Date()) < startOfDay(groupCheckIn) ? startOfDay(groupCheckIn) : startOfDay(new Date())
   const checkOut = current[0].checkOut
   if (nightsBetween(boundary, checkOut) < 1) throw new Error('Khách trả phòng trong hôm nay — dùng Trả phòng, không đổi phòng')
 
@@ -1377,9 +1391,31 @@ exports.previewTransferGroup = async (groupId, { items } = {}) => {
     rooms.push({ roomNumber: room.roomNumber, kind: 'added', total: c.totalAmount })
   }
   const remaining = total - paid
+
+  // Gợi ý người dọn cho phòng BỎ (giống previewCheckOutGroup) — lễ tân đổi tay được.
+  // Preview chưa biết phòng nào 'clean'/'available' nên gợi ý cho TẤT CẢ phòng bỏ; FE chỉ
+  // hiện dropdown ở phòng đang chọn "Giao dọn".
+  const hk = require('./housekeepingService')
+  const pool = await hk.suggestHousekeepers(s.branch._id, null)
+  const nameById = Object.fromEntries(pool.map((h) => [String(h.accountId), h.fullName || h.email]))
+  const dropAssign = s.droppedMembers.length
+    ? (await autoAssignHousekeepers(s.branch._id, s.droppedMembers.map((b) => ({
+        bookingId: b._id, roomId: b.room._id, floor: b.room.floor,
+      }))) || {})
+    : {}
+
   return {
     kept: s.keptIds.size, dropped: s.droppedMembers.length, added: s.addedRooms.length,
-    droppedRooms: s.droppedMembers.map((b) => ({ bookingId: b._id, roomNumber: b.room.roomNumber })),
+    droppedRooms: s.droppedMembers.map((b) => ({
+      bookingId: b._id, roomNumber: b.room.roomNumber,
+      housekeeperId: dropAssign[String(b._id)] || null,               // điền sẵn dropdown FE
+      housekeeper: nameById[String(dropAssign[String(b._id)])] || null,
+    })),
+    canAssign: pool.length > 0,   // false = chi nhánh chưa có HK -> task tạo ra không có người
+    housekeepers: pool.map((h) => ({
+      accountId: h.accountId, name: h.fullName || h.email, floors: h.floors,
+      activeTasks: h.activeTasks, onFloor: h.onFloor,
+    })),
     newTotal: total, paid, remaining,
     collectMore: remaining > 0 ? remaining : 0,   // dương = còn thu thêm lúc trả phòng
     refundDue: remaining < 0 ? -remaining : 0,    // âm = cần hoàn khách
@@ -1388,7 +1424,8 @@ exports.previewTransferGroup = async (groupId, { items } = {}) => {
 
 // items: [{ roomId }]  — dàn phòng mới (số khách backend tự chia).
 // vacate: { [bookingId]: 'clean' | 'available' } — cách xử phòng BỎ (mặc định 'clean' để có kiểm kê bắt đồ hỏng).
-exports.transferGroup = async (groupId, { items, vacate = {}, by } = {}) => {
+// assignees: { [bookingId]: housekeeperAccountId } — lễ tân đổi tay người dọn phòng BỎ (giống checkOutGroup).
+exports.transferGroup = async (groupId, { items, vacate = {}, assignees = {}, by } = {}) => {
   const { group, branch, current, boundary, checkOut, allocByRoom, curByRoom, keptIds, droppedMembers, addedRooms } = await _transferSetup(groupId, items)
 
   // Khoá tiền chặng ĐÃ NGỦ của 1 member (từ segmentStart tới hôm nay).
@@ -1415,6 +1452,13 @@ exports.transferGroup = async (groupId, { items, vacate = {}, by } = {}) => {
     assign = await autoAssignHousekeepers(branch._id, toClean.map((b) => ({
       bookingId: b._id, roomId: b.room._id, floor: b.room.floor,
     }))) || {}
+    // Ghi đè người dọn lễ tân chọn tay: validate thuộc chi nhánh, phòng phải nằm trong nhóm giao dọn.
+    for (const [bookingId, hkId] of Object.entries(assignees || {})) {
+      if (!hkId) continue
+      if (!toClean.some((b) => String(b._id) === String(bookingId))) continue
+      await hk.assertHousekeeperInBranch(hkId, branch._id)
+      assign[String(bookingId)] = hkId
+    }
   }
 
   const result = await runInTransaction(async (session) => {
@@ -1439,6 +1483,8 @@ exports.transferGroup = async (groupId, { items, vacate = {}, by } = {}) => {
       await lockPast(b)
       b.roomCharge = 0; b.bedSurcharge = 0
       b.status = 'checked_out'
+      b.transferredOut = true                 // đổi đi, không phải trả phòng thật -> rollup xử riêng
+      b.transferredAt = new Date()
       recalcBill(b)
       await b.save({ session })
       const mode = vacate[String(b._id)] || 'clean'

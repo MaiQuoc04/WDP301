@@ -457,6 +457,14 @@
 .s-cancelled, .s-no_show { background: #FEE2E2; color: #B91C1C; }
 /* Nhóm lệch pha: các phòng không cùng trạng thái. Màu riêng để không lẫn với bất kỳ pha nào. */
 .s-mixed { background: #EDE9FE; color: #6D28D9; }
+/* Phòng đã đổi đi (transferredOut): xám-lam, khác hẳn "đã trả phòng" để không nhầm là checkout thật. */
+.s-transferred { background: #E0F2FE; color: #0369A1; }
+
+/* Khối "Đã đổi phòng" ở cuối chi tiết nhóm — phụ, làm mờ để tách khỏi phòng đang ở. */
+.rc-transferred { margin-top: 18px; }
+.rc-transferred h4 { margin: 0 0 8px; font-size: 14px; color: var(--rc-text-main); }
+.rc-transferred .rc-table { opacity: .82; }
+.rc-table tbody tr.rc-row-muted td { background: #FafafA; color: #64748B; }
 
 /* Nhãn nhỏ "N phòng" trong danh sách nhóm — viền vàng chữ vàng, KHÔNG nền vàng đặc:
    nền đặc làm nó nặng ngang mã booking, trong khi nó chỉ là chú thích của mã. */
@@ -1171,11 +1179,17 @@
 }
 
 /* ── Đổi phòng (TransferModal) ── */
+.rc-vacate-item { padding: 8px 0; border-bottom: 1px dashed var(--rc-border, #e6e0d4); }
+.rc-vacate-item:last-of-type { border-bottom: 0; }
 .rc-vacate-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 8px 0;
 }
+.rc-vacate-item .rc-vacate-row { padding: 0; }
 .rc-vacate-row .rc-seg { min-width: 200px; }
+/* Dropdown người dọn của phòng giao dọn */
+.rc-vacate-hk { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.rc-vacate-hk label { flex: 0 0 auto; font-size: 12px; }
+.rc-vacate-hk .rc-hk-pick { flex: 1 1 auto; }
 /* Bảng xem trước tiền khi đổi phòng */
 .rc-xfer-preview {
   margin-top: 14px; padding: 14px 16px;
