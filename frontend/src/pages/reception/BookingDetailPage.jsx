@@ -703,8 +703,25 @@ export default function BookingDetailPage() {
             <h4>Dịch vụ {b.services.length > 0 && `· đã thêm ${b.services.length}`}</h4>
             {b.services.length > 0 && (
               <ul className="rc-lines">
-                {b.services.map((s) => <li key={s._id}>{s.name} ×{s.quantity} = {vnd(s.price * s.quantity)}
-                  <button className="link" onClick={() => act(() => bookingService.removeService(id, s._id), 'Đã xoá')}>✕</button></li>)}
+                {b.services.map((s) => {
+                  const delivered = s.status === 'delivered'
+                  return (
+                    <li key={s._id} className="rc-line">
+                      <span className="rc-line-name">{s.name}</span>
+                      {delivered ? (
+                        <span className="rc-badge s-completed" style={{ padding: '1px 8px', fontSize: 11 }}>đã giao ×{s.quantity}</span>
+                      ) : (
+                        <span className="rc-qty">
+                          <button type="button" className="rc-qty-btn" title="Bớt 1" onClick={() => act(() => bookingService.adjustService(id, s._id, -1), 'Đã cập nhật')}>−</button>
+                          <b>×{s.quantity}</b>
+                          <button type="button" className="rc-qty-btn" title="Thêm 1" onClick={() => act(() => bookingService.adjustService(id, s._id, 1), 'Đã cập nhật')}>+</button>
+                        </span>
+                      )}
+                      <span className="rc-line-sum">{vnd(s.price * s.quantity)}</span>
+                      <button className="link" title="Xoá dòng" onClick={() => act(() => bookingService.removeService(id, s._id), 'Đã xoá')}>✕</button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
             <div className="rc-picker">
@@ -719,8 +736,18 @@ export default function BookingDetailPage() {
             <h4>Thiết bị thiếu {b.missingAmenities.length > 0 && `· đã ghi ${b.missingAmenities.length}`}</h4>
             {b.missingAmenities.length > 0 && (
               <ul className="rc-lines">
-                {b.missingAmenities.map((a) => <li key={a._id}>{a.name} ×{a.quantity} = {vnd(a.price * a.quantity)}
-                  <button className="link" onClick={() => act(() => bookingService.removeMissingAmenity(id, a._id), 'Đã xoá')}>✕</button></li>)}
+                {b.missingAmenities.map((a) => (
+                  <li key={a._id} className="rc-line">
+                    <span className="rc-line-name">{a.name}</span>
+                    <span className="rc-qty">
+                      <button type="button" className="rc-qty-btn" title="Bớt 1" onClick={() => act(() => bookingService.adjustMissingAmenity(id, a._id, -1), 'Đã cập nhật')}>−</button>
+                      <b>×{a.quantity}</b>
+                      <button type="button" className="rc-qty-btn" title="Thêm 1" onClick={() => act(() => bookingService.adjustMissingAmenity(id, a._id, 1), 'Đã cập nhật')}>+</button>
+                    </span>
+                    <span className="rc-line-sum">{vnd(a.price * a.quantity)}</span>
+                    <button className="link" title="Xoá dòng" onClick={() => act(() => bookingService.removeMissingAmenity(id, a._id), 'Đã xoá')}>✕</button>
+                  </li>
+                ))}
               </ul>
             )}
             <div className="rc-picker">

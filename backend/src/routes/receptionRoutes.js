@@ -48,6 +48,7 @@ router.get('/bookings/:id/bill', validateObjectId('id'), c.getBill)             
 router.post('/bookings/:id/services', validateObjectId('id'), c.addService)                                  // UC-32
 router.delete('/bookings/:id/services/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeService)
 router.patch('/bookings/:id/services/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.setServiceDelivered) // toggle đã giao
+router.patch('/bookings/:id/services/:lineId/quantity', validateObjectId('id'), validateObjectId('lineId'), c.adjustService) // UC-32 ±số lượng
 router.get('/service-board', c.serviceBoard)                                                                 // bảng triển khai dịch vụ theo phòng
 
 // Housekeeping — lễ tân yêu cầu kiểm tra / dọn phòng + xem trạng thái
@@ -57,6 +58,7 @@ router.get('/bookings/:id/housekeeping', validateObjectId('id'), c.getBookingHou
 router.get('/bookings/:id/housekeepers', validateObjectId('id'), c.getHousekeeperSuggestions)  // gợi ý housekeeper để giao việc
 router.post('/bookings/:id/missing-amenities', validateObjectId('id'), c.addMissingAmenity)                  // UC-33
 router.delete('/bookings/:id/missing-amenities/:lineId', validateObjectId('id'), validateObjectId('lineId'), c.removeMissingAmenity)
+router.patch('/bookings/:id/missing-amenities/:lineId/quantity', validateObjectId('id'), validateObjectId('lineId'), c.adjustMissingAmenity)
 
 // Giai đoạn 4 — huỷ / no-show
 router.post('/bookings/:id/cancel', validateObjectId('id'), c.cancel)       // UC-35 huỷ trước check-in

@@ -356,6 +356,10 @@ exports.removeService = async (accountId, bookingId, lineId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.removeExtraService(bookingId, lineId, accountId)
 }
+exports.adjustService = async (accountId, bookingId, lineId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.adjustExtraService(bookingId, lineId, body.delta, accountId)
+}
 exports.addMissingAmenity = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.addMissingAmenity(bookingId, body.amenityId, body.quantity, accountId)
@@ -363,6 +367,10 @@ exports.addMissingAmenity = async (accountId, bookingId, body = {}) => {
 exports.removeMissingAmenity = async (accountId, bookingId, lineId) => {
   await assertInBranch(accountId, bookingId)
   return bookingService.removeMissingAmenity(bookingId, lineId, accountId)
+}
+exports.adjustMissingAmenity = async (accountId, bookingId, lineId, body = {}) => {
+  await assertInBranch(accountId, bookingId)
+  return bookingService.adjustMissingAmenity(bookingId, lineId, body.delta, accountId)
 }
 exports.getBill = async (accountId, bookingId) => {
   await assertInBranch(accountId, bookingId)
