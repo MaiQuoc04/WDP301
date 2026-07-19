@@ -444,6 +444,84 @@ function DepositQRModal({ bookingId, depositAmount, totalAmount, onClose, onSucc
   )
 }
 
+/* ─── Modal chỉnh sửa booking (UC Update Booking) ─────────────────
+   Nối vào API updateBooking (PATCH /bookings/:id) vốn đã có nhưng chưa có nút bấm.
+   Khách có tài khoản: tên & SĐT lấy từ hồ sơ -> khoá, chỉ sửa số khách / ghi chú.
+   Đổi số khách -> backend tính lại phụ phí giường phụ + bill. */
+function EditBookingModal({ booking, onSave, onClose }) {
+  const registered = !!booking.customer
+  const [guestName, setGuestName] = useState(booking.guestName || booking.customer?.fullName || '')
+  const [guestPhone, setGuestPhone] = useState(booking.guestPhone || '')
+  const [adults, setAdults] = useState(booking.adults ?? 1)
+  const [children, setChildren] = useState(booking.children ?? 0)
+  const [notes, setNotes] = useState(booking.notes || '')
+  const [saving, setSaving] = useState(false)
+  const [localErr, setLocalErr] = useState('')
+
+  const A = Number(adults), C = Number(children)
+  const invalid = !Number.isInteger(A) || A < 1 || !Number.isInteger(C) || C < 0 ||
+    (!registered && !guestName.trim())
+
+  const submit = async () => {
+    if (invalid) return
+    setSaving(true); setLocalErr('')
+    try {
+      const payload = { adults: A, children: C, notes: notes.trim() }
+      if (!registered) { payload.guestName = guestName.trim(); payload.guestPhone = guestPhone.trim() }
+      await onSave(payload)   // thành công -> modal unmount
+    } catch (e) {
+      setLocalErr(e.response?.data?.message || 'Lỗi cập nhật')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rc-modal-overlay" onClick={onClose}>
+      <div className="rc-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ color: 'var(--rc-text-main)' }}>Chỉnh sửa booking</h3>
+        <p className="rc-modal-hint">Sửa thông tin khách và số người. Đổi số khách sẽ tính lại phụ phí giường phụ.</p>
+
+        <div className="rc-edit-form">
+          <label>
+            <span>Tên khách</span>
+            <input value={guestName} disabled={registered}
+              onChange={(e) => setGuestName(e.target.value)} placeholder="Tên khách" />
+          </label>
+          <label>
+            <span>Số điện thoại</span>
+            <input value={guestPhone} disabled={registered}
+              onChange={(e) => setGuestPhone(e.target.value)} placeholder="SĐT liên hệ" />
+          </label>
+          <div className="rc-edit-row">
+            <label>
+              <span>Người lớn</span>
+              <input type="number" min={1} value={adults} onChange={(e) => setAdults(e.target.value)} />
+            </label>
+            <label>
+              <span>Trẻ em</span>
+              <input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} />
+            </label>
+          </div>
+          <label>
+            <span>Ghi chú</span>
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ghi chú nội bộ (không bắt buộc)" />
+          </label>
+        </div>
+
+        {registered && <p className="rc-modal-hint">Khách có tài khoản — tên &amp; SĐT lấy từ hồ sơ, không sửa tại đây.</p>}
+        {localErr && <p className="rc-err" style={{ marginTop: 10 }}>{localErr}</p>}
+
+        <div className="rc-modal-actions">
+          <button className="link" onClick={onClose}>Huỷ</button>
+          <button className="primary" disabled={saving || invalid} onClick={submit}>
+            {saving ? 'Đang lưu…' : 'Lưu'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Main Page ─────────────────────────────────────────────────── */
 export default function BookingDetailPage() {
   const { id } = useParams()
@@ -460,6 +538,7 @@ export default function BookingDetailPage() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
   const [showDepositQRModal, setShowDepositQRModal] = useState(false)
   const [hoursFor, setHoursFor] = useState(null)   // 'early' | 'late'
+  const [editOpen, setEditOpen] = useState(false)  // modal chỉnh sửa booking
 
   const reload = useCallback(async () => {
     setErr('')
@@ -496,10 +575,18 @@ export default function BookingDetailPage() {
     catch (e) { setErr(e.response?.data?.message || 'Lỗi') }
   }
 
+  // Lưu chỉnh sửa booking. Ném lỗi ra ngoài để modal tự hiện (giữ modal mở khi lỗi).
+  const saveEdit = async (payload) => {
+    await bookingService.update(id, payload)
+    setEditOpen(false); setErr(''); setMsg('Đã cập nhật booking')
+    await reload()
+  }
+
   if (!d) return <p>{err || 'Đang tải...'}</p>
   const b = d.booking
   const st = b.status
   const editable = ['confirmed', 'checked_in'].includes(st)
+  const canEditInfo = ['pending', 'confirmed', 'checked_in'].includes(st) // updateBooking cho phép trước check-out
 
   // Mở picker chọn housekeeper để giao việc (inspection / cleaning)
   const openPicker = async (type) => {
@@ -642,7 +729,10 @@ export default function BookingDetailPage() {
 
       <div className="rc-cols">
         <section>
-          <h3>Thông tin</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <h3 style={{ margin: 0 }}>Thông tin</h3>
+            {canEditInfo && <button className="link" onClick={() => setEditOpen(true)}>✎ Chỉnh sửa</button>}
+          </div>
           <p>Khách: <b>{b.customer?.fullName || b.guestName}</b>{b.guestPhone && ` · ${b.guestPhone}`}</p>
           <p>Loại phòng: {b.roomType?.name} · Phòng: {b.room?.roomNumber || '— (gán khi check-in)'}</p>
           <p>Nhận {fmtDateTime(b.checkIn)} → Trả {fmtDateTime(b.checkOut)}</p>
@@ -834,6 +924,10 @@ export default function BookingDetailPage() {
           onSuccess={(m) => { setMsg(m); setShowDepositQRModal(false); reload() }}
           onError={(e) => { setErr(e); setShowDepositQRModal(false) }}
         />
+      )}
+
+      {editOpen && (
+        <EditBookingModal booking={b} onSave={saveEdit} onClose={() => setEditOpen(false)} />
       )}
     </div>
   )
