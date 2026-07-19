@@ -49,6 +49,11 @@ const bookingSchema = new mongoose.Schema({
   roomChargeLocked:      { type: Number, default: 0 },      // Σ tiền phòng các chặng đã qua
   bedSurchargeLocked:    { type: Number, default: 0 },      // Σ phụ phí giường phụ các chặng đã qua
   roomSegmentStart:      { type: Date },                    // mốc bắt đầu chặng hiện tại (null = checkIn)
+  // Phòng bị ĐỔI ĐI (không phải trả phòng thật): status='checked_out' nhưng đây là 1 chặng đã kết
+  // thúc do đổi phòng. TIỀN vẫn tính (đêm đã ngủ đã khoá), nhưng KHÔNG đếm là phòng đang ở / không
+  // gây "hỗn hợp" ở rollup — chỉ hiện riêng để lễ tân biết booking nào đã đổi.
+  transferredOut:        { type: Boolean, default: false },
+  transferredAt:         { type: Date },
   // Phí giờ: nhận sớm / trả muộn — 10% giá đêm/giờ; trả muộn quá 18:00 -> tính 1 đêm (lateFullNight)
   earlyHours:            { type: Number, default: 0 },
   lateHours:             { type: Number, default: 0 },

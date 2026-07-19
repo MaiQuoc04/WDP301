@@ -24,6 +24,7 @@ export default function TransferModal({ groupId, group, currentMembers, onClose,
   const [avail, setAvail] = useState([])
   const [picked, setPicked] = useState(() => new Set(curRooms.map((r) => r.roomId))) // giữ hết ban đầu
   const [vacate, setVacate] = useState({})   // bookingId -> 'clean' | 'available'
+  const [hkPick, setHkPick] = useState({})   // bookingId -> housekeeperId (đè gợi ý người dọn)
   const [preview, setPreview] = useState(null)
   const [pvErr, setPvErr] = useState('')
   const [loadingRooms, setLoadingRooms] = useState(true)
@@ -57,6 +58,21 @@ export default function TransferModal({ groupId, group, currentMembers, onClose,
   // Phòng đang ở bị BỎ tick = rời đi -> cần quyết giao dọn / để trống.
   const droppedCur = curRooms.filter((r) => !picked.has(r.roomId))
 
+  // Người dọn: pool HK của chi nhánh + gợi ý auto mỗi phòng bỏ (từ preview). Lễ tân đổi tay được.
+  const hkPool = preview?.housekeepers || []
+  const suggById = useMemo(
+    () => Object.fromEntries((preview?.droppedRooms || []).map((d) => [String(d.bookingId), d.housekeeperId ? String(d.housekeeperId) : ''])),
+    [preview],
+  )
+  const isClean = (bookingId) => (vacate[bookingId] || 'clean') === 'clean'
+  const hkOf = (bookingId) => (hkPick[bookingId] !== undefined ? hkPick[bookingId] : (suggById[bookingId] || ''))
+  // Tải việc hiển thị = việc đang có + số phòng bỏ (đang giao dọn) mà lễ tân dồn cho người này.
+  const loadOf = (accountId) => {
+    const base = hkPool.find((h) => String(h.accountId) === String(accountId))?.activeTasks || 0
+    const extra = droppedCur.filter((r) => isClean(r.bookingId) && String(hkOf(r.bookingId)) === String(accountId)).length
+    return base + extra
+  }
+
   // Gọi preview mỗi khi đổi lựa chọn (gộp nhiều tick liên tiếp).
   useEffect(() => {
     if (!picked.size) { setPreview(null); setPvErr('Chọn ít nhất 1 phòng'); return }
@@ -76,7 +92,10 @@ export default function TransferModal({ groupId, group, currentMembers, onClose,
     try {
       const items = [...picked].map((roomId) => ({ roomId }))
       const vac = Object.fromEntries(droppedCur.map((r) => [r.bookingId, vacate[r.bookingId] || 'clean']))
-      const res = await bookingService.transferGroup(groupId, { items, vacate: vac })
+      // Người dọn chỉ gửi cho phòng GIAO DỌN; bỏ trống = không cần. Rỗng thì backend tự phân.
+      const assignees = {}
+      droppedCur.forEach((r) => { if (isClean(r.bookingId) && hkOf(r.bookingId)) assignees[r.bookingId] = hkOf(r.bookingId) })
+      const res = await bookingService.transferGroup(groupId, { items, vacate: vac, assignees })
       onDone(res.data || res)
     } catch (e) {
       onError(e.response?.data?.message || 'Lỗi đổi phòng')
@@ -125,17 +144,41 @@ export default function TransferModal({ groupId, group, currentMembers, onClose,
         {droppedCur.length > 0 && (
           <div style={{ marginTop: 14 }}>
             <p className="payos-section-label">Phòng rời đi — xử lý dọn dẹp</p>
-            {droppedCur.map((r) => (
-              <div key={r.bookingId} className="rc-vacate-row">
-                <span><b>{r.roomNumber}</b> <small className="rc-muted">{r.roomTypeName}</small></span>
-                <div className="rc-seg" style={{ margin: 0, flex: '0 0 auto' }}>
-                  <button className={'rc-seg-btn' + ((vacate[r.bookingId] || 'clean') === 'clean' ? ' on' : '')}
-                    onClick={() => setVacate((v) => ({ ...v, [r.bookingId]: 'clean' }))}>Giao dọn</button>
-                  <button className={'rc-seg-btn' + (vacate[r.bookingId] === 'available' ? ' on' : '')}
-                    onClick={() => setVacate((v) => ({ ...v, [r.bookingId]: 'available' }))}>Để trống ngay</button>
+            {droppedCur.map((r) => {
+              const clean = isClean(r.bookingId)
+              const cur = hkOf(r.bookingId)
+              const changed = String(cur) !== String(suggById[r.bookingId] || '')
+              return (
+                <div key={r.bookingId} className="rc-vacate-item">
+                  <div className="rc-vacate-row">
+                    <span><b>{r.roomNumber}</b> <small className="rc-muted">{r.roomTypeName}</small></span>
+                    <div className="rc-seg" style={{ margin: 0, flex: '0 0 auto' }}>
+                      <button className={'rc-seg-btn' + (clean ? ' on' : '')}
+                        onClick={() => setVacate((v) => ({ ...v, [r.bookingId]: 'clean' }))}>Giao dọn</button>
+                      <button className={'rc-seg-btn' + (vacate[r.bookingId] === 'available' ? ' on' : '')}
+                        onClick={() => setVacate((v) => ({ ...v, [r.bookingId]: 'available' }))}>Để trống ngay</button>
+                    </div>
+                  </div>
+                  {clean && hkPool.length > 0 && (
+                    <div className="rc-vacate-hk">
+                      <label className="rc-muted">Người dọn</label>
+                      <select className={'rc-hk-pick' + (changed ? ' changed' : '')} value={cur}
+                        onChange={(e) => setHkPick((p) => ({ ...p, [r.bookingId]: e.target.value }))}>
+                        {!suggById[r.bookingId] && <option value="">— chưa xác định —</option>}
+                        {hkPool.map((h) => (
+                          <option key={h.accountId} value={String(h.accountId)}>
+                            {h.name} · {loadOf(h.accountId)} việc{h.floors?.length ? ` · T${h.floors.join(',')}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {clean && hkPool.length === 0 && (
+                    <p className="rc-hint" style={{ margin: '4px 0 0' }}>Chi nhánh chưa có nhân viên buồng phòng — task dọn sẽ chờ phân sau.</p>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
             <p className="rc-hint">Giao dọn = nhân viên buồng phòng kiểm kê (bắt đồ khách làm hỏng). Để trống = mở bán ngay, không kiểm kê.</p>
           </div>
         )}

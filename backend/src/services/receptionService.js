@@ -58,7 +58,7 @@ exports.listBookings = async (accountId, { status, date, q, view } = {}) => {
     .sort('-createdAt').lean()
   const members = await Booking.find({ group: { $in: groups.map((g) => g._id) } })
     .populate('room', 'roomNumber').populate('roomType', 'name')
-    .select('group status totalAmount paidAmount remainingAmount depositAmount room roomType')
+    .select('group status totalAmount paidAmount remainingAmount depositAmount room roomType transferredOut')
     .lean()
   const byGroup = {}
   members.forEach((m) => { (byGroup[String(m.group)] = byGroup[String(m.group)] || []).push(m) })
@@ -70,8 +70,9 @@ exports.listBookings = async (accountId, { status, date, q, view } = {}) => {
       _id: g._id, code: g.code, source: g.source,
       guestName: g.guestName, guestPhone: g.guestPhone, customer: g.customer,
       checkIn: g.checkIn, checkOut: g.checkOut, createdAt: g.createdAt,
-      roomNumbers: ms.map((m) => m.room?.roomNumber).filter(Boolean),
-      roomTypeNames: [...new Set(ms.map((m) => m.roomType?.name).filter(Boolean))],
+      // Ẩn phòng đã đổi đi khỏi thẻ danh sách — chỉ hiện dàn phòng hiện tại.
+      roomNumbers: ms.filter((m) => !m.transferredOut).map((m) => m.room?.roomNumber).filter(Boolean),
+      roomTypeNames: [...new Set(ms.filter((m) => !m.transferredOut).map((m) => m.roomType?.name).filter(Boolean))],
       ...roll, // status, roomCount, activeCount, totalAmount, paidAmount, remainingAmount, paymentStatus, depositAmount
     }
   })
@@ -449,7 +450,7 @@ exports.previewTransferGroup = async (accountId, groupId, body = {}) => {
 }
 exports.transferGroup = async (accountId, groupId, body = {}) => {
   await assertGroupInBranch(accountId, groupId)
-  return bookingService.transferGroup(groupId, { items: body.items, vacate: body.vacate, by: accountId })
+  return bookingService.transferGroup(groupId, { items: body.items, vacate: body.vacate, assignees: body.assignees, by: accountId })
 }
 exports.update = async (accountId, bookingId, body = {}) => {
   await assertInBranch(accountId, bookingId)

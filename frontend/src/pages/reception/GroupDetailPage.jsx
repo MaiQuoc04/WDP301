@@ -427,7 +427,8 @@ export default function GroupDetailPage() {
           <h3>Thông tin nhóm</h3>
           <p>Khách: <b>{group.guestName}</b>{group.guestPhone && ` · ${group.guestPhone}`}</p>
           <p>Nhận {fmtDate(group.checkIn)} 14:00 → Trả {fmtDate(group.checkOut)} 12:00</p>
-          <p>Số phòng: <b>{rollup.roomCount}</b>{rollup.activeCount !== rollup.roomCount && ` (còn ${rollup.activeCount} hiệu lực)`}</p>
+          <p>Số phòng: <b>{rollup.roomCount}</b>{rollup.activeCount !== rollup.roomCount && ` (còn ${rollup.activeCount} hiệu lực)`}
+            {rollup.transferredCount > 0 && <small className="rc-muted"> · đã đổi {rollup.transferredCount} phòng</small>}</p>
           {rollup.mixed && <p style={{ color: '#7c3aed' }}>Các phòng đang <b>lệch trạng thái</b>: {mixedSummary(rollup)} — xem bảng bên phải.</p>}
           <p>Tổng khách: {group.adultsTotal} người lớn + {group.childrenTotal} trẻ em</p>
           <p>Thanh toán: <b>{paymentStatusLabel(rollup.paymentStatus)}</b></p>
@@ -448,7 +449,7 @@ export default function GroupDetailPage() {
               <th>Phòng</th><th>Khách</th><th>Trạng thái</th><th>Tình trạng phòng</th><th className="rc-num">Tiền</th><th></th>
             </tr></thead>
             <tbody>
-              {members.map((m) => {
+              {members.filter((m) => !m.transferredOut).map((m) => {
                 const rd = readyOf(m)
                 return (
                   <tr key={m._id}>
@@ -467,6 +468,29 @@ export default function GroupDetailPage() {
             </tbody>
           </table>
           </div>
+
+          {/* Phòng ĐÃ ĐỔI ĐI: khối riêng để lễ tân biết booking nào đã đổi. Tiền vẫn nằm trong tổng nhóm. */}
+          {members.some((m) => m.transferredOut) && (
+            <div className="rc-transferred">
+              <h4>Đã đổi phòng <small className="rc-muted">({members.filter((m) => m.transferredOut).length} phòng — tiền các đêm đã ở vẫn tính vào tổng nhóm)</small></h4>
+              <div className="rc-table-wrap">
+                <table className="rc-table">
+                  <thead><tr><th>Phòng</th><th>Đổi lúc</th><th></th><th className="rc-num">Tiền đã ở</th><th></th></tr></thead>
+                  <tbody>
+                    {members.filter((m) => m.transferredOut).map((m) => (
+                      <tr key={m._id} className="rc-row-muted">
+                        <td><b>{m.room?.roomNumber || '—'}</b><br /><small>{m.roomType?.name}</small></td>
+                        <td><small>{m.transferredAt ? fmtDateTime(m.transferredAt) : '—'}</small></td>
+                        <td><span className="rc-badge s-transferred">Đã đổi phòng</span></td>
+                        <td className="rc-num">{vnd(m.totalAmount)}</td>
+                        <td><Link className="link" to={`/reception/bookings/${m._id}`}>Mở →</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <h3>Hoá đơn gom</h3>
           <table className="rc-bill"><tbody>
